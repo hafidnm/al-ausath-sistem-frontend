@@ -8,18 +8,97 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BookOpen, Users, GraduationCap, Shield, Star, Moon, ArrowLeft } from "lucide-react"
+import { authService } from "@/lib/services/auth.service"
+import { useToast } from "@/hooks/use-toast"
+import { useEffect } from "react"
 
 export default function LoginPage() {
   const [userType, setUserType] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const { toast } = useToast()
 
-  const handleLogin = async (e: React.FormEvent) => {
+  useEffect(() => {
+  const checkUser = async () => {
+    try {
+      const res = await authService.me()
+      if (res?.user) {
+        window.location.replace("/dashboard")
+      }
+    } catch {
+      localStorage.removeItem('user')
+      localStorage.removeItem('role')
+    }
+  }
+  checkUser()
+}, [])
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
+    if (!userType) {
+      toast({
+        title: "Error",
+        description: "Pilih jenis pengguna terlebih dahulu",
+        variant: "destructive",
+      })
+      return
+    }
+
     setIsLoading(true)
-    // Simulate login
-    setTimeout(() => {
-      window.location.href = "/dashboard"
-    }, 1000)
+
+    try {
+      const formData = new FormData(e.currentTarget)
+      const username = formData.get('username') as string
+      const password = formData.get('password') as string
+
+      let role: 'petugas' | 'santri'
+      if (userType === 'admin' || userType === 'guru') {
+        role = 'petugas'
+      } else {
+        role = 'santri'
+      }
+
+      const response = await authService.login({
+        role,
+        username,
+        password,
+      })
+
+      localStorage.setItem('user', JSON.stringify(response.user))
+      localStorage.setItem('role', response.role)
+
+      toast({
+        title: "Login Berhasil!",
+        description: `Selamat datang, ${response.user.nama_lengkap}`,
+      })
+
+      setTimeout(() => {
+        if (role === 'petugas') {
+          if (userType === 'admin') {
+            window.location.href = '/dashboard/admin-panel'
+          } else {
+            window.location.href = '/dashboard/guru-panel'
+          }
+        } else {
+          window.location.href = '/dashboard/santri-panel'
+        }
+      }, 500)
+
+    } catch (error: any) {
+      console.error('Login error:', error)
+
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.errors?.username?.[0] ||
+                          'Login gagal. Periksa kredensial Anda.'
+      
+      toast({
+        title: "Login Gagal",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -115,7 +194,7 @@ export default function LoginPage() {
               <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="userType" className="text-foreground">Masuk Sebagai</Label>
-                  <Select value={userType} onValueChange={setUserType}>
+                  <Select value={userType} onValueChange={setUserType} required>
                     <SelectTrigger id="userType" className="bg-background">
                       <SelectValue placeholder="Pilih jenis pengguna" />
                     </SelectTrigger>
@@ -143,10 +222,13 @@ export default function LoginPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="username" className="text-foreground">Username / NIS</Label>
+                  <Label htmlFor="username" className="text-foreground">
+                    {userType === 'santri' ? 'Username / Nama Akun' : 'Email / Username'}
+                  </Label>
                   <Input
                     id="username"
-                    placeholder="Masukkan username atau NIS"
+                    name="username"
+                    placeholder={userType === 'santri' ? 'Masukkan username' : 'Masukkan email'}
                     className="bg-background"
                     required
                   />
@@ -164,6 +246,7 @@ export default function LoginPage() {
                   </div>
                   <Input
                     id="password"
+                    name="password"
                     type="password"
                     placeholder="Masukkan kata sandi"
                     className="bg-background"

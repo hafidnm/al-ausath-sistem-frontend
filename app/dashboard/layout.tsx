@@ -1,12 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { authService } from "@/lib/services/auth.service"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,7 +66,43 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [user, setUser] = useState<any>(null)
   const pathname = usePathname()
+
+  useEffect(() => {
+  const checkAuth = async () => {
+    const user = await authService.me()
+
+    if (!user) {
+      window.location.replace("/login")
+      return
+    }
+
+    setUser(user.user)
+  }
+
+  checkAuth()
+}, [])
+
+  const handleLogout = async () => {
+  try {
+    await authService.logout()
+  } catch (error) {
+    console.error('Logout backend failed:', error)
+    localStorage.clear()
+  } finally {
+    window.location.replace('/')
+  }
+}
+  // Ambil inisial nama
+  const getInitials = (name: string) => {
+    return name
+      ?.split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2) || 'U'
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -132,17 +169,20 @@ export default function DashboardLayout({
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/50">
               <Avatar className="w-9 h-9">
-                <AvatarImage src="/placeholder-user.jpg" />
                 <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
-                  AD
+                  {user ? getInitials(user.nama_lengkap) : 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">Admin User</p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">admin@pesantren.id</p>
-              </div>
+                <p className="text-sm font-medium text-sidebar-foreground truncate">
+                  {user?.nama_lengkap || 'User'}
+                </p>
+                <p className="text-xs text-sidebar-foreground/60 truncate">
+                  {user?.email || 'user@example.com'}
+                </p>
             </div>
-          </div>
+        </div>
+      </div>
         </div>
       </aside>
 
@@ -177,39 +217,41 @@ export default function DashboardLayout({
 
               {/* User Menu */}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center gap-2 px-2">
-                    <Avatar className="w-8 h-8">
-                      <AvatarImage src="/placeholder-user.jpg" />
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        AD
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="hidden md:block text-sm font-medium text-foreground">Admin</span>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Akun Saya</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="w-4 h-4 mr-2" />
-                    Profil
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Pengaturan
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/" className="text-destructive">
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Keluar
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="flex items-center gap-2 px-2">
+            <Avatar className="w-8 h-8">
+              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                {user ? getInitials(user.nama_lengkap) : 'U'}
+              </AvatarFallback>
+            </Avatar>
+            <span className="hidden md:block text-sm font-medium text-foreground">
+              {user?.nama_lengkap || 'User'}
+            </span>
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Akun Saya</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem>
+            <User className="w-4 h-4 mr-2" />
+            Profil
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <Settings className="w-4 h-4 mr-2" />
+            Pengaturan
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={handleLogout}
+            className="text-destructive cursor-pointer"
+          >
+            <LogOut className="w-4 h-4 mr-2" />
+            Keluar
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
           </div>
         </header>
 
