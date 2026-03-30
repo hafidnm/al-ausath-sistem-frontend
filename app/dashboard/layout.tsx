@@ -38,6 +38,7 @@ import {
   BarChart3,
   UserCog,
   Shield,
+  UserPlus,
 } from "lucide-react"
 
 const menuItems = [
@@ -53,6 +54,7 @@ const menuItems = [
   { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/nilai" },
   { icon: FileText, label: "Rapor", href: "/dashboard/rapor" },
   { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
+  { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: UserCog, label: "Panel Guru", href: "/dashboard/guru-panel" },
   { icon: User, label: "Panel Santri", href: "/dashboard/santri-panel" },
   { icon: Shield, label: "Panel Admin", href: "/dashboard/admin-panel" },
