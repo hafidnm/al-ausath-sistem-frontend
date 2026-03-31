@@ -39,6 +39,7 @@ import {
   BarChart3,
   UserCog,
   Shield,
+  Building2,
 } from "lucide-react"
 
 const menuItems = [
@@ -47,6 +48,7 @@ const menuItems = [
   { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
   { icon: GraduationCap, label: "Data Guru", href: "/dashboard/guru" },
   { icon: School, label: "Data Kelas", href: "/dashboard/kelas" },
+  { icon: Building2, label: "Data Unit", href: "/dashboard/unit" },
   { icon: BookOpen, label: "Mata Pelajaran", href: "/dashboard/mapel" },
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
   { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
