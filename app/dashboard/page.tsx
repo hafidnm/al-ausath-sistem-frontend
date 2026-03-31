@@ -19,6 +19,7 @@ import {
   AlertCircle,
   CheckCircle,
   ClipboardCheck,
+  Wallet,
 } from "lucide-react"
 
 const statsCards = [
@@ -130,6 +131,24 @@ const topStudents = [
   { name: "Siti Aisyah", class: "12 IPA", score: 94.2, rank: 2, attendance: 98 },
   { name: "Muhammad Rizki", class: "11 IPS", score: 93.5, rank: 3, attendance: 96 },
 ]
+
+const ppdbOverview = {
+  gelombang: "Gelombang 2",
+  totalPendaftar: 186,
+  terverifikasi: 142,
+  menunggu: 31,
+  ditolak: 13,
+  deadline: "15 Februari 2025",
+}
+
+const sppOverview = {
+  periode: "Januari 2025",
+  totalTagihan: 1247,
+  lunas: 892,
+  cicilan: 221,
+  menunggak: 134,
+  jatuhTempo: "10 Februari 2025",
+}
 
 const getStatusBadge = (status: string) => {
   switch (status) {
@@ -474,6 +493,109 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
+          {/* PPDB Overview */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-foreground">PPDB</CardTitle>
+                  <CardDescription>Ringkasan penerimaan santri baru</CardDescription>
+                </div>
+                <Badge className="bg-primary/10 text-primary border-0">{ppdbOverview.gelombang}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-xs text-muted-foreground">Total Pendaftar</p>
+                  <p className="text-xl font-bold text-foreground mt-1">{ppdbOverview.totalPendaftar}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-xs text-muted-foreground">Terverifikasi</p>
+                  <p className="text-xl font-bold text-primary mt-1">{ppdbOverview.terverifikasi}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="w-4 h-4" />
+                    Menunggu Verifikasi
+                  </div>
+                  <span className="font-semibold text-foreground">{ppdbOverview.menunggu}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <AlertCircle className="w-4 h-4" />
+                    Ditolak
+                  </div>
+                  <span className="font-semibold text-foreground">{ppdbOverview.ditolak}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                  <span className="text-muted-foreground">Batas Pendaftaran</span>
+                  <span className="font-medium text-foreground">{ppdbOverview.deadline}</span>
+                </div>
+              </div>
+
+              <Link href="/dashboard/ppdb">
+                <Button variant="outline" className="w-full justify-start bg-transparent">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Kelola PPDB
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          {/* SPP Overview */}
+          <Card className="border-border/50">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg text-foreground">SPP</CardTitle>
+                  <CardDescription>Ringkasan pembayaran SPP santri</CardDescription>
+                </div>
+                <Badge className="bg-accent/20 text-accent border-0">{sppOverview.periode}</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-xs text-muted-foreground">Total Tagihan</p>
+                  <p className="text-xl font-bold text-foreground mt-1">{sppOverview.totalTagihan}</p>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border/50">
+                  <p className="text-xs text-muted-foreground">Lunas</p>
+                  <p className="text-xl font-bold text-primary mt-1">{sppOverview.lunas}</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Cicilan</span>
+                  <span className="font-semibold text-foreground">{sppOverview.cicilan}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <AlertCircle className="w-4 h-4" />
+                    Menunggak
+                  </div>
+                  <span className="font-semibold text-foreground">{sppOverview.menunggak}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                  <span className="text-muted-foreground">Jatuh Tempo Berikutnya</span>
+                  <span className="font-medium text-foreground">{sppOverview.jatuhTempo}</span>
+                </div>
+              </div>
+
+              <Link href="/dashboard/spp">
+                <Button variant="outline" className="w-full justify-start bg-transparent">
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Kelola SPP
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
           {/* Top Students */}
           <Card className="border-border/50">
             <CardHeader className="pb-4">
@@ -543,6 +665,12 @@ export default function DashboardPage() {
                 <Button variant="outline" className="w-full justify-start bg-transparent">
                   <FileText className="w-4 h-4 mr-2" />
                   Cetak Rapor
+                </Button>
+              </Link>
+              <Link href="/dashboard/spp">
+                <Button variant="outline" className="w-full justify-start bg-transparent">
+                  <Wallet className="w-4 h-4 mr-2" />
+                  Kelola SPP
                 </Button>
               </Link>
             </CardContent>
