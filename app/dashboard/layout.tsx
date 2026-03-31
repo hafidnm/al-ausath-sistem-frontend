@@ -41,6 +41,7 @@ import {
   Shield,
   UserPlus,
   Wallet,
+  Building2,
 } from "lucide-react"
 
 const menuItems = [
