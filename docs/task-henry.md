@@ -14,8 +14,8 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 
 ### Scope Endpoint Henry
 
-- [ ] Bobot nilai
-- [ ] KKM mapel
+- [~] Bobot nilai
+- [~] KKM mapel
 - [ ] Konversi nilai
 - [ ] Nilai akhlak
 - [ ] Nilai mapel
@@ -29,30 +29,30 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 
 View target:
 
-- [ ] `GET /api/akademik/bobot` -> View List Bobot (`/petugas/akademik/bobot`)
-- [ ] `POST /api/akademik/bobot` -> View Form Bobot (`/petugas/akademik/bobot/new`)
-- [ ] `PUT /api/akademik/bobot/{id}` -> View Form Edit Bobot (`/petugas/akademik/bobot/:id/edit`)
-- [ ] `DELETE /api/akademik/bobot/{id}` -> Action delete di View List Bobot
-- [ ] `POST /api/akademik/bobot/set-default` -> Action set default di View List Bobot
+- [~] `GET /api/akademik/bobot` -> View List Bobot (`/dashboard/admin-panel/bobot`)
+- [~] `POST /api/akademik/bobot` -> View Form Bobot (`/dashboard/admin-panel/bobot/new`)
+- [~] `PUT /api/akademik/bobot/{id}` -> View Form Edit Bobot (`/dashboard/admin-panel/bobot/:id/edit`)
+- [~] `DELETE /api/akademik/bobot/{id}` -> Action delete di View List Bobot
+- [~] `POST /api/akademik/bobot/set-default` -> Action set default di View List Bobot
 
 Acceptance flow client:
 
-- [ ] Bobot default harus 20% tugas, 30% ulangan, 50% ujian akhir
-- [ ] Bobot berlaku sama untuk semua mapel
+- [~] Bobot default harus 20% tugas, 30% ulangan, 50% ujian akhir
+- [~] Bobot berlaku sama untuk semua mapel
 
 #### B. KKM Mapel
 
 View target:
 
-- [ ] `GET /api/akademik/kkm-mapel` -> View List KKM (`/petugas/akademik/kkm`)
-- [ ] `POST /api/akademik/kkm-mapel` -> View Form KKM (`/petugas/akademik/kkm/new`)
-- [ ] `PUT /api/akademik/kkm-mapel/{id}` -> View Form Edit KKM (`/petugas/akademik/kkm/:id/edit`)
-- [ ] `DELETE /api/akademik/kkm-mapel/{id}` -> Action delete di View List KKM
+- [~] `GET /api/akademik/kkm-mapel` -> View List KKM (`/dashboard/admin-panel/kkm`)
+- [~] `POST /api/akademik/kkm-mapel` -> View Form KKM (`/dashboard/admin-panel/kkm/new`)
+- [~] `PUT /api/akademik/kkm-mapel/{id}` -> View Form Edit KKM (`/dashboard/admin-panel/kkm/:id/edit`)
+- [~] `DELETE /api/akademik/kkm-mapel/{id}` -> Action delete di View List KKM
 
 Acceptance flow client:
 
-- [ ] KKM dikelola guru mapel
-- [ ] KKM antar jenjang diset sama (MTQU/MTS/Aliyah tidak dibedakan)
+- [~] KKM dikelola guru mapel
+- [~] KKM antar jenjang diset sama (MTQU/MTS/Aliyah tidak dibedakan)
 
 #### C. Konversi Nilai
 
@@ -162,30 +162,30 @@ Acceptance flow client:
 
 ### View
 
-- [ ] View List Bobot (`/petugas/akademik/bobot`)
-- [ ] View Form Tambah/Edit Bobot (`/petugas/akademik/bobot/new`, `/petugas/akademik/bobot/:id/edit`)
+- [x] View List Bobot (`/dashboard/admin-panel/bobot`)
+- [x] View Form Tambah/Edit Bobot (`/dashboard/admin-panel/bobot/new`, `/dashboard/admin-panel/bobot/:id/edit`)
 
 ### Task Endpoint
 
-- [ ] `GET /api/akademik/bobot` -> tampilkan tabel bobot + pagination
-- [ ] `POST /api/akademik/bobot` -> implement create bobot
-- [ ] `PUT /api/akademik/bobot/{id}` -> implement update bobot
-- [ ] `DELETE /api/akademik/bobot/{id}` -> implement delete bobot
-- [ ] `POST /api/akademik/bobot/set-default` -> implement tombol set default 20/30/50
+- [~] `GET /api/akademik/bobot` -> tampilkan tabel bobot + pagination
+- [~] `POST /api/akademik/bobot` -> implement create bobot
+- [~] `PUT /api/akademik/bobot/{id}` -> implement update bobot
+- [~] `DELETE /api/akademik/bobot/{id}` -> implement delete bobot
+- [~] `POST /api/akademik/bobot/set-default` -> implement tombol set default 20/30/50
 
 ## 4. Akademik - KKM Mapel
 
 ### View
 
-- [ ] View List KKM (`/petugas/akademik/kkm`)
-- [ ] View Form Tambah/Edit KKM (`/petugas/akademik/kkm/new`, `/petugas/akademik/kkm/:id/edit`)
+- [x] View List KKM (`/dashboard/admin-panel/kkm`)
+- [x] View Form Tambah/Edit KKM (`/dashboard/admin-panel/kkm/new`, `/dashboard/admin-panel/kkm/:id/edit`)
 
 ### Task Endpoint
 
-- [ ] `GET /api/akademik/kkm-mapel` -> list KKM + filter `kode_mapel`, `tahun_ajaran`, `semester`, `kode_unit`, `per_page`
-- [ ] `POST /api/akademik/kkm-mapel` -> create KKM + handling error 422 duplicate
-- [ ] `PUT /api/akademik/kkm-mapel/{id}` -> update KKM + handling 403/422
-- [ ] `DELETE /api/akademik/kkm-mapel/{id}` -> delete KKM + handling 403
+- [~] `GET /api/akademik/kkm-mapel` -> list KKM + filter `kode_mapel`, `tahun_ajaran`, `semester`, `kode_unit`, `per_page`
+- [~] `POST /api/akademik/kkm-mapel` -> create KKM + handling error 422 duplicate
+- [~] `PUT /api/akademik/kkm-mapel/{id}` -> update KKM + handling 403/422
+- [~] `DELETE /api/akademik/kkm-mapel/{id}` -> delete KKM + handling 403
 
 ## 5. Akademik - Konversi Nilai
 

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import {
   Clock,
   Weight,
+  ClipboardList,
   ArrowRight,
 } from "lucide-react"
 
@@ -33,6 +34,13 @@ export function AdminPanelHome() {
       href: "/dashboard/admin-panel/bobot",
       color: "bg-accent/20 text-accent",
     },
+    {
+      title: "KKM Mapel",
+      description: "Kelola nilai KKM berdasarkan mapel, tahun ajaran, semester, dan unit",
+      icon: <ClipboardList className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/kkm",
+      color: "bg-chart-3/20 text-chart-4",
+    },
   ]
 
   return (
@@ -44,7 +52,7 @@ export function AdminPanelHome() {
       </div>
 
       {/* Module Grid */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
         {modules.map((module) => (
           <Link key={module.href} href={module.href}>
             <Card className="border-border/50 cursor-pointer hover:shadow-lg transition-shadow h-full">
