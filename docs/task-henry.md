@@ -16,7 +16,7 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 
 - [~] Bobot nilai
 - [~] KKM mapel
-- [ ] Konversi nilai
+- [~] Konversi nilai
 - [ ] Nilai akhlak
 - [ ] Nilai mapel
 - [ ] Raport catatan wali
@@ -58,10 +58,10 @@ Acceptance flow client:
 
 View target:
 
-- [ ] `GET /api/akademik/konversi-nilai` -> View List Konversi (`/petugas/akademik/konversi`)
-- [ ] `POST /api/akademik/konversi-nilai` -> View Form Konversi (`/petugas/akademik/konversi/new`)
-- [ ] `PUT /api/akademik/konversi-nilai/{id}` -> View Form Edit Konversi (`/petugas/akademik/konversi/:id/edit`)
-- [ ] `DELETE /api/akademik/konversi-nilai/{id}` -> Action delete di View List Konversi
+- [~] `GET /api/akademik/konversi-nilai` -> View List Konversi (`/dashboard/admin-panel/konversi`)
+- [~] `POST /api/akademik/konversi-nilai` -> View Form Konversi (`/dashboard/admin-panel/konversi/new`)
+- [~] `PUT /api/akademik/konversi-nilai/{id}` -> View Form Edit Konversi (`/dashboard/admin-panel/konversi/:id/edit`)
+- [~] `DELETE /api/akademik/konversi-nilai/{id}` -> Action delete di View List Konversi
 
 Acceptance flow client:
 
@@ -191,15 +191,15 @@ Acceptance flow client:
 
 ### View
 
-- [ ] View List Konversi (`/petugas/akademik/konversi`)
-- [ ] View Form Tambah/Edit Konversi (`/petugas/akademik/konversi/new`, `/petugas/akademik/konversi/:id/edit`)
+- [x] View List Konversi (`/dashboard/admin-panel/konversi`)
+- [x] View Form Tambah/Edit Konversi (`/dashboard/admin-panel/konversi/new`, `/dashboard/admin-panel/konversi/:id/edit`)
 
 ### Task Endpoint
 
-- [ ] `GET /api/akademik/konversi-nilai` -> list konversi + pagination
-- [ ] `POST /api/akademik/konversi-nilai` -> create konversi nilai
-- [ ] `PUT /api/akademik/konversi-nilai/{id}` -> update konversi nilai
-- [ ] `DELETE /api/akademik/konversi-nilai/{id}` -> delete konversi nilai
+- [~] `GET /api/akademik/konversi-nilai` -> list konversi + pagination
+- [~] `POST /api/akademik/konversi-nilai` -> create konversi nilai
+- [~] `PUT /api/akademik/konversi-nilai/{id}` -> update konversi nilai
+- [~] `DELETE /api/akademik/konversi-nilai/{id}` -> delete konversi nilai
 
 ## 6. Akademik - Nilai Mapel
 

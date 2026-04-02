@@ -7,6 +7,7 @@ import {
   Clock,
   Weight,
   ClipboardList,
+  ArrowUpDown,
   ArrowRight,
 } from "lucide-react"
 
@@ -40,6 +41,13 @@ export function AdminPanelHome() {
       icon: <ClipboardList className="w-6 h-6" />,
       href: "/dashboard/admin-panel/kkm",
       color: "bg-chart-3/20 text-chart-4",
+    },
+    {
+      title: "Konversi Nilai",
+      description: "Kelola rentang nilai ke huruf dan predikat untuk konsistensi rapor",
+      icon: <ArrowUpDown className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/konversi",
+      color: "bg-chart-2/20 text-chart-2",
     },
   ]
 
