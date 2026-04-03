@@ -13,9 +13,9 @@ export interface NilaiAkhlakItem {
 }
 
 export interface GetNilaiAkhlakParams {
-  nomor_induk: string
   tahun_ajaran?: string
   semester?: string
+  aspek?: string
   per_page?: string
 }
 
@@ -62,8 +62,19 @@ const extractList = (payload: any): any[] => {
 }
 
 const normalizeNilaiAkhlakItem = (raw: any): NilaiAkhlakItem => {
+  const rawId =
+    raw?.id
+    ?? raw?.id_nilai_akhlak
+    ?? raw?.nilai_akhlak_id
+    ?? raw?.id_akhlak
+    ?? raw?.id_nilai_karakter
+    ?? raw?.nilai_akhlak?.nilai_akhlak_id
+    ?? raw?.nilai_akhlak?.id_akhlak
+    ?? raw?.nilai_akhlak?.id
+    ?? raw?.nilai_akhlak?.id_nilai_akhlak
+
   return {
-    id: toNumber(raw?.id ?? raw?.id_nilai_akhlak, -1),
+    id: toNumber(rawId, -1),
     nomor_induk: toText(raw?.nomor_induk ?? raw?.santri?.nomor_induk) ?? "",
     nama_santri: toText(raw?.nama_santri ?? raw?.santri?.nama_lengkap ?? raw?.santri?.nama),
     tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
@@ -81,6 +92,11 @@ export const nilaiAkhlakService = {
     return extractList(response.data).map(normalizeNilaiAkhlakItem)
   },
 
+  async getAllBar(params?: Omit<GetNilaiAkhlakParams, "nomor_induk">): Promise<NilaiAkhlakItem[]> {
+    const response = await api.get("/akademik/nilai-akhlak/bar", { params })
+    return extractList(response.data).map(normalizeNilaiAkhlakItem)
+  },
+
   async upsert(payload: UpsertNilaiAkhlakPayload): Promise<NilaiAkhlakItem> {
     const response = await api.post("/akademik/nilai-akhlak", {
       nomor_induk: payload.nomor_induk,
@@ -93,5 +109,9 @@ export const nilaiAkhlakService = {
     })
 
     return normalizeNilaiAkhlakItem(response.data?.data ?? response.data)
+  },
+
+  async remove(id: number): Promise<void> {
+    await api.delete(`/akademik/nilai-akhlak/${id}`)
   },
 }

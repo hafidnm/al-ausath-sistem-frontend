@@ -224,7 +224,7 @@ Acceptance flow client:
 
 ### Task Endpoint
 
-- [~] `GET /api/akademik/nilai-akhlak` -> list nilai akhlak per `nomor_induk`
+- [~] `GET /api/akademik/nilai-akhlak/bar` -> list semua nilai akhlak tanpa `nomor_induk`
 - [~] `POST /api/akademik/nilai-akhlak` -> upsert nilai akhlak
 
 ## 8. Akademik - Keseharian dan Catatan Wali
