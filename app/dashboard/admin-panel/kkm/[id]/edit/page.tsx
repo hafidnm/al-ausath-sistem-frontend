@@ -11,6 +11,7 @@ export default function KkmEditPage() {
   const id = Number(params.id)
   const [selected, setSelected] = useState<KkmItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [submitError, setSubmitError] = useState("")
 
   useEffect(() => {
     const fetchDetail = async () => {
@@ -55,10 +56,12 @@ export default function KkmEditPage() {
     keterangan?: string
   }) => {
     try {
+      setSubmitError("")
       await kkmService.update(id, data)
       router.push("/dashboard/admin-panel/kkm")
-    } catch (error) {
-      console.error(error)
+    } catch (error: any) {
+      setSubmitError(error?.response?.data?.message || "Gagal memperbarui data KKM")
+      throw error
     }
   }
 
@@ -71,6 +74,7 @@ export default function KkmEditPage() {
 
       <KkmForm
         isEdit
+        submitError={submitError}
         initialData={{
           kode_mapel: selected.kode_mapel,
           tahun_ajaran: selected.tahun_ajaran,

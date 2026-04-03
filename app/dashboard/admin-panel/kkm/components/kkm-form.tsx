@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle } from "lucide-react"
-import { mapelOptions, semesterOptions, tahunAjaranOptions, unitOptions } from "../utils/constants"
+import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 import { isValidKkm } from "../utils/helpers"
 
 interface KkmFormPayload {
@@ -30,18 +30,20 @@ interface KkmFormPayload {
 interface KkmFormProps {
   isEdit?: boolean
   initialData?: KkmFormPayload
-  onSubmit?: (data: KkmFormPayload) => void
+  submitError?: string
+  onSubmit?: (data: KkmFormPayload) => Promise<void> | void
   onCancel?: () => void
 }
 
-export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: KkmFormProps) {
+export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, onCancel }: KkmFormProps) {
   const [kodeMapel, setKodeMapel] = useState(initialData?.kode_mapel ?? "")
   const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
   const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm ?? 75)
-  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit ?? "global")
+  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit ?? "")
   const [keterangan, setKeterangan] = useState(initialData?.keterangan ?? "")
   const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
     if (!initialData) return
@@ -50,14 +52,17 @@ export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: Kkm
     setTahunAjaran(initialData.tahun_ajaran)
     setSemester(String(initialData.semester))
     setNilaiKkm(initialData.nilai_kkm)
-    setKodeUnit(initialData.kode_unit ?? "global")
+    setKodeUnit(initialData.kode_unit ?? "")
     setKeterangan(initialData.keterangan ?? "")
   }, [initialData])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!kodeMapel || !tahunAjaran || !semester) {
+    const normalizedKodeMapel = kodeMapel.trim().toUpperCase()
+    const normalizedUnit = kodeUnit.trim().toUpperCase()
+
+    if (!normalizedKodeMapel || !tahunAjaran || !semester) {
       setError("Field wajib belum lengkap")
       return
     }
@@ -67,14 +72,23 @@ export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: Kkm
       return
     }
 
-    onSubmit?.({
-      kode_mapel: kodeMapel,
-      tahun_ajaran: tahunAjaran,
-      semester: Number(semester),
-      nilai_kkm: nilaiKkm,
-      kode_unit: kodeUnit,
-      keterangan,
-    })
+    try {
+      setIsSubmitting(true)
+      setError("")
+
+      await onSubmit?.({
+        kode_mapel: normalizedKodeMapel,
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+        nilai_kkm: nilaiKkm,
+        kode_unit: normalizedUnit || undefined,
+        keterangan,
+      })
+    } catch {
+      // Error API ditangani oleh parent melalui submitError.
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -92,19 +106,21 @@ export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: Kkm
             </Alert>
           )}
 
+          {!error && submitError && (
+            <Alert className="bg-destructive/10 border-destructive/30">
+              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <AlertDescription className="text-destructive ml-2">{submitError}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Kode Mapel</Label>
-              <Select value={kodeMapel} onValueChange={(v) => { setKodeMapel(v); setError("") }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih mapel" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mapelOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                value={kodeMapel}
+                onChange={(e) => { setKodeMapel(e.target.value); setError("") }}
+                placeholder="Contoh: MATH-01"
+              />
             </div>
 
             <div className="space-y-2">
@@ -147,17 +163,12 @@ export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: Kkm
             </div>
 
             <div className="space-y-2">
-              <Label>Kode Unit (opsional)</Label>
-              <Select value={kodeUnit} onValueChange={setKodeUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {unitOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Kode Unit (opsional, kosongkan untuk global)</Label>
+              <Input
+                value={kodeUnit}
+                onChange={(e) => { setKodeUnit(e.target.value); setError("") }}
+                placeholder="Contoh: U01"
+              />
             </div>
           </div>
 
@@ -175,7 +186,7 @@ export function KkmForm({ isEdit = false, initialData, onSubmit, onCancel }: Kkm
             <Button type="button" variant="outline" className="bg-transparent" onClick={onCancel}>
               Batal
             </Button>
-            <Button type="submit">{isEdit ? "Simpan Perubahan" : "Simpan KKM"}</Button>
+            <Button type="submit" disabled={isSubmitting}>{isEdit ? "Simpan Perubahan" : "Simpan KKM"}</Button>
           </div>
         </form>
       </CardContent>

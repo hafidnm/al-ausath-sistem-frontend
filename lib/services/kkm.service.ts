@@ -63,6 +63,15 @@ export interface GetKkmParams {
   per_page?: string
 }
 
+export interface KkmPayload {
+  kode_mapel: string
+  tahun_ajaran: string
+  semester: number
+  nilai_kkm: number
+  kode_unit?: string | null
+  keterangan?: string
+}
+
 const normalizeKkmItem = (raw: any): KkmItem => {
   const rawId = raw?.id ?? raw?.id_kkm ?? raw?.idKkm
 
@@ -87,6 +96,21 @@ const extractList = (payload: any): any[] => {
   return []
 }
 
+const normalizePayload = (payload: KkmPayload): KkmPayload => {
+  const kodeMapel = payload.kode_mapel?.trim()
+  const tahunAjaran = payload.tahun_ajaran?.trim()
+  const kodeUnitRaw = typeof payload.kode_unit === "string" ? payload.kode_unit.trim() : payload.kode_unit
+  const keteranganRaw = payload.keterangan?.trim()
+
+  return {
+    ...payload,
+    kode_mapel: kodeMapel,
+    tahun_ajaran: tahunAjaran,
+    kode_unit: kodeUnitRaw ? kodeUnitRaw : null,
+    keterangan: keteranganRaw ? keteranganRaw : undefined,
+  }
+}
+
 export const kkmService = {
   async getAll(params?: GetKkmParams): Promise<KkmItem[]> {
     const response = await api.get("/akademik/kkm-mapel", { params })
@@ -100,14 +124,14 @@ export const kkmService = {
     return normalizeKkmItem(raw)
   },
 
-  async create(payload: Omit<KkmItem, "id" | "mapel" | "updatedAt">): Promise<KkmItem> {
-    const response = await api.post("/akademik/kkm-mapel", payload)
+  async create(payload: KkmPayload): Promise<KkmItem> {
+    const response = await api.post("/akademik/kkm-mapel", normalizePayload(payload))
     const raw = response.data?.data ?? response.data
     return normalizeKkmItem(raw)
   },
 
-  async update(id: number, payload: Omit<KkmItem, "id" | "mapel" | "updatedAt">): Promise<KkmItem> {
-    const response = await api.put(`/akademik/kkm-mapel/${id}`, payload)
+  async update(id: number, payload: KkmPayload): Promise<KkmItem> {
+    const response = await api.put(`/akademik/kkm-mapel/${id}`, normalizePayload(payload))
     const raw = response.data?.data ?? response.data
     return normalizeKkmItem(raw)
   },

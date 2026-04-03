@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { KkmForm } from "../components/kkm-form"
 import { kkmService } from "@/lib/services/kkm.service"
 
 export default function KkmNewPage() {
   const router = useRouter()
+  const [submitError, setSubmitError] = useState("")
 
   const handleSubmit = async (data: {
     kode_mapel: string
@@ -16,10 +18,12 @@ export default function KkmNewPage() {
     keterangan?: string
   }) => {
     try {
+      setSubmitError("")
       await kkmService.create(data)
       router.push("/dashboard/admin-panel/kkm")
-    } catch (error) {
-      console.error(error)
+    } catch (error: any) {
+      setSubmitError(error?.response?.data?.message || "Gagal menambahkan data KKM")
+      throw error
     }
   }
 
@@ -30,7 +34,7 @@ export default function KkmNewPage() {
         <p className="text-muted-foreground">Buat data KKM baru untuk mapel dan semester tertentu</p>
       </div>
 
-      <KkmForm onSubmit={handleSubmit} onCancel={() => router.back()} />
+      <KkmForm submitError={submitError} onSubmit={handleSubmit} onCancel={() => router.back()} />
     </div>
   )
 }
