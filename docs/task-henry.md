@@ -17,7 +17,7 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 - [~] Bobot nilai
 - [~] KKM mapel
 - [~] Konversi nilai
-- [ ] Nilai akhlak
+- [~] Nilai akhlak
 - [ ] Nilai mapel
 - [ ] Raport catatan wali
 - [ ] Raport generate
@@ -71,8 +71,8 @@ Acceptance flow client:
 
 View target:
 
-- [ ] `GET /api/akademik/nilai-akhlak` -> View List Nilai Akhlak (`/petugas/akademik/nilai-akhlak`)
-- [ ] `POST /api/akademik/nilai-akhlak` -> View Form Input Nilai Akhlak (`/petugas/akademik/nilai-akhlak/new`)
+- [~] `GET /api/akademik/nilai-akhlak` -> View List Nilai Akhlak (`/dashboard/admin-panel/nilai-akhlak`)
+- [~] `POST /api/akademik/nilai-akhlak` -> View Form Input Nilai Akhlak (`/dashboard/admin-panel/nilai-akhlak/new`)
 
 Acceptance flow client:
 
@@ -83,7 +83,7 @@ Acceptance flow client:
 View target:
 
 - [ ] `GET /api/akademik/nilai-mapel` -> View List Nilai Mapel (`/petugas/akademik/nilai-mapel`)
-- [ ] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/petugas/akademik/nilai-mapel/new`)
+-   [ ] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/petugas/akademik/nilai-mapel/new`)
 - [ ] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> View Detail Nilai Mapel (`/petugas/akademik/nilai-mapel/:kode_mapel`)
 
 Acceptance flow client:
@@ -219,13 +219,13 @@ Acceptance flow client:
 
 ### View
 
-- [ ] View List Nilai Akhlak (`/petugas/akademik/nilai-akhlak`)
-- [ ] View Form Upsert Nilai Akhlak (`/petugas/akademik/nilai-akhlak/new`)
+- [x] View List Nilai Akhlak (`/dashboard/admin-panel/nilai-akhlak`)
+- [x] View Form Upsert Nilai Akhlak (`/dashboard/admin-panel/nilai-akhlak/new`)
 
 ### Task Endpoint
 
-- [ ] `GET /api/akademik/nilai-akhlak` -> list nilai akhlak per `nomor_induk`
-- [ ] `POST /api/akademik/nilai-akhlak` -> upsert nilai akhlak
+- [~] `GET /api/akademik/nilai-akhlak` -> list nilai akhlak per `nomor_induk`
+- [~] `POST /api/akademik/nilai-akhlak` -> upsert nilai akhlak
 
 ## 8. Akademik - Keseharian dan Catatan Wali
 

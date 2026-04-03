@@ -8,6 +8,7 @@ import {
   Weight,
   ClipboardList,
   ArrowUpDown,
+  HeartHandshake,
   ArrowRight,
 } from "lucide-react"
 
@@ -48,6 +49,13 @@ export function AdminPanelHome() {
       icon: <ArrowUpDown className="w-6 h-6" />,
       href: "/dashboard/admin-panel/konversi",
       color: "bg-chart-2/20 text-chart-2",
+    },
+    {
+      title: "Nilai Akhlak",
+      description: "Input nilai akhlak santri berbasis angka secara sederhana",
+      icon: <HeartHandshake className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/nilai-akhlak",
+      color: "bg-emerald-500/15 text-emerald-600",
     },
   ]
 
