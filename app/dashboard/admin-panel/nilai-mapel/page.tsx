@@ -59,6 +59,16 @@ export default function NilaiMapelPage() {
     router.push(`/dashboard/admin-panel/nilai-mapel/${encodeURIComponent(item.kode_mapel)}?${query.toString()}`)
   }
 
+  const handleDelete = async (id: number) => {
+    try {
+      setError("")
+      await nilaiMapelService.remove(id)
+      await fetchNilaiMapel()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menghapus data nilai mapel")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <NilaiMapelHeader
@@ -87,6 +97,7 @@ export default function NilaiMapelPage() {
         isLoading={isLoading}
         error={error}
         onDetail={handleDetail}
+        onDelete={handleDelete}
       />
     </div>
   )

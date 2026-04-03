@@ -113,7 +113,7 @@ const normalizeUlanganItem = (raw: any): NilaiMapelUlanganItem => ({
 })
 
 const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
-  const rawId = raw?.id ?? raw?.id_nilai_mapel ?? raw?.nilai_mapel_id
+  const rawId = raw?.id ?? raw?.id_nilai ?? raw?.id_nilai_mapel ?? raw?.nilai_mapel_id
 
   const tugasRaw = Array.isArray(raw?.tugas) ? raw.tugas : []
   const ulanganRaw = Array.isArray(raw?.ulangan) ? raw.ulangan : []
@@ -154,5 +154,9 @@ export const nilaiMapelService = {
     const response = await api.post("/akademik/nilai-mapel", payload)
     const raw = response.data?.data ?? response.data
     return normalizeNilaiMapelItem(raw)
+  },
+
+  async remove(id: number): Promise<void> {
+    await api.delete(`/akademik/nilai-mapel/${id}`)
   },
 }
