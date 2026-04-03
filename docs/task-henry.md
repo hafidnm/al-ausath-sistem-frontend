@@ -83,7 +83,7 @@ Acceptance flow client:
 View target:
 
 - [ ] `GET /api/akademik/nilai-mapel` -> View List Nilai Mapel (`/petugas/akademik/nilai-mapel`)
--   [ ] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/petugas/akademik/nilai-mapel/new`)
+- [ ] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/petugas/akademik/nilai-mapel/new`)
 - [ ] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> View Detail Nilai Mapel (`/petugas/akademik/nilai-mapel/:kode_mapel`)
 
 Acceptance flow client:
