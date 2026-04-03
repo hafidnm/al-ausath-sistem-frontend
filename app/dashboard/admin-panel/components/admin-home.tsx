@@ -9,6 +9,7 @@ import {
   ClipboardList,
   ArrowUpDown,
   HeartHandshake,
+  BookMarked,
   ArrowRight,
 } from "lucide-react"
 
@@ -56,6 +57,13 @@ export function AdminPanelHome() {
       icon: <HeartHandshake className="w-6 h-6" />,
       href: "/dashboard/admin-panel/nilai-akhlak",
       color: "bg-emerald-500/15 text-emerald-600",
+    },
+    {
+      title: "Nilai Mapel",
+      description: "Input komponen tugas, ulangan, ujian akhir, dan lihat detail nilai mapel",
+      icon: <BookMarked className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/nilai-mapel",
+      color: "bg-sky-500/15 text-sky-600",
     },
   ]
 

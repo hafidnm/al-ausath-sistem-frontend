@@ -18,7 +18,7 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 - [~] KKM mapel
 - [~] Konversi nilai
 - [~] Nilai akhlak
-- [ ] Nilai mapel
+- [~] Nilai mapel
 - [ ] Raport catatan wali
 - [ ] Raport generate
 - [ ] Raport pdf
@@ -82,9 +82,9 @@ Acceptance flow client:
 
 View target:
 
-- [ ] `GET /api/akademik/nilai-mapel` -> View List Nilai Mapel (`/petugas/akademik/nilai-mapel`)
-- [ ] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/petugas/akademik/nilai-mapel/new`)
-- [ ] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> View Detail Nilai Mapel (`/petugas/akademik/nilai-mapel/:kode_mapel`)
+- [~] `GET /api/akademik/nilai-mapel` -> View List Nilai Mapel (`/dashboard/admin-panel/nilai-mapel`)
+- [~] `POST /api/akademik/nilai-mapel` -> View Form Input Nilai Mapel (`/dashboard/admin-panel/nilai-mapel/new`)
+- [~] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> View Detail Nilai Mapel (`/dashboard/admin-panel/nilai-mapel/:kode_mapel`)
 
 Acceptance flow client:
 
@@ -205,15 +205,15 @@ Acceptance flow client:
 
 ### View
 
-- [ ] View List Nilai Mapel (`/petugas/akademik/nilai-mapel`)
-- [ ] View Form Input/Edit Nilai Mapel (`/petugas/akademik/nilai-mapel/new`, `/petugas/akademik/nilai-mapel/:id/edit`)
-- [ ] View Detail Nilai Mapel (`/petugas/akademik/nilai-mapel/:kode_mapel`)
+- [x] View List Nilai Mapel (`/dashboard/admin-panel/nilai-mapel`)
+- [x] View Form Input Nilai Mapel (`/dashboard/admin-panel/nilai-mapel/new`)
+- [x] View Detail Nilai Mapel (`/dashboard/admin-panel/nilai-mapel/:kode_mapel`)
 
 ### Task Endpoint
 
-- [ ] `GET /api/akademik/nilai-mapel` -> list nilai mapel dengan query `nomor_induk` (wajib) + filter opsional
-- [ ] `POST /api/akademik/nilai-mapel` -> upsert nilai mapel (dynamic rows tugas/ulangan, minimal 3 item)
-- [ ] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> detail nilai mapel per mapel
+- [~] `GET /api/akademik/nilai-mapel` -> list nilai mapel dengan query `nomor_induk` (wajib) + filter opsional
+- [~] `POST /api/akademik/nilai-mapel` -> upsert nilai mapel (dynamic rows tugas/ulangan, minimal 3 item)
+- [~] `GET /api/akademik/nilai-mapel/{kode_mapel}` -> detail nilai mapel per mapel
 
 ## 7. Akademik - Nilai Akhlak
 
