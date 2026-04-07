@@ -19,8 +19,8 @@ Guideline utama section ini mengacu ke `docs/client-flow.md`.
 - [~] Konversi nilai
 - [~] Nilai akhlak
 - [~] Nilai mapel
-- [ ] Raport catatan wali
-- [ ] Raport generate
+- [~] Raport catatan wali
+- [~] Raport generate
 - [ ] Raport pdf
 
 ### Mapping Endpoint -> View -> Task
@@ -100,11 +100,15 @@ Acceptance flow client:
 
 View target:
 
-- [ ] `GET /api/akademik/raport/catatan-wali` -> View Form Catatan Wali (`/petugas/akademik/rapor/catatan-wali`)
-- [ ] `POST /api/akademik/raport/catatan-wali` -> Action simpan catatan di View Form Catatan Wali
+- [~] `GET /api/akademik/raport/catatan-wali` -> Panel Catatan Wali di View Operasional Rapor (`/petugas/akademik/rapor`)
+- [~] `POST /api/akademik/raport/catatan-wali` -> Action simpan catatan di panel Catatan Wali pada halaman yang sama
 
 Acceptance flow client:
 
+- [~] Pencarian santri berdasarkan nama/nomor induk tersedia di halaman operasional rapor
+- [~] Dari hasil pencarian, petugas bisa preview PDF rapor
+- [~] Input catatan wali hanya aktif jika data rapor sudah di-generate (sudah ada record rapor)
+- [~] Jika rapor belum ada, form catatan wali disabled dan tampilkan info "generate rapor dulu"
 - [ ] Catatan berisi pengembangan diri, akhlak/adab, akademis, dan pesan wali kelas
 - [ ] Nomor induk wajib terisi saat submit
 
@@ -112,10 +116,11 @@ Acceptance flow client:
 
 View target:
 
-- [ ] `POST /api/akademik/raport/generate` -> Action generate di View Operasional Rapor (`/petugas/akademik/rapor`)
+- [~] `POST /api/akademik/raport/generate` -> Action generate di View Operasional Rapor (`/petugas/akademik/rapor`)
 
 Acceptance flow client:
 
+- [~] Generate menjadi prasyarat sebelum input catatan wali
 - [ ] Generate menghitung nilai berdasarkan bobot 20/30/50
 - [ ] Rata-rata rapor desimal dibulatkan 2 angka di belakang koma
 - [ ] Urutan peringkat mengikuti rata-rata rapor (sesuai rumus kebijakan client)
@@ -227,19 +232,16 @@ Acceptance flow client:
 - [~] `GET /api/akademik/nilai-akhlak/bar` -> list semua nilai akhlak tanpa `nomor_induk`
 - [~] `POST /api/akademik/nilai-akhlak` -> upsert nilai akhlak
 
-## 8. Akademik - Keseharian dan Catatan Wali
+## 8. Akademik - Keseharian
 
 ### View
 
 - [ ] View Form Keseharian (`/petugas/akademik/rapor/keseharian`)
-- [ ] View Form Catatan Wali (`/petugas/akademik/rapor/catatan-wali`)
 
 ### Task Endpoint
 
 - [ ] `GET /api/akademik/raport/keseharian` -> fetch data keseharian
 - [ ] `POST /api/akademik/raport/keseharian` -> submit/update data keseharian
-- [ ] `GET /api/akademik/raport/catatan-wali` -> fetch catatan wali
-- [ ] `POST /api/akademik/raport/catatan-wali` -> submit/update catatan wali
 
 ## 9. Akademik - Rapor Operasional Petugas
 
@@ -248,18 +250,35 @@ Acceptance flow client:
 - [ ] View List Rapor (`/petugas/akademik/rapor`)
 - [ ] View Detail Rapor (`/petugas/akademik/rapor/detail`)
 - [ ] Action Generate Rapor (`/petugas/akademik/rapor`)
+- [~] Panel Isi/Edit Catatan Wali dalam halaman operasional rapor (`/petugas/akademik/rapor`)
 - [ ] Action Ranking Kelas (`/petugas/akademik/rapor`)
 - [ ] Action Publish Rapor (`/petugas/akademik/rapor`)
+- [~] Action Preview PDF Rapor dari hasil pencarian santri (`/petugas/akademik/rapor`)
 - [ ] Action Download PDF Rapor (`/petugas/akademik/rapor`)
 
 ### Task Endpoint
 
 - [ ] `GET /api/akademik/raport` -> list rapor + filter + server-side pagination
 - [ ] `GET /api/akademik/raport/show` -> detail rapor
-- [ ] `POST /api/akademik/raport/generate` -> generate rapor per santri
+- [~] `POST /api/akademik/raport/generate` -> generate rapor per santri
+- [~] `GET /api/akademik/raport/catatan-wali` -> fetch catatan wali di panel halaman operasional rapor
+- [~] `POST /api/akademik/raport/catatan-wali` -> submit/update catatan wali (hanya jika rapor sudah di-generate)
 - [ ] `POST /api/akademik/raport/rank` -> hitung ranking per kelas
 - [ ] `POST /api/akademik/raport/publish` -> publish rapor (kelas/santri)
 - [ ] `GET /api/akademik/raport/pdf` -> download PDF rapor
+
+### Checklist Implementasi UI (Halaman Gabungan Rapor)
+
+- [ ] Search santri by `nama`/`nomor_induk` di halaman `/petugas/akademik/rapor`
+- [ ] Saat santri dipilih, fetch status rapor aktif (`nomor_induk`, `tahun_ajaran`, `semester`)
+- [ ] Tombol preview PDF aktif hanya jika data rapor sudah ada
+- [ ] Tombol generate rapor tersedia untuk membuat data awal rapor
+- [ ] Setelah generate sukses, refresh state agar panel catatan wali langsung aktif
+- [ ] Panel catatan wali memuat data awal dari `GET /api/akademik/raport/catatan-wali`
+- [ ] Form catatan wali disable jika rapor belum ada, tampilkan helper text yang jelas
+- [ ] Submit catatan wali kirim payload minimal wajib (`nomor_induk`, `kode_kelas`, `tahun_ajaran`, `semester`, `catatan_wali`)
+- [ ] Tangani response error validasi (422) per field dan tampilkan pesan global jika gagal
+- [ ] Preview/download PDF menggunakan response blob dari `GET /api/akademik/raport/pdf`
 
 ## 10. Administrasi - PPDB
 
