@@ -58,7 +58,7 @@ export interface GetKkmParams {
   q?: string
   kode_mapel?: string
   tahun_ajaran?: string
-  semester?: string
+  semester?: string | number
   kode_unit?: string
   per_page?: string
 }

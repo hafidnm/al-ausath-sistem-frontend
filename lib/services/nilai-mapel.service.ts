@@ -25,7 +25,10 @@ export interface NilaiMapelItem {
   ujian_akhir: number
   nilai_rapor_tampil?: number
   flag_warna_rapor?: boolean
+  flag_warna_rapor_raw?: string
+  status_ketuntasan?: string
   status_kkm?: string
+  nilai_kkm?: number
   keterangan?: string
   updatedAt?: string
 }
@@ -93,6 +96,38 @@ const toBoolean = (value: unknown): boolean => {
   return false
 }
 
+const normalizeRaporFlag = (value: unknown): { isRed?: boolean; raw?: string } => {
+  if (value == null) return {}
+
+  if (typeof value === "boolean" || typeof value === "number") {
+    return { isRed: toBoolean(value), raw: toText(value) }
+  }
+
+  if (typeof value === "string") {
+    const lower = value.trim().toLowerCase()
+
+    if (lower.includes("merah")) {
+      return { isRed: true, raw: value }
+    }
+
+    if (lower.includes("hitam")) {
+      return { isRed: false, raw: value }
+    }
+
+    if (["1", "true", "ya", "yes"].includes(lower)) {
+      return { isRed: true, raw: value }
+    }
+
+    if (["0", "false", "tidak", "no"].includes(lower)) {
+      return { isRed: false, raw: value }
+    }
+
+    return { isRed: false, raw: value }
+  }
+
+  return { isRed: toBoolean(value), raw: toText(value) }
+}
+
 const extractList = (payload: any): any[] => {
   if (Array.isArray(payload)) return payload
   if (Array.isArray(payload?.data)) return payload.data
@@ -114,6 +149,7 @@ const normalizeUlanganItem = (raw: any): NilaiMapelUlanganItem => ({
 
 const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
   const rawId = raw?.id ?? raw?.id_nilai ?? raw?.id_nilai_mapel ?? raw?.nilai_mapel_id
+  const raporFlag = normalizeRaporFlag(raw?.flag_warna_rapor)
 
   const tugasRaw = Array.isArray(raw?.tugas) ? raw.tugas : []
   const ulanganRaw = Array.isArray(raw?.ulangan) ? raw.ulangan : []
@@ -131,8 +167,11 @@ const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
     ulangan: ulanganRaw.map(normalizeUlanganItem),
     ujian_akhir: toNumber(raw?.ujian_akhir, 0),
     nilai_rapor_tampil: raw?.nilai_rapor_tampil != null ? toNumber(raw?.nilai_rapor_tampil, 0) : undefined,
-    flag_warna_rapor: raw?.flag_warna_rapor != null ? toBoolean(raw?.flag_warna_rapor) : undefined,
-    status_kkm: toText(raw?.status_kkm),
+    flag_warna_rapor: raporFlag.isRed,
+    flag_warna_rapor_raw: raporFlag.raw,
+    status_ketuntasan: toText(raw?.status_ketuntasan ?? raw?.status_kkm ?? raw?.perhitungan?.kkm?.status),
+    status_kkm: toText(raw?.status_kkm ?? raw?.status_ketuntasan),
+    nilai_kkm: raw?.nilai_kkm != null ? toNumber(raw?.nilai_kkm, 0) : toNumber(raw?.perhitungan?.kkm?.nilai_kkm, 0) || undefined,
     keterangan: toText(raw?.keterangan),
     updatedAt: toText(raw?.updated_at ?? raw?.updatedAt),
   }
@@ -152,7 +191,11 @@ export const nilaiMapelService = {
 
   async upsert(payload: UpsertNilaiMapelPayload): Promise<NilaiMapelItem> {
     const response = await api.post("/akademik/nilai-mapel", payload)
-    const raw = response.data?.data ?? response.data
+    const rawData = response.data?.data ?? response.data
+    const raw = {
+      ...(rawData && typeof rawData === "object" ? rawData : {}),
+      perhitungan: response.data?.perhitungan ?? rawData?.perhitungan,
+    }
     return normalizeNilaiMapelItem(raw)
   },
 

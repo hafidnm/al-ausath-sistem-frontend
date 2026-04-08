@@ -21,6 +21,7 @@ import {
   NilaiMapelUlanganItem,
   UpsertNilaiMapelPayload,
 } from "@/lib/services/nilai-mapel.service"
+import { kkmService } from "@/lib/services/kkm.service"
 import { authService } from "@/lib/services/auth.service"
 import { semesterOptions, tahunAjaranOptions, jenisTugasOptions } from "../utils/constants"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
@@ -100,9 +101,13 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const [tugas, setTugas] = useState<NilaiMapelTugasItem[]>(defaultTugas)
   const [ulangan, setUlangan] = useState<NilaiMapelUlanganItem[]>(defaultUlangan)
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
+  const [nilaiKkm, setNilaiKkm] = useState<number | undefined>(undefined)
+  const [isLoadingKkm, setIsLoadingKkm] = useState(false)
   const [isUserReady, setIsUserReady] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const normalizeCode = (value: string): string => value.trim().toUpperCase()
 
   useEffect(() => {
     const loadUser = async () => {
@@ -115,10 +120,68 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
     loadUser()
   }, [])
 
+  useEffect(() => {
+    const kodeMapelTrimmed = kodeMapel.trim()
+    if (!kodeMapelTrimmed || !tahunAjaran || !semester) {
+      setNilaiKkm(undefined)
+      return
+    }
+
+    let cancelled = false
+
+    const loadKkm = async () => {
+      try {
+        setIsLoadingKkm(true)
+        let rows = await kkmService.getAll({
+          kode_mapel: kodeMapelTrimmed,
+          tahun_ajaran: tahunAjaran,
+          semester: Number(semester),
+          per_page: "10",
+        })
+
+        // Fallback: beberapa backend mengabaikan/mismatch filter tahun/semester.
+        // Ambil by kode_mapel lalu pilih baris paling relevan di frontend.
+        if (rows.length === 0) {
+          rows = await kkmService.getAll({
+            kode_mapel: kodeMapelTrimmed,
+            per_page: "50",
+          })
+        }
+
+        if (cancelled) return
+
+        const kodeMapelNormalized = normalizeCode(kodeMapelTrimmed)
+        const selected = rows.find((row) => (
+          normalizeCode(row.kode_mapel) === kodeMapelNormalized
+          && row.tahun_ajaran === tahunAjaran
+          && String(row.semester) === semester
+        ))
+          ?? rows.find((row) => normalizeCode(row.kode_mapel) === kodeMapelNormalized)
+          ?? rows[0]
+
+        setNilaiKkm(selected?.nilai_kkm)
+      } catch {
+        if (!cancelled) {
+          setNilaiKkm(undefined)
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingKkm(false)
+        }
+      }
+    }
+
+    loadKkm()
+
+    return () => {
+      cancelled = true
+    }
+  }, [kodeMapel, tahunAjaran, semester])
+
   const preview = useMemo(() => {
     const raw = calculateRaporRaw(tugas, ulangan, ujianAkhir)
     const normalized = normalizeRaporDisplay(raw)
-    const status = statusKkm(normalized.nilai)
+    const status = statusKkm(normalized.nilai, nilaiKkm ?? 75)
 
     return {
       raw,
@@ -126,7 +189,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       isRed: normalized.isRed,
       status,
     }
-  }, [tugas, ulangan, ujianAkhir])
+  }, [nilaiKkm, tugas, ulangan, ujianAkhir])
 
   const updateTugas = (index: number, patch: Partial<NilaiMapelTugasItem>) => {
     setTugas((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
@@ -166,6 +229,11 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
 
     if (!petugasInputId) {
       setError("ID petugas input tidak ditemukan dari akun login. Silakan refresh halaman atau cek data akun petugas")
+      return
+    }
+
+    if (nilaiKkm == null) {
+      setError("KKM mapel belum ditemukan. Pastikan KKM mapel sudah disetting untuk tahun ajaran dan semester ini")
       return
     }
 
@@ -353,6 +421,10 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
               <div>
                 <p className="text-muted-foreground">Rapor Tampil</p>
                 <p className={preview.isRed ? "font-semibold text-destructive" : "font-semibold text-primary"}>{preview.nilai}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">KKM Aktif</p>
+                <p className="font-semibold text-foreground">{isLoadingKkm ? "Memuat..." : (nilaiKkm ?? "Belum diset")}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Status KKM</p>
