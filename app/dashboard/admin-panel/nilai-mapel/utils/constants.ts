@@ -1,0 +1,16 @@
+export const tahunAjaranOptions = [
+  { value: "2025/2026", label: "2025/2026" },
+  { value: "2024/2025", label: "2024/2025" },
+  { value: "2023/2024", label: "2023/2024" },
+]
+
+export const semesterOptions = [
+  { value: "1", label: "Semester 1" },
+  { value: "2", label: "Semester 2" },
+]
+
+export const jenisTugasOptions = [
+  { value: "PR", label: "PR" },
+  { value: "TUGAS_PENGGANTI", label: "Tugas Pengganti" },
+  { value: "MODUL_KOMPETENSI", label: "Modul Kompetensi" },
+]

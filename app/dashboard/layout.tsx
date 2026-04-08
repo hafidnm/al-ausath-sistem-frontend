@@ -71,9 +71,14 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  const [mounted, setMounted] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [user, setUser] = useState<any>(null)
   const pathname = usePathname()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
   const checkAuth = async () => {
@@ -108,6 +113,10 @@ export default function DashboardLayout({
       .join('')
       .toUpperCase()
       .substring(0, 2) || 'U'
+  }
+
+  if (!mounted) {
+    return <div className="min-h-screen bg-background" suppressHydrationWarning />
   }
 
   return (
