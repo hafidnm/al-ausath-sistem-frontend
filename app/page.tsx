@@ -5,7 +5,17 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Users, GraduationCap, Shield, Star, Moon, Menu, Calendar, Bell, MapPin, Phone, Mail, Clock, CheckCircle2, Award, Building2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import { usePpdbPortalRegister } from "@/hooks/use-ppdb-portal"
+import { BookOpen, Users, GraduationCap, Star, Moon, Menu, Calendar, Bell, MapPin, Phone, Mail, Clock, CheckCircle2, Building2, ChevronDown, LogIn, UserPlus, Loader2 } from "lucide-react"
 
 export default function LandingPage() {
   return (
@@ -43,11 +53,28 @@ export default function LandingPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <Link href="/login">
-                <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                  Login
-                </Button>
-              </Link>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
+                    Masuk / Daftar
+                    <ChevronDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem asChild>
+                    <Link href="/ppdb/register" className="w-full inline-flex items-center">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      PPDB
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="w-full inline-flex items-center">
+                      <LogIn className="w-4 h-4 mr-2" />
+                      Halaman Login
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="ghost" size="icon" className="md:hidden">
                 <Menu className="h-5 w-5" />
               </Button>
@@ -100,90 +127,21 @@ export default function LandingPage() {
       </section>
 
       {/* PPDB Section */}
-      <section id="ppdb" className="py-20 bg-background">
+      <section id="ppdb" className="scroll-mt-24 py-20 bg-background">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">PPDB 2025/2026</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Penerimaan Peserta Didik Baru
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Bergabunglah dengan pesantren kami dan raih prestasi gemilang bersama sistem pendidikan berkualitas
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto mb-10">
-            <Card>
-              <CardHeader>
-                <Calendar className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Jadwal Pendaftaran</CardTitle>
-                <CardDescription>Periode pendaftaran santri baru</CardDescription>
+          <div className="max-w-5xl mx-auto">
+            <Card className="border-border/70 shadow-lg">
+              <CardHeader className="bg-sidebar/5 border-b border-border rounded-t-xl">
+                <Badge variant="outline" className="w-fit mb-3">PPDB 1447/1448 H</Badge>
+                <CardTitle className="text-2xl md:text-3xl tracking-tight text-foreground">
+                  BUAT AKUN PENDAFTAR
+                </CardTitle>
+                <CardDescription className="text-base text-muted-foreground">
+                  Tahap 1 PPDB: daftar akun, lalu lengkapi form data santri di dashboard pendaftar.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="text-sm font-medium">Gelombang 1</span>
-                  <span className="text-sm text-muted-foreground">Jan - Mar 2025</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b">
-                  <span className="text-sm font-medium">Gelombang 2</span>
-                  <span className="text-sm text-muted-foreground">Apr - Jun 2025</span>
-                </div>
-                <div className="flex justify-between items-center py-2">
-                  <span className="text-sm font-medium">Gelombang 3</span>
-                  <span className="text-sm text-muted-foreground">Jul - Agu 2025</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CheckCircle2 className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Persyaratan</CardTitle>
-                <CardDescription>Dokumen yang harus disiapkan</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Fotokopi Ijazah/SKHUN</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Fotokopi Kartu Keluarga</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Fotokopi Akta Kelahiran</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Pas Foto 3x4 (4 lembar)</span>
-                  </li>
-                  <li className="flex items-start gap-2 text-sm">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span>Surat Keterangan Sehat</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <Award className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Biaya Pendaftaran</CardTitle>
-                <CardDescription>Investasi pendidikan putra-putri Anda</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Formulir Pendaftaran</p>
-                  <p className="text-2xl font-bold text-foreground">Rp 250.000</p>
-                </div>
-                <div className="pt-3 border-t">
-                  <p className="text-xs text-muted-foreground mb-2">Biaya pendidikan akan dijelaskan saat verifikasi berkas</p>
-                  <Button className="w-full" size="sm">
-                    Daftar Sekarang
-                  </Button>
-                </div>
+              <CardContent className="p-6 md:p-8">
+                <PpdbRegistrationForm />
               </CardContent>
             </Card>
           </div>
@@ -342,28 +300,22 @@ export default function LandingPage() {
               features={["Calistung Dasar", "Hafalan Surat Pendek", "Kegiatan Seni", "Pembiasaan Akhlak"]}
             />
             <EducationCard
-              level="SD/MI"
+              level="MI"
               ageRange="6-12 Tahun"
               description="Sekolah Dasar/Madrasah Ibtidaiyah dengan perpaduan kurikulum nasional dan pesantren."
               features={["Kurikulum Merdeka", "Tahfidz Juz 30", "Bahasa Arab & Inggris", "Ekstrakulikuler"]}
             />
             <EducationCard
-              level="SMP/MTs"
+              level="MTs"
               ageRange="12-15 Tahun"
               description="Sekolah Menengah Pertama dengan pendalaman ilmu agama dan sains modern."
               features={["Pembelajaran Terpadu", "Tahfidz 3 Juz", "Sains & Teknologi", "Leadership Training"]}
             />
             <EducationCard
-              level="SMA/MA"
+              level="MA"
               ageRange="15-18 Tahun"
               description="Sekolah Menengah Atas dengan penjurusan IPA, IPS, dan Keagamaan."
               features={["Persiapan PTN", "Tahfidz 5 Juz", "Penelitian Ilmiah", "Kewirausahaan"]}
-            />
-            <EducationCard
-              level="Mahad"
-              ageRange="18+ Tahun"
-              description="Program Ma'had Aly untuk pendalaman ilmu agama dan tahfidz intensif."
-              features={["Kajian Kitab Kuning", "Tahfidz 30 Juz", "Dakwah & Mubaligh", "Studi Lanjut"]}
             />
           </div>
         </div>
@@ -530,6 +482,191 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
+  )
+}
+
+function PpdbRegistrationForm() {
+  const { toast } = useToast()
+  const { register, loading: registerLoading } = usePpdbPortalRegister()
+
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [form, setForm] = React.useState({
+    email: "",
+    phone: "",
+    password: "",
+    passwordConfirmation: "",
+  })
+
+  const resetForm = () => {
+    setForm({
+      email: "",
+      phone: "",
+      password: "",
+      passwordConfirmation: "",
+    })
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+
+    if (
+      !form.email.trim() ||
+      !form.phone.trim() ||
+      !form.password ||
+      !form.passwordConfirmation
+    ) {
+      toast({
+        title: "Data belum lengkap",
+        description: "Email, nomor telepon, dan kata sandi wajib diisi.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (form.password.length < 8) {
+      toast({
+        title: "Kata sandi terlalu pendek",
+        description: "Kata sandi minimal 8 karakter.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (form.password !== form.passwordConfirmation) {
+      toast({
+        title: "Konfirmasi kata sandi tidak sesuai",
+        description: "Pastikan kata sandi dan konfirmasi kata sandi sama.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
+      toast({
+        title: "Email tidak valid",
+        description: "Masukkan email pendaftar yang valid.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsSubmitting(true)
+
+    try {
+      const result = await register({
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        password: form.password,
+        password_confirmation: form.passwordConfirmation,
+      })
+
+      toast({
+        title: "Akun pendaftar berhasil dibuat",
+        description: result.message || "Silakan lanjut ke halaman informasi akun.",
+      })
+      resetForm()
+      setTimeout(() => {
+        const noPendaftaran = encodeURIComponent(result.noPendaftaran || "")
+        const idPendaftar = encodeURIComponent(result.idPendaftar || "")
+        window.location.href = `/ppdb/register/success?no=${noPendaftaran}&id=${idPendaftar}`
+      }, 500)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Terjadi kesalahan saat mengirim pendaftaran."
+      toast({
+        title: "Pendaftaran gagal",
+        description: message,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  return (
+    <form className="space-y-6" onSubmit={handleSubmit}>
+      <div className="rounded-lg border border-border/70 p-4 bg-muted/30">
+        <p className="text-sm text-muted-foreground">Nomor Pendaftaran</p>
+        <p className="text-sm text-foreground mt-1">
+          Akan dibuat otomatis saat tombol <span className="font-semibold">Buat Akun Pendaftar</span> ditekan.
+        </p>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[240px_minmax(0,1fr)] md:items-center">
+        <Label htmlFor="ppdb-email" className="text-base font-semibold text-foreground">
+          Email Akun <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="ppdb-email"
+          type="email"
+          placeholder="contoh@email.com"
+          className="h-11"
+          value={form.email}
+          onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+        />
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[240px_minmax(0,1fr)] md:items-center">
+        <Label htmlFor="ppdb-phone" className="text-base font-semibold text-foreground">
+          Nomor Telepon <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="ppdb-phone"
+          placeholder="08xxxxxxxxxx"
+          className="h-11"
+          value={form.phone}
+          onChange={(event) => setForm((prev) => ({ ...prev, phone: event.target.value }))}
+        />
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[240px_minmax(0,1fr)] md:items-center">
+        <Label htmlFor="ppdb-password" className="text-base font-semibold text-foreground">
+          Buat Kata Sandi Akun <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="ppdb-password"
+          type="password"
+          placeholder="Minimal 8 karakter"
+          className="h-11"
+          value={form.password}
+          onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+        />
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[240px_minmax(0,1fr)] md:items-center">
+        <Label htmlFor="ppdb-password-confirmation" className="text-base font-semibold text-foreground">
+          Konfirmasi Kata Sandi <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="ppdb-password-confirmation"
+          type="password"
+          placeholder="Masukkan konfirmasi kata sandi"
+          className="h-11"
+          value={form.passwordConfirmation}
+          onChange={(event) => setForm((prev) => ({ ...prev, passwordConfirmation: event.target.value }))}
+        />
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-[240px_minmax(0,1fr)] md:items-center">
+        <div />
+        <div className="space-y-3 w-full sm:w-[340px]">
+          <Button
+            type="submit"
+            className="h-11 w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            disabled={isSubmitting || registerLoading}
+          >
+            {isSubmitting || registerLoading ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <UserPlus className="w-4 h-4 mr-2" />
+            )}
+            Buat Akun Pendaftar
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            Setelah akun dibuat, lanjutkan dengan login dan isi form lengkap di dashboard pendaftar.
+          </p>
+        </div>
+      </div>
+    </form>
   )
 }
 

@@ -51,9 +51,9 @@ import {
 // Sample data for pending validations
 const pendingValidations = {
   santri: [
-    { id: 1, type: "santri", name: "Muhammad Rizki", identifier: "2024003", kelas: "9A", jenjang: "SMP", mapel: "Tahfidz Al-Quran", tanggal: "30 Jan 2025", status: "sakit", keterangan: "Demam tinggi", pengaju: "Ustadz Ahmad", waktuPengajuan: "07:30" },
-    { id: 2, type: "santri", name: "Fatimah Zahra", identifier: "2024004", kelas: "9A", jenjang: "SMP", mapel: "Fiqih", tanggal: "30 Jan 2025", status: "izin", keterangan: "Acara keluarga", pengaju: "Ustadzah Fatimah", waktuPengajuan: "06:45" },
-    { id: 3, type: "santri", name: "Khadijah Amina", identifier: "2024006", kelas: "8A", jenjang: "SMP", mapel: "Bahasa Arab", tanggal: "30 Jan 2025", status: "alpha", keterangan: "Tidak ada keterangan", pengaju: "Ustadz Ibrahim", waktuPengajuan: "08:15" },
+    { id: 1, type: "santri", name: "Muhammad Rizki", identifier: "2024003", kelas: "9A", jenjang: "MA", mapel: "Tahfidz Al-Quran", tanggal: "30 Jan 2025", status: "sakit", keterangan: "Demam tinggi", pengaju: "Ustadz Ahmad", waktuPengajuan: "07:30" },
+    { id: 2, type: "santri", name: "Fatimah Zahra", identifier: "2024004", kelas: "9A", jenjang: "MA", mapel: "Fiqih", tanggal: "30 Jan 2025", status: "izin", keterangan: "Acara keluarga", pengaju: "Ustadzah Fatimah", waktuPengajuan: "06:45" },
+    { id: 3, type: "santri", name: "Khadijah Amina", identifier: "2024006", kelas: "8A", jenjang: "MA", mapel: "Bahasa Arab", tanggal: "30 Jan 2025", status: "alpha", keterangan: "Tidak ada keterangan", pengaju: "Ustadz Ibrahim", waktuPengajuan: "08:15" },
     { id: 4, type: "santri", name: "Maryam Salma", identifier: "2024010", kelas: "12A", jenjang: "SMA", mapel: "Matematika", tanggal: "30 Jan 2025", status: "sakit", keterangan: "Sakit perut", pengaju: "Pak Budi", waktuPengajuan: "07:50" },
   ],
   guru: [
