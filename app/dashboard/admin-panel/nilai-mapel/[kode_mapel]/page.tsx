@@ -81,7 +81,9 @@ export default function NilaiMapelDetailPage() {
   const normalized = normalizeRaporDisplay(raw)
   const raporTampil = item.nilai_rapor_tampil ?? normalized.nilai
   const raporIsRed = item.flag_warna_rapor ?? normalized.isRed
-  const kkmStatus = item.status_kkm || statusKkm(raporTampil)
+  const kkmStatus = item.status_ketuntasan
+    || item.status_kkm
+    || statusKkm(raporTampil, item.nilai_kkm ?? 75)
 
   return (
     <div className="space-y-6">
@@ -100,7 +102,7 @@ export default function NilaiMapelDetailPage() {
           <CardTitle className="text-lg">Ringkasan</CardTitle>
           <CardDescription>{item.tahun_ajaran} - Semester {item.semester}</CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-4 gap-4 text-sm">
+        <CardContent className="grid md:grid-cols-5 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Kode Kelas</p>
             <p className="font-semibold text-foreground">{item.kode_kelas || "-"}</p>
@@ -112,6 +114,10 @@ export default function NilaiMapelDetailPage() {
           <div>
             <p className="text-muted-foreground">Nilai Rapor Tampil</p>
             <p className={raporIsRed ? "font-semibold text-destructive" : "font-semibold text-primary"}>{raporTampil}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">KKM Mapel</p>
+            <p className="font-semibold text-foreground">{item.nilai_kkm ?? "-"}</p>
           </div>
           <div>
             <p className="text-muted-foreground">Status KKM</p>
