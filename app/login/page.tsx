@@ -10,27 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { BookOpen, Users, GraduationCap, Shield, Star, Moon, ArrowLeft } from "lucide-react"
 import { authService } from "@/lib/services/auth.service"
 import { useToast } from "@/hooks/use-toast"
-import { useEffect } from "react"
 
 export default function LoginPage() {
   const [userType, setUserType] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
-
-  useEffect(() => {
-  const checkUser = async () => {
-    try {
-      const res = await authService.me()
-      if (res?.user) {
-        window.location.replace("/dashboard")
-      }
-    } catch {
-      localStorage.removeItem('user')
-      localStorage.removeItem('role')
-    }
-  }
-  checkUser()
-}, [])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()

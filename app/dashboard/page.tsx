@@ -1,8 +1,12 @@
+"use client"
+
+import { useEffect, useMemo } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useSppTunggakanSummary } from "@/hooks/use-spp"
 import {
   Users,
   GraduationCap,
@@ -78,7 +82,7 @@ const jenjangStats = [
   { name: "PAUD", count: 120, color: "bg-chart-1" },
   { name: "TK", count: 185, color: "bg-chart-2" },
   { name: "SD", count: 412, color: "bg-primary" },
-  { name: "SMP", count: 298, color: "bg-accent" },
+  { name: "MA", count: 298, color: "bg-accent" },
   { name: "SMA", count: 232, color: "bg-chart-4" },
 ]
 
@@ -141,13 +145,26 @@ const ppdbOverview = {
   deadline: "15 Februari 2025",
 }
 
-const sppOverview = {
+const defaultSppOverview = {
   periode: "Januari 2025",
   totalTagihan: 1247,
   lunas: 892,
   cicilan: 221,
   menunggak: 134,
   jatuhTempo: "10 Februari 2025",
+}
+
+const formatDashboardDate = (value: string): string => {
+  if (!value) return "-"
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+
+  return parsed.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  })
 }
 
 const getStatusBadge = (status: string) => {
@@ -166,8 +183,32 @@ const getStatusBadge = (status: string) => {
 }
 
 export default function DashboardPage() {
+  const { data: sppSummary, fetchSummary } = useSppTunggakanSummary()
+
+  useEffect(() => {
+    void fetchSummary()
+  }, [fetchSummary])
+
   const santriPercentage = Math.round((attendanceOverview.santri.hadir / attendanceOverview.santri.total) * 100)
   const guruPercentage = Math.round((attendanceOverview.guru.hadir / attendanceOverview.guru.total) * 100)
+
+  const sppOverview = useMemo(() => {
+    if (!sppSummary) {
+      return defaultSppOverview
+    }
+
+    return {
+      periode: sppSummary.periode || defaultSppOverview.periode,
+      totalTagihan: sppSummary.totalTagihan || defaultSppOverview.totalTagihan,
+      lunas: sppSummary.totalLunas || defaultSppOverview.lunas,
+      cicilan: sppSummary.totalCicilan || defaultSppOverview.cicilan,
+      menunggak:
+        sppSummary.totalTerlambat + sppSummary.totalBelumBayar || defaultSppOverview.menunggak,
+      jatuhTempo: sppSummary.jatuhTempoBerikutnya
+        ? formatDashboardDate(sppSummary.jatuhTempoBerikutnya)
+        : defaultSppOverview.jatuhTempo,
+    }
+  }, [sppSummary])
 
   return (
     <div className="space-y-6">

@@ -1,5 +1,58 @@
 import axios from 'axios';
 
+export const PPDB_AUTH_TOKEN_STORAGE_KEY = 'ppdb_portal_auth_token';
+export const PPDB_AUTH_COOKIE_NAME = 'ppdb_auth';
+
+const isBrowser = typeof window !== 'undefined';
+
+const setCookie = (name: string, value: string, maxAgeSeconds: number) => {
+    if (typeof document === 'undefined') return;
+
+    document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax`;
+};
+
+const clearCookie = (name: string) => {
+    if (typeof document === 'undefined') return;
+
+    document.cookie = `${name}=; Max-Age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
+};
+
+export const setPpdbAuthMarker = () => {
+    setCookie(PPDB_AUTH_COOKIE_NAME, '1', 60 * 60 * 24 * 14);
+};
+
+export const clearPpdbAuthMarker = () => {
+    clearCookie(PPDB_AUTH_COOKIE_NAME);
+};
+
+export const getStoredPpdbToken = (): string => {
+    if (!isBrowser) return '';
+
+    return (
+        window.localStorage.getItem(PPDB_AUTH_TOKEN_STORAGE_KEY) ||
+        window.sessionStorage.getItem(PPDB_AUTH_TOKEN_STORAGE_KEY) ||
+        ''
+    ).trim();
+};
+
+export const setStoredPpdbToken = (token: string) => {
+    if (!isBrowser) return;
+
+    const value = token.trim();
+    if (!value) return;
+
+    window.localStorage.setItem(PPDB_AUTH_TOKEN_STORAGE_KEY, value);
+    setPpdbAuthMarker();
+};
+
+export const clearStoredPpdbToken = () => {
+    if (!isBrowser) return;
+
+    window.localStorage.removeItem(PPDB_AUTH_TOKEN_STORAGE_KEY);
+    window.sessionStorage.removeItem(PPDB_AUTH_TOKEN_STORAGE_KEY);
+    clearPpdbAuthMarker();
+};
+
 const api = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
     withCredentials: true,
@@ -11,12 +64,21 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
+        if (!config.headers) {
+            config.headers = {};
+        }
+
+        const headers = config.headers as Record<string, string | undefined>;
         const token = getCookieValue('XSRF-TOKEN');
         if (token) {
-            config.headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
-        } else {
-            console.warn('No XSRF-TOKEN cookie found');
+            headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
         }
+
+        const bearerToken = getStoredPpdbToken();
+        if (bearerToken && !headers.Authorization) {
+            headers.Authorization = `Bearer ${bearerToken}`;
+        }
+
         return config;
     },
     (error) => {
@@ -29,12 +91,25 @@ api.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
-            window.location.href = '/login';
+        if (error.response?.status === 401) {
+            if (isBrowser) {
+                const currentPath = window.location.pathname || '';
+                const isPpdbRoute = currentPath.startsWith('/ppdb');
+                const isLoginPage = currentPath === '/login' || currentPath.startsWith('/ppdb/login');
+
+                if (isPpdbRoute) {
+                    clearStoredPpdbToken();
+                }
+
+                if (!isLoginPage) {
+                    window.location.href = isPpdbRoute ? '/ppdb/login' : '/login';
+                }
+            }
+
             return Promise.reject(error);
         }
 
-        if (error.response?.status === 419 && !originalRequest._retry) {
+        if (error.response?.status === 419 && originalRequest && !originalRequest._retry) {
             originalRequest._retry = true;
             
             try {
@@ -42,7 +117,11 @@ api.interceptors.response.use(
                 
                 const newToken = getCookieValue('XSRF-TOKEN');
                 if (newToken) {
-                    originalRequest.headers['X-XSRF-TOKEN'] = decodeURIComponent(newToken);
+                    if (!originalRequest.headers) {
+                        originalRequest.headers = {};
+                    }
+
+                    (originalRequest.headers as Record<string, string>)['X-XSRF-TOKEN'] = decodeURIComponent(newToken);
                 }
                 
                 return api.request(originalRequest);
@@ -70,7 +149,12 @@ function getCookieValue(name: string): string | null {
 
 export const getCsrfToken = async () => {
     try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '');
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+        const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+
+        if (!baseUrl) {
+            throw new Error('NEXT_PUBLIC_API_URL belum diatur');
+        }
         
         const response = await axios.get(`${baseUrl}/sanctum/csrf-cookie`, {
             withCredentials: true
