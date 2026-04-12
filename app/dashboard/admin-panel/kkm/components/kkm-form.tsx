@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,8 +15,38 @@ import {
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle } from "lucide-react"
+import api from "@/lib/axios"
 import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 import { isValidKkm } from "../utils/helpers"
+
+const kodeUnitOptions = ["PAUD", "TK", "MI", "MTS", "MA"] as const
+
+interface MapelOption {
+  kode_mapel: string
+  nama_mapel: string
+  kode_unit?: string
+}
+
+const extractMapelList = (payload: any): any[] => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.items)) return payload.items
+  if (Array.isArray(payload?.results)) return payload.results
+  if (Array.isArray(payload?.data?.data)) return payload.data.data
+  return []
+}
+
+const toMapelOption = (raw: any): MapelOption | null => {
+  if (!raw || typeof raw !== "object") return null
+
+  const kode_mapel = String(raw.kode_mapel ?? "").trim().toUpperCase()
+  const nama_mapel = String(raw.nama_mapel ?? raw.mapel ?? "").trim()
+  const kode_unit = raw.kode_unit ? String(raw.kode_unit).trim().toUpperCase() : undefined
+
+  if (!kode_mapel || !nama_mapel) return null
+
+  return { kode_mapel, nama_mapel, kode_unit }
+}
 
 interface KkmFormPayload {
   kode_mapel: string
@@ -40,10 +70,38 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
   const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
   const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm ?? 75)
-  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit ?? "")
+  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit?.toUpperCase() ?? "")
   const [keterangan, setKeterangan] = useState(initialData?.keterangan ?? "")
+  const [mapelOptions, setMapelOptions] = useState<MapelOption[]>([])
+  const [isLoadingMapel, setIsLoadingMapel] = useState(true)
+  const [mapelError, setMapelError] = useState("")
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const selectedMapel = useMemo(() => {
+    const activeCode = kodeMapel.trim().toUpperCase()
+    return mapelOptions.find((item) => item.kode_mapel === activeCode)
+  }, [mapelOptions, kodeMapel])
+
+  const displayedMapelOptions = useMemo(() => {
+    const activeCode = kodeMapel.trim().toUpperCase()
+
+    if (!activeCode) return mapelOptions
+    if (mapelOptions.some((item) => item.kode_mapel === activeCode)) return mapelOptions
+
+    return [
+      {
+        kode_mapel: activeCode,
+        nama_mapel: "Mapel tersimpan (tidak ditemukan di daftar aktif)",
+      },
+      ...mapelOptions,
+    ]
+  }, [mapelOptions, kodeMapel])
+
+  const availableUnitOptions = useMemo(() => {
+    if (!selectedMapel?.kode_unit) return kodeUnitOptions
+    return kodeUnitOptions.filter((unit) => unit === selectedMapel.kode_unit)
+  }, [selectedMapel])
 
   useEffect(() => {
     if (!initialData) return
@@ -52,9 +110,46 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
     setTahunAjaran(initialData.tahun_ajaran)
     setSemester(String(initialData.semester))
     setNilaiKkm(initialData.nilai_kkm)
-    setKodeUnit(initialData.kode_unit ?? "")
+    setKodeUnit(initialData.kode_unit?.toUpperCase() ?? "")
     setKeterangan(initialData.keterangan ?? "")
   }, [initialData])
+
+  useEffect(() => {
+    if (!selectedMapel) return
+
+    if (selectedMapel.kode_unit) {
+      setKodeUnit(selectedMapel.kode_unit)
+    }
+  }, [selectedMapel])
+
+  useEffect(() => {
+    const fetchMapelOptions = async () => {
+      try {
+        setIsLoadingMapel(true)
+        setMapelError("")
+
+        const response = await api.get("/administrasi/mata-pelajaran", {
+          params: {
+            per_page: 200,
+          },
+        })
+
+        const rows = extractMapelList(response.data)
+        const normalized = rows
+          .map(toMapelOption)
+          .filter((item): item is MapelOption => item !== null)
+          .sort((a, b) => a.kode_mapel.localeCompare(b.kode_mapel))
+
+        setMapelOptions(normalized)
+      } catch {
+        setMapelError("Gagal memuat daftar mata pelajaran")
+      } finally {
+        setIsLoadingMapel(false)
+      }
+    }
+
+    fetchMapelOptions()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -116,11 +211,23 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Kode Mapel</Label>
-              <Input
+              <Select
                 value={kodeMapel}
-                onChange={(e) => { setKodeMapel(e.target.value); setError("") }}
-                placeholder="Contoh: MATH-01"
-              />
+                onValueChange={(v) => { setKodeMapel(v); setError("") }}
+                disabled={isLoadingMapel || displayedMapelOptions.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={isLoadingMapel ? "Memuat mata pelajaran..." : "Pilih mata pelajaran"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {displayedMapelOptions.map((item) => (
+                    <SelectItem key={item.kode_mapel} value={item.kode_mapel}>
+                      {item.kode_mapel} - {item.nama_mapel}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {mapelError && <p className="text-sm text-destructive">{mapelError}</p>}
             </div>
 
             <div className="space-y-2">
@@ -163,12 +270,24 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
             </div>
 
             <div className="space-y-2">
-              <Label>Kode Unit (opsional, kosongkan untuk global)</Label>
-              <Input
+              <Label>Kode Unit</Label>
+              <Select
                 value={kodeUnit}
-                onChange={(e) => { setKodeUnit(e.target.value); setError("") }}
-                placeholder="Contoh: U01"
-              />
+                onValueChange={(v) => { setKodeUnit(v); setError("") }}
+                disabled={selectedMapel?.kode_unit ? true : false}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedMapel?.kode_unit ? `Unit khusus: ${selectedMapel.kode_unit}` : "Pilih kode unit"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableUnitOptions.map((item) => (
+                    <SelectItem key={item} value={item}>{item}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedMapel?.kode_unit && (
+                <p className="text-xs text-muted-foreground">Mapel ini khusus untuk unit {selectedMapel.kode_unit}</p>
+              )}
             </div>
           </div>
 
