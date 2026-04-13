@@ -41,6 +41,8 @@ export interface PpdbPortalLoginRequest {
 
 export interface PpdbPortalFormRequest {
   namaCalon?: string;
+  namaLengkap?: string;
+  program?: string;
   jenjang?: string;
   nomorUmi?: string;
   asalKota?: string;
@@ -48,6 +50,21 @@ export interface PpdbPortalFormRequest {
   tempatLahir?: string;
   tanggalLahir?: string;
   jenisKelamin?: string;
+  nikCalonSantri?: string;
+  alamatLengkap?: string;
+  riwayatPenyakit?: string;
+  namaAyah?: string;
+  penghasilanAyah?: string;
+  noHpAyah?: string;
+  namaIbu?: string;
+  noHpIbu?: string;
+  soalJawab?: string;
+  suratPernyataanText?: string;
+  dokumenAkta?: File | null;
+  dokumenKk?: File | null;
+  dokumenAktaKk?: File | null;
+  dokumenRekomendasiUstadz?: File | null;
+  dokumenSuratPernyataan?: File | null;
   alamat?: string;
   emailPpdb?: string;
   idAkun?: string;
@@ -56,9 +73,12 @@ export interface PpdbPortalFormRequest {
 export interface PpdbPortalDashboard {
   idPendaftar: string;
   noPendaftaran: string;
+  waktuPendaftaran: string;
   email: string;
   phone: string;
   namaCalon: string;
+  namaLengkap: string;
+  program: string;
   jenjang: string;
   nomorUmi: string;
   asalKota: string;
@@ -66,6 +86,21 @@ export interface PpdbPortalDashboard {
   tempatLahir: string;
   tanggalLahir: string;
   jenisKelamin: string;
+  nikCalonSantri: string;
+  alamatLengkap: string;
+  riwayatPenyakit: string;
+  namaAyah: string;
+  penghasilanAyah: string;
+  noHpAyah: string;
+  namaIbu: string;
+  noHpIbu: string;
+  soalJawab: string;
+  suratPernyataanText: string;
+  berkasAktaUrl: string;
+  berkasKkUrl: string;
+  berkasAktaKkUrl: string;
+  berkasRekomendasiUstadzUrl: string;
+  berkasSuratPernyataanUrl: string;
   alamat: string;
   status: PpdbVerificationStatus;
   tesRequired: boolean;
@@ -83,6 +118,12 @@ export interface PpdbPortalAnnouncementResult {
   namaCalon: string;
   status: PpdbVerificationStatus;
   message: string;
+}
+
+export interface PpdbPortalPengumumanRekap {
+  fileUrl: string;
+  fileName: string;
+  contentType: string;
 }
 
 type ApiRecord = Record<string, unknown>;
@@ -546,6 +587,115 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     profile.alamat ?? identity.alamat ?? pendaftaran.alamat,
   );
 
+  const resolvedProgram = toStringOrEmpty(
+    profile.program ??
+      profile.program_daftar ??
+      profile.program_pilihan ??
+      identity.program ??
+      identity.program_daftar ??
+      pendaftaran.program ??
+      pendaftaran.program_daftar,
+  );
+
+  const resolvedNikCalonSantri = toStringOrEmpty(
+    profile.nik_calon_santri ??
+      profile.nik ??
+      identity.nik_calon_santri ??
+      identity.nik ??
+      pendaftaran.nik_calon_santri ??
+      pendaftaran.nik,
+  );
+
+  const resolvedRiwayatPenyakit = toStringOrEmpty(
+    profile.riwayat_penyakit ??
+      profile.riwayatPenyakit ??
+      identity.riwayat_penyakit ??
+      pendaftaran.riwayat_penyakit,
+  );
+
+  const resolvedNamaAyah = toStringOrEmpty(
+    profile.nama_ayah ?? identity.nama_ayah ?? pendaftaran.nama_ayah,
+  );
+
+  const resolvedPenghasilanAyah = toStringOrEmpty(
+    profile.penghasilan_ayah ??
+      profile.penghasilan ??
+      identity.penghasilan_ayah ??
+      pendaftaran.penghasilan_ayah ??
+      pendaftaran.penghasilan,
+  );
+
+  const resolvedNoHpAyah = toStringOrEmpty(
+    profile.no_hp_ayah ??
+      profile.hp_ayah ??
+      identity.no_hp_ayah ??
+      pendaftaran.no_hp_ayah,
+  );
+
+  const resolvedNamaIbu = toStringOrEmpty(
+    profile.nama_ibu ?? identity.nama_ibu ?? pendaftaran.nama_ibu,
+  );
+
+  const resolvedNoHpIbu = toStringOrEmpty(
+    profile.no_hp_ibu ??
+      profile.hp_ibu ??
+      identity.no_hp_ibu ??
+      pendaftaran.no_hp_ibu,
+  );
+
+  const resolvedSoalJawab = toStringOrEmpty(
+    profile.soal_jawab ??
+      profile.jawaban_soal ??
+      identity.soal_jawab ??
+      pendaftaran.soal_jawab,
+  );
+
+  const resolvedSuratPernyataanText = toStringOrEmpty(
+    profile.surat_pernyataan_text ??
+      profile.surat_pernyataan ??
+      identity.surat_pernyataan_text ??
+      pendaftaran.surat_pernyataan_text,
+  );
+
+  const resolvedBerkasAktaUrl = toStringOrEmpty(
+    profile.berkas_akta_url ??
+      profile.akta_url ??
+      profile.file_akta ??
+      identity.berkas_akta_url ??
+      pendaftaran.berkas_akta_url,
+  );
+
+  const resolvedBerkasKkUrl = toStringOrEmpty(
+    profile.berkas_kk_url ??
+      profile.kk_url ??
+      profile.file_kk ??
+      identity.berkas_kk_url ??
+      pendaftaran.berkas_kk_url,
+  );
+
+  const resolvedBerkasAktaKkUrl = toStringOrEmpty(
+    profile.berkas_akta_kk_url ??
+      profile.akta_kk_url ??
+      profile.file_akta_kk ??
+      identity.berkas_akta_kk_url ??
+      pendaftaran.berkas_akta_kk_url,
+  );
+
+  const resolvedBerkasRekomendasiUstadzUrl = toStringOrEmpty(
+    profile.berkas_rekomendasi_ustadz_url ??
+      profile.rekomendasi_ustadz_url ??
+      profile.file_rekomendasi_ustadz ??
+      identity.berkas_rekomendasi_ustadz_url ??
+      pendaftaran.berkas_rekomendasi_ustadz_url,
+  );
+
+  const resolvedBerkasSuratPernyataanUrl = toStringOrEmpty(
+    profile.berkas_surat_pernyataan_url ??
+      profile.file_surat_pernyataan ??
+      identity.berkas_surat_pernyataan_url ??
+      pendaftaran.berkas_surat_pernyataan_url,
+  );
+
   const resolvedEmail = toStringOrEmpty(
     profile.email_ppdb ??
       profile.email ??
@@ -657,8 +807,8 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       : Boolean(
           resolvedNamaCalon &&
             resolvedJenjang &&
-            resolvedNomorUmi &&
-            (resolvedAsalKota || resolvedAsalSekolah),
+            resolvedNikCalonSantri &&
+            resolvedAlamat,
         );
 
   const step = deriveStep(formCompleted, tesRequired, pengumumanOpen, status);
@@ -666,9 +816,14 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   return {
     idPendaftar,
     noPendaftaran,
+    waktuPendaftaran: toStringOrEmpty(
+      data.created_at ?? pendaftaran.created_at ?? profile.created_at,
+    ),
     email: resolvedEmail,
     phone: resolvedPhone,
     namaCalon: resolvedNamaCalon,
+    namaLengkap: resolvedNamaCalon,
+    program: resolvedProgram,
     jenjang: resolvedJenjang,
     nomorUmi: resolvedNomorUmi,
     asalKota: resolvedAsalKota,
@@ -676,6 +831,21 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     tempatLahir: resolvedTempatLahir,
     tanggalLahir: resolvedTanggalLahir,
     jenisKelamin: resolvedJenisKelamin,
+    nikCalonSantri: resolvedNikCalonSantri,
+    alamatLengkap: resolvedAlamat,
+    riwayatPenyakit: resolvedRiwayatPenyakit,
+    namaAyah: resolvedNamaAyah,
+    penghasilanAyah: resolvedPenghasilanAyah,
+    noHpAyah: resolvedNoHpAyah,
+    namaIbu: resolvedNamaIbu,
+    noHpIbu: resolvedNoHpIbu,
+    soalJawab: resolvedSoalJawab,
+    suratPernyataanText: resolvedSuratPernyataanText,
+    berkasAktaUrl: resolvedBerkasAktaUrl || resolvedBerkasAktaKkUrl,
+    berkasKkUrl: resolvedBerkasKkUrl || resolvedBerkasAktaKkUrl,
+    berkasAktaKkUrl: resolvedBerkasAktaKkUrl,
+    berkasRekomendasiUstadzUrl: resolvedBerkasRekomendasiUstadzUrl,
+    berkasSuratPernyataanUrl: resolvedBerkasSuratPernyataanUrl,
     alamat: resolvedAlamat,
     status,
     tesRequired,
@@ -912,7 +1082,10 @@ export const ppdbPortalService = {
 
     const payload = {
       nama_calon: data.namaCalon,
-      nama: data.namaCalon,
+      nama: data.namaLengkap ?? data.namaCalon,
+      nama_lengkap: data.namaLengkap ?? data.namaCalon,
+      program: data.program,
+      program_daftar: data.program,
       jenjang: data.jenjang,
       nomor_umi: data.nomorUmi,
       asal_kota: data.asalKota,
@@ -921,17 +1094,80 @@ export const ppdbPortalService = {
       tempat_lahir: data.tempatLahir,
       tanggal_lahir: data.tanggalLahir,
       jenis_kelamin: data.jenisKelamin,
-      alamat: data.alamat,
+      nik_calon_santri: data.nikCalonSantri,
+      nik: data.nikCalonSantri,
+      alamat: data.alamatLengkap ?? data.alamat,
+      alamat_lengkap: data.alamatLengkap ?? data.alamat,
+      riwayat_penyakit: data.riwayatPenyakit,
+      nama_ayah: data.namaAyah,
+      penghasilan_ayah: data.penghasilanAyah,
+      penghasilan: data.penghasilanAyah,
+      no_hp_ayah: data.noHpAyah,
+      nama_ibu: data.namaIbu,
+      no_hp_ibu: data.noHpIbu,
+      soal_jawab: data.soalJawab,
+      jawaban_soal: data.soalJawab,
+      surat_pernyataan_text: data.suratPernyataanText,
+      surat_pernyataan: data.suratPernyataanText,
       email_ppdb: resolvedEmailPpdb,
       id_akun: resolvedIdAkun,
       email: resolvedEmailPpdb,
     };
 
+    const hasFilePayload = Boolean(
+      data.dokumenAkta ||
+        data.dokumenKk ||
+        data.dokumenAktaKk ||
+        data.dokumenRekomendasiUstadz ||
+        data.dokumenSuratPernyataan,
+    );
+
+    const requestBody: FormData | ApiRecord = hasFilePayload
+      ? (() => {
+          const formData = new FormData();
+
+          Object.entries(payload).forEach(([key, value]) => {
+            if (value !== undefined && value !== null && value !== '') {
+              formData.append(key, String(value));
+            }
+          });
+
+          if (data.dokumenAkta) {
+            formData.append('akta', data.dokumenAkta);
+            formData.append('berkas_akta', data.dokumenAkta);
+          }
+          if (data.dokumenKk) {
+            formData.append('kk', data.dokumenKk);
+            formData.append('berkas_kk', data.dokumenKk);
+          }
+          if (data.dokumenAktaKk) {
+            formData.append('akta_kk', data.dokumenAktaKk);
+          }
+          if (data.dokumenRekomendasiUstadz) {
+            formData.append('surat_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
+          }
+          if (data.dokumenSuratPernyataan) {
+            formData.append('surat_pernyataan_file', data.dokumenSuratPernyataan);
+          }
+
+          return formData;
+        })()
+      : payload;
+
+    const requestConfig = hasFilePayload
+      ? {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      : undefined;
+
     // New backend flow: create identity first through dedicated endpoint.
     try {
       const response = await api.post(
         `${PPDB_PORTAL_BASE_PATH}/pendaftaran/create-identitas`,
-        payload,
+        requestBody,
+        requestConfig,
       );
       return response.data;
     } catch (error) {
@@ -945,7 +1181,11 @@ export const ppdbPortalService = {
     }
 
     try {
-      const response = await api.put(`${PPDB_PORTAL_BASE_PATH}/form`, payload);
+      const response = await api.put(
+        `${PPDB_PORTAL_BASE_PATH}/form`,
+        requestBody,
+        requestConfig,
+      );
       return response.data;
     } catch (error) {
       const message = extractErrorMessage(error, 'Gagal menyimpan form PPDB');
@@ -967,5 +1207,40 @@ export const ppdbPortalService = {
       const message = extractErrorMessage(error, 'Gagal mengecek pengumuman PPDB');
       throw new Error(message);
     }
+  },
+
+  getRekapPengumuman: async (): Promise<PpdbPortalPengumumanRekap> => {
+    try {
+      const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/pengumuman/rekap`);
+      const data = resolveRecord(response.data);
+
+      const fileUrl = toStringOrEmpty(
+        data.file_url ?? data.url ?? data.download_url ?? data.link,
+      );
+
+      const fileName = toStringOrEmpty(data.file_name ?? data.nama_file ?? data.filename);
+      const contentType = toStringOrEmpty(data.content_type ?? data.mime_type);
+
+      if (fileUrl) {
+        return {
+          fileUrl,
+          fileName,
+          contentType,
+        };
+      }
+    } catch {
+      // Fallback to direct endpoint URL below.
+    }
+
+    const baseApiUrl = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+    const fallbackUrl = baseApiUrl
+      ? `${baseApiUrl}${PPDB_PORTAL_BASE_PATH}/pengumuman/rekap`
+      : `${PPDB_PORTAL_BASE_PATH}/pengumuman/rekap`;
+
+    return {
+      fileUrl: fallbackUrl,
+      fileName: '',
+      contentType: '',
+    };
   },
 };

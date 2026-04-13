@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { ArrowLeft, FileCheck, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, FileCheck, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   usePpdbPortalAnnouncement,
   usePpdbPortalDashboard,
+  usePpdbPortalRekapPengumuman,
 } from '@/hooks/use-ppdb-portal';
 
 const statusBadgeClass: Record<string, string> = {
@@ -29,6 +30,11 @@ export default function PpdbPengumumanPage() {
     checkAnnouncement,
     loading,
   } = usePpdbPortalAnnouncement();
+  const {
+    data: rekapData,
+    fetchRekap,
+    loading: rekapLoading,
+  } = usePpdbPortalRekapPengumuman();
 
   const [announcementId, setAnnouncementId] = useState('');
 
@@ -38,7 +44,11 @@ export default function PpdbPengumumanPage() {
     }).catch(() => {
       // Halaman pengumuman tetap bisa diakses walau dashboard gagal.
     });
-  }, [fetchDashboard]);
+
+    void fetchRekap().catch(() => {
+      // Rekap bisa belum tersedia.
+    });
+  }, [fetchDashboard, fetchRekap]);
 
   const handleCheck = async () => {
     if (!announcementId.trim()) {
@@ -104,6 +114,29 @@ export default function PpdbPengumumanPage() {
                 Tanggal pengumuman dari sistem: {dashboard.pengumumanDate}
               </p>
             ) : null}
+
+            <div className="rounded-lg border border-border p-4 bg-muted/30 space-y-2">
+              <p className="text-sm font-medium text-foreground">Rekap Pengumuman Seleksi</p>
+              <p className="text-xs text-muted-foreground">
+                Rekap peserta diterima dapat dipublikasikan sebagai file PDF/DOC dari backend.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={rekapLoading || !rekapData?.fileUrl}
+                onClick={() => {
+                  if (!rekapData?.fileUrl) return;
+                  window.open(rekapData.fileUrl, '_blank', 'noopener,noreferrer');
+                }}
+              >
+                {rekapLoading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4 mr-2" />
+                )}
+                Unduh Rekap Pengumuman
+              </Button>
+            </div>
 
             {data ? (
               <div className="rounded-lg border border-border p-4 bg-muted/30 space-y-3">

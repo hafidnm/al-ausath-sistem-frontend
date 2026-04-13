@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosHeaders } from 'axios';
 
 export const PPDB_AUTH_TOKEN_STORAGE_KEY = 'ppdb_portal_auth_token';
 export const PPDB_AUTH_COOKIE_NAME = 'ppdb_auth';
@@ -64,11 +64,7 @@ const api = axios.create({
 
 api.interceptors.request.use(
     (config) => {
-        if (!config.headers) {
-            config.headers = {};
-        }
-
-        const headers = config.headers as Record<string, string | undefined>;
+        const headers = new AxiosHeaders(config.headers);
         const token = getCookieValue('XSRF-TOKEN');
         if (token) {
             headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
@@ -78,6 +74,8 @@ api.interceptors.request.use(
         if (bearerToken && !headers.Authorization) {
             headers.Authorization = `Bearer ${bearerToken}`;
         }
+
+        config.headers = headers;
 
         return config;
     },
@@ -98,11 +96,12 @@ api.interceptors.response.use(
                 const isLoginPage = currentPath === '/login' || currentPath.startsWith('/ppdb/login');
 
                 if (isPpdbRoute) {
-                    clearStoredPpdbToken();
+                    // Avoid redirect loop and token wipe while PPDB session/token propagation is in progress.
+                    return Promise.reject(error);
                 }
 
                 if (!isLoginPage) {
-                    window.location.href = isPpdbRoute ? '/ppdb/login' : '/login';
+                    window.location.href = '/login';
                 }
             }
 

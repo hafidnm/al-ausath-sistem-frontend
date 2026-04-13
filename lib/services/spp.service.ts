@@ -1,6 +1,12 @@
 import api from '../axios';
 
-export type SppStatus = 'Lunas' | 'Cicilan' | 'Belum Bayar' | 'Terlambat';
+export type SppStatus =
+  | 'Lunas'
+  | 'Cicilan'
+  | 'Belum Bayar'
+  | 'Terlambat'
+  | 'Menunggu Verifikasi'
+  | 'Terverifikasi';
 
 export interface SppPayment {
   id: string;
@@ -13,6 +19,12 @@ export interface SppPayment {
   nominal: number;
   terbayar: number;
   status: SppStatus;
+  channelPembayaran: string;
+  nomorWaPembayaran: string;
+  buktiBayarUrl: string;
+  kwitansiUrl: string;
+  verifikasiAt: string;
+  catatanVerifikasi: string;
 }
 
 export interface SppSetting {
@@ -63,6 +75,12 @@ export interface CreateSppPaymentRequest {
 }
 
 export type UpdateSppPaymentRequest = Partial<CreateSppPaymentRequest>;
+
+export interface VerifySppPaymentRequest {
+  status?: 'verified' | 'rejected' | 'pending';
+  verified?: boolean;
+  catatan?: string;
+}
 
 export interface CreateSppSettingRequest {
   nama: string;
@@ -265,6 +283,20 @@ const normalizePaymentStatus = (
   const raw = toStringOrEmpty(value).trim().toLowerCase();
 
   if (raw === 'lunas' || raw === 'paid' || raw === 'selesai') return 'Lunas';
+  if (
+    raw === 'terverifikasi' ||
+    raw === 'verified' ||
+    raw === 'valid' ||
+    raw === 'approved'
+  )
+    return 'Terverifikasi';
+  if (
+    raw === 'menunggu verifikasi' ||
+    raw === 'menunggu_verifikasi' ||
+    raw === 'waiting_verification' ||
+    raw === 'pending_verification'
+  )
+    return 'Menunggu Verifikasi';
   if (raw === 'cicilan' || raw === 'partial' || raw === 'installment') return 'Cicilan';
   if (
     raw === 'belum bayar' ||
@@ -319,6 +351,24 @@ const normalizePayment = (item: ApiRecord): SppPayment => {
     nominal,
     terbayar,
     status,
+    channelPembayaran: toStringOrEmpty(
+      item.channel_pembayaran ?? item.metode_pembayaran ?? item.payment_channel,
+    ),
+    nomorWaPembayaran: toStringOrEmpty(
+      item.nomor_wa_pembayaran ?? item.wa_number ?? item.whatsapp,
+    ),
+    buktiBayarUrl: toStringOrEmpty(
+      item.bukti_bayar_url ?? item.payment_proof_url ?? item.bukti_url,
+    ),
+    kwitansiUrl: toStringOrEmpty(
+      item.kwitansi_url ?? item.receipt_url ?? item.invoice_url,
+    ),
+    verifikasiAt: toStringOrEmpty(
+      item.verified_at ?? item.verifikasi_at ?? item.tanggal_verifikasi,
+    ),
+    catatanVerifikasi: toStringOrEmpty(
+      item.catatan_verifikasi ?? item.verification_note ?? item.keterangan_verifikasi,
+    ),
   };
 };
 
@@ -472,17 +522,29 @@ const mapSettingPayload = (data: CreateSppSettingRequest | UpdateSppSettingReque
 
 export const sppService = {
   getTunggakanSummary: async (): Promise<SppTunggakanSummary> => {
-    try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.get(buildPath(basePath, '/tunggakan')),
-      );
+    const pathCandidates = ['/tunggakan-ringkasan', '/tunggakan'];
+    let lastError: unknown;
 
-      const normalizedPayments = extractList(response.data).map(normalizePayment);
-      return normalizeSummary(response.data, normalizedPayments);
-    } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to fetch tunggakan summary');
-      throw new Error(message);
+    for (const path of pathCandidates) {
+      try {
+        const response = await requestWithBasePathFallback((basePath) =>
+          api.get(buildPath(basePath, path)),
+        );
+
+        const normalizedPayments = extractList(response.data).map(normalizePayment);
+        return normalizeSummary(response.data, normalizedPayments);
+      } catch (error) {
+        lastError = error;
+        const status = getErrorStatus(error);
+        if (status !== 404 && status !== 405) {
+          const message = extractErrorMessage(error, 'Failed to fetch tunggakan summary');
+          throw new Error(message);
+        }
+      }
     }
+
+    const message = extractErrorMessage(lastError, 'Failed to fetch tunggakan summary');
+    throw new Error(message);
   },
 
   getPayments: async (): Promise<SppPaymentListResponse> => {
@@ -543,6 +605,24 @@ export const sppService = {
       return response.data;
     } catch (error) {
       const message = extractErrorMessage(error, 'Failed to update payment');
+      throw new Error(message);
+    }
+  },
+
+  verifyPayment: async (id: string, data?: VerifySppPaymentRequest) => {
+    try {
+      const payload = {
+        status: data?.status ?? 'verified',
+        verified: data?.verified ?? true,
+        catatan: data?.catatan,
+      };
+
+      const response = await requestWithBasePathFallback((basePath) =>
+        api.put(buildPath(basePath, `/pembayaran/${id}/verifikasi`), payload),
+      );
+      return response.data;
+    } catch (error) {
+      const message = extractErrorMessage(error, 'Failed to verify payment');
       throw new Error(message);
     }
   },
