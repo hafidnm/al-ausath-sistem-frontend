@@ -10,6 +10,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalLogin } from '@/hooks/use-ppdb-portal';
+import { ppdbPortalService } from '@/lib/services/ppdb-portal.service';
+
+const wait = (ms: number) => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
+
+const ensureDashboardReady = async (): Promise<void> => {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await ppdbPortalService.getDashboard();
+      return;
+    } catch {
+      await wait(300 * (attempt + 1));
+    }
+  }
+};
 
 export default function PpdbLoginPage() {
   const { toast } = useToast();
@@ -44,6 +60,8 @@ export default function PpdbLoginPage() {
         login: form.login.trim(),
         password: form.password,
       });
+
+      await ensureDashboardReady();
 
       toast({
         title: 'Login berhasil',

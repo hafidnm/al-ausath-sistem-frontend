@@ -57,6 +57,7 @@ AlertTriangle,
 Receipt,
 Settings,
 Loader2,
+BadgeCheck,
 } from "lucide-react"
 import {
 useCreateSppPayment,
@@ -70,6 +71,7 @@ useSppSettings,
 useSppTunggakanSummary,
 useUpdateSppPayment,
 useUpdateSppSetting,
+useVerifySppPayment,
 } from "@/hooks/use-spp"
 import {
 SppPayment,
@@ -101,7 +103,14 @@ aktif: "true" | "false"
 keterangan: string
 }
 
-const paymentStatusOptions: SppStatus[] = ["Lunas", "Cicilan", "Belum Bayar", "Terlambat"]
+const paymentStatusOptions: SppStatus[] = [
+"Menunggu Verifikasi",
+"Terverifikasi",
+"Lunas",
+"Cicilan",
+"Belum Bayar",
+"Terlambat",
+]
 
 const emptyPaymentForm: PaymentFormState = {
 noTagihan: "",
@@ -165,6 +174,10 @@ case "Lunas":
 return <Badge className="bg-primary/10 text-primary border-0">Lunas</Badge>
 case "Cicilan":
 return <Badge className="bg-accent/20 text-accent border-0">Cicilan</Badge>
+case "Menunggu Verifikasi":
+return <Badge className="bg-chart-3/20 text-chart-4 border-0">Menunggu Verifikasi</Badge>
+case "Terverifikasi":
+return <Badge className="bg-primary/10 text-primary border-0">Terverifikasi</Badge>
 case "Belum Bayar":
 return <Badge className="bg-chart-3/20 text-chart-4 border-0">Belum Bayar</Badge>
 case "Terlambat":
@@ -311,6 +324,7 @@ fetchSettingDetail,
 
 const { createPayment, loading: createPaymentLoading } = useCreateSppPayment()
 const { updatePayment, loading: updatePaymentLoading } = useUpdateSppPayment()
+const { verifyPayment, loading: verifyPaymentLoading } = useVerifySppPayment()
 const { deletePayment, loading: deletePaymentLoading } = useDeleteSppPayment()
 
 const { createSetting, loading: createSettingLoading } = useCreateSppSetting()
@@ -378,6 +392,7 @@ const totalSisa = summary.totalSisa
 const isProcessing =
 createPaymentLoading ||
 updatePaymentLoading ||
+verifyPaymentLoading ||
 deletePaymentLoading ||
 createSettingLoading ||
 updateSettingLoading ||
@@ -461,6 +476,20 @@ alert(getErrorMessage(error, "Gagal menghapus tagihan"))
 }
 }
 
+const handleVerifyPayment = async (item: SppPayment) => {
+if (!confirm(`Verifikasi pembayaran ${item.noTagihan}? Kwitansi akan aktif setelah verifikasi.`)) return
+
+try {
+await verifyPayment(item.id, {
+status: "verified",
+verified: true,
+})
+await refreshAll()
+} catch (error) {
+alert(getErrorMessage(error, "Gagal memverifikasi pembayaran"))
+}
+}
+
 const handleAddSetting = async () => {
 if (!newSettingForm.nama || !newSettingForm.nominal) {
 alert("Nama setting dan nominal wajib diisi")
@@ -536,7 +565,7 @@ return (
 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 <div>
 <h1 className="text-2xl font-bold text-foreground">SPP - Pembayaran SPP</h1>
-<p className="text-muted-foreground">Kelola tagihan, cicilan, pelunasan, dan pengaturan nominal SPP</p>
+<p className="text-muted-foreground">Tagihan tampil di website, pembayaran via WA, admin verifikasi lalu kwitansi otomatis tersedia.</p>
 </div>
 <div className="flex items-center gap-2">
 <Button variant="outline" size="sm" onClick={() => void refreshAll()} disabled={isProcessing}>
@@ -905,6 +934,10 @@ Lihat Detail
 <Edit className="w-4 h-4 mr-2" />
 Catat Pembayaran
 </DropdownMenuItem>
+<DropdownMenuItem onClick={() => void handleVerifyPayment(item)}>
+<BadgeCheck className="w-4 h-4 mr-2" />
+Verifikasi Pembayaran
+</DropdownMenuItem>
 <DropdownMenuItem
 className="text-destructive focus:text-destructive"
 onClick={() => void handleDeletePayment(item)}
@@ -1208,6 +1241,32 @@ Memuat detail...
 <div className="mt-1">
 {currentDetail ? getStatusBadge(currentDetail.status) : <Badge variant="outline">-</Badge>}
 </div>
+</div>
+
+<div>
+<p className="text-muted-foreground">Channel Pembayaran</p>
+<p className="font-medium">{currentDetail?.channelPembayaran || "WhatsApp"}</p>
+</div>
+
+<div>
+<p className="text-muted-foreground">Nomor WA</p>
+<p className="font-medium">{currentDetail?.nomorWaPembayaran || "-"}</p>
+</div>
+
+<div className="col-span-2">
+<p className="text-muted-foreground">Kwitansi</p>
+{currentDetail?.kwitansiUrl ? (
+<a
+href={currentDetail.kwitansiUrl}
+target="_blank"
+rel="noreferrer"
+className="font-medium text-primary hover:underline"
+>
+Lihat / Unduh Kwitansi
+</a>
+) : (
+<p className="font-medium">Kwitansi belum tersedia. Verifikasi pembayaran terlebih dahulu.</p>
+)}
 </div>
 </div>
 )}

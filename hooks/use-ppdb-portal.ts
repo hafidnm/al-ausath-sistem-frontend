@@ -4,6 +4,7 @@ import {
   PpdbPortalDashboard,
   PpdbPortalFormRequest,
   PpdbPortalLoginRequest,
+  PpdbPortalPengumumanRekap,
   PpdbPortalRegisterRequest,
   ppdbPortalService,
 } from '@/lib/services/ppdb-portal.service';
@@ -159,4 +160,29 @@ export function usePpdbPortalAnnouncement() {
   }, []);
 
   return { data, loading, error, checkAnnouncement };
+}
+
+export function usePpdbPortalRekapPengumuman() {
+  const [data, setData] = useState<PpdbPortalPengumumanRekap | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRekap = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await ppdbPortalService.getRekapPengumuman();
+      setData(response);
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Gagal mengambil rekap pengumuman';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { data, loading, error, fetchRekap };
 }

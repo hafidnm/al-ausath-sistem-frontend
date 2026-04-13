@@ -7,6 +7,7 @@ import {
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
   UpdateSppSettingRequest,
+  VerifySppPaymentRequest,
   sppService,
 } from '@/lib/services/spp.service';
 
@@ -125,6 +126,33 @@ export function useUpdateSppPayment() {
   }, []);
 
   return { loading, error, success, updatePayment };
+}
+
+export function useVerifySppPayment() {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const verifyPayment = useCallback(async (id: string, payload?: VerifySppPaymentRequest) => {
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+
+    try {
+      const response = await sppService.verifyPayment(id, payload);
+      setSuccess(true);
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to verify payment';
+      setError(message);
+      console.error('Error verifying payment:', err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  return { loading, error, success, verifyPayment };
 }
 
 export function useDeleteSppPayment() {
