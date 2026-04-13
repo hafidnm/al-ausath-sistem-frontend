@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, Plus, Trash2 } from "lucide-react"
+import { AlertTriangle, Plus, Trash2, Check } from "lucide-react"
 import {
   NilaiMapelTugasItem,
   NilaiMapelUlanganItem,
@@ -23,6 +23,7 @@ import {
 } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
 import { authService } from "@/lib/services/auth.service"
+import { santriService, type SantriItem } from "@/lib/services/santri.service"
 import { semesterOptions, tahunAjaranOptions, jenisTugasOptions } from "../utils/constants"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
 
@@ -91,7 +92,15 @@ const toErrorMessage = (error: any): string => {
 }
 
 export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: NilaiMapelFormProps) {
-  const [nomorInduk, setNomorInduk] = useState(initialNomorInduk)
+  const [selectedNomorInduk, setSelectedNomorInduk] = useState(initialNomorInduk)
+  const [selectedNama, setSelectedNama] = useState("")
+  const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
+  const [searchInput, setSearchInput] = useState("")
+  const [santriResults, setSantriResults] = useState<SantriItem[]>([])
+  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
+  const [isLoadingSantriDetail, setIsLoadingSantriDetail] = useState(false)
+  const [santriSearchError, setSantriSearchError] = useState("")
+  const [openSantriPopover, setOpenSantriPopover] = useState(false)
   const [kodeMapel, setKodeMapel] = useState("")
   const [kodeKelas, setKodeKelas] = useState("")
   const [tahunAjaran, setTahunAjaran] = useState("")
@@ -119,6 +128,78 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
 
     loadUser()
   }, [])
+
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      setSantriResults([])
+      setSantriSearchError("")
+      return
+    }
+
+    let cancelled = false
+
+    const searchSantri = async () => {
+      try {
+        setIsLoadingSantri(true)
+        setSantriSearchError("")
+        // Search API support both nomor_induk and nama
+        const results = await santriService.search(searchInput.trim())
+        if (!cancelled) {
+          setSantriResults(results)
+        }
+      } catch {
+        if (!cancelled) {
+          setSantriResults([])
+          setSantriSearchError("Gagal mengambil data santri dari server")
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSantri(false)
+        }
+      }
+    }
+
+    const timer = setTimeout(searchSantri, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [searchInput])
+
+  useEffect(() => {
+    if (!selectedSantriId || selectedSantriId < 1) {
+      return
+    }
+
+    let cancelled = false
+
+    const loadSantriDetail = async () => {
+      try {
+        setIsLoadingSantriDetail(true)
+        const detail = await santriService.getById(selectedSantriId)
+
+        if (cancelled) return
+
+        if (detail.kelas) {
+          setKodeKelas(detail.kelas)
+        }
+      } catch {
+        if (!cancelled) {
+          // Keep existing value if detail fetch fails.
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSantriDetail(false)
+        }
+      }
+    }
+
+    loadSantriDetail()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedSantriId])
 
   useEffect(() => {
     const kodeMapelTrimmed = kodeMapel.trim()
@@ -202,7 +283,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!nomorInduk.trim() || !kodeMapel.trim() || !kodeKelas.trim() || !tahunAjaran || !semester) {
+    if (!selectedNomorInduk.trim() || !kodeMapel.trim() || !kodeKelas.trim() || !tahunAjaran || !semester) {
       setError("Nomor induk, kode mapel, kode kelas, tahun ajaran, dan semester wajib diisi")
       return
     }
@@ -242,7 +323,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       setError("")
 
       await onSubmit?.({
-        nomor_induk: nomorInduk.trim(),
+        nomor_induk: selectedNomorInduk.trim(),
         kode_mapel: kodeMapel.trim(),
         kode_kelas: kodeKelas.trim(),
         tahun_ajaran: tahunAjaran,
@@ -278,7 +359,73 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nomor Induk</Label>
-              <Input value={nomorInduk} onChange={(e) => setNomorInduk(e.target.value)} placeholder="2025001" />
+              <div className="relative">
+                <Input
+                  placeholder="Cari berdasarkan nomor induk atau nama..."
+                  value={selectedNomorInduk && !searchInput ? `${selectedNomorInduk}${selectedNama ? " - " + selectedNama : ""}` : searchInput}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSearchInput(value)
+                    setSelectedNomorInduk("")
+                    setSelectedNama("")
+                    setSelectedSantriId(null)
+                    setOpenSantriPopover(true)
+                  }}
+                  onFocus={() => setOpenSantriPopover(true)}
+                  onBlur={() => {
+                    setTimeout(() => setOpenSantriPopover(false), 120)
+                  }}
+                />
+
+                {openSantriPopover && (searchInput.trim() || isLoadingSantri || santriResults.length > 0) && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
+                    {isLoadingSantri && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari santri...</div>
+                    )}
+
+                    {!isLoadingSantri && santriSearchError && (
+                      <div className="px-2 py-4 text-center text-sm text-destructive">{santriSearchError}</div>
+                    )}
+
+                    {!isLoadingSantri && !santriSearchError && santriResults.length === 0 && searchInput.trim() && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada santri ditemukan</div>
+                    )}
+
+                    {!isLoadingSantri && santriResults.length > 0 && (
+                      <div className="max-h-60 overflow-auto">
+                        {santriResults.map((santri) => (
+                          <button
+                            key={santri.id}
+                            type="button"
+                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setSelectedNomorInduk(santri.nomor_induk)
+                              setSelectedNama(santri.nama_lengkap ?? "")
+                              setSelectedSantriId(santri.id)
+                              if (santri.kelas) {
+                                setKodeKelas(santri.kelas)
+                              }
+                              setSearchInput("")
+                              setOpenSantriPopover(false)
+                            }}
+                          >
+                            <Check
+                              className={`mt-0.5 h-4 w-4 ${
+                                selectedNomorInduk === santri.nomor_induk ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{santri.nomor_induk} - {santri.nama_lengkap}</div>
+                              {santri.kelas && <div className="text-xs text-muted-foreground">{santri.kelas}</div>}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Kode Mapel</Label>
@@ -287,6 +434,9 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             <div className="space-y-2">
               <Label>Kode Kelas</Label>
               <Input value={kodeKelas} onChange={(e) => setKodeKelas(e.target.value)} placeholder="KLS-10A" />
+              {isLoadingSantriDetail && (
+                <p className="text-xs text-muted-foreground">Mengisi data santri...</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
