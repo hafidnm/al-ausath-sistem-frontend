@@ -5,6 +5,7 @@ export interface SantriItem {
   nomor_induk: string
   nama_lengkap?: string
   kelas?: string
+  kode_kelas?: string
   jenjang?: string
   updatedAt?: string
 }
@@ -68,6 +69,7 @@ const normalizeSantriItem = (raw: any): SantriItem => ({
   nomor_induk: toText(raw?.nomor_induk ?? raw?.nis) ?? "",
   nama_lengkap: toText(raw?.nama_lengkap_santri ?? raw?.nama_lengkap ?? raw?.nama),
   kelas: toText(raw?.kelas?.kode_kelas ?? raw?.kelas ?? raw?.kode_kelas),
+  kode_kelas: toText(raw?.kode_kelas ?? raw?.kelas?.kode_kelas ?? raw?.kelas),
   jenjang: toText(raw?.jenjang),
   updatedAt: toText(raw?.updated_at ?? raw?.updatedAt),
 })
