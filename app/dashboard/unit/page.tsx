@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
@@ -54,10 +55,16 @@ import {
   Filter,
   Import as ImportIcon,
   MoreVertical,
-  PencilLine,
   PlusCircle,
   Trash2,
 } from "lucide-react"
+import {
+  dataUnitService,
+  DataUnitApiItem,
+  DataUnitListParams,
+  BackendStatus,
+} from "@/lib/services/unit.service"
+import { useToast } from "@/hooks/use-toast"
 
 type UnitStatus = "Aktif" | "Nonaktif"
 type PpdbStatus = "Dibuka" | "Ditutup"
@@ -105,83 +112,64 @@ const defaultFormState: UnitFormData = {
   statusPpdb: "Dibuka",
 }
 
-const initialUnits: UnitRow[] = [
-  {
-    id: 1,
-    urut: 1,
-    kode: "PAUD",
-    nama: "PAUD",
-    keterangan: "Jenjang PAUD",
-    jumlahKelas: 1,
-    jumlahSantri: 16,
-    statusUnit: "Aktif",
-    statusPpdb: "Dibuka",
-  },
-  {
-    id: 2,
-    urut: 2,
-    kode: "TK",
-    nama: "TK",
-    keterangan: "Jenjang TK",
-    jumlahKelas: 4,
-    jumlahSantri: 70,
-    statusUnit: "Aktif",
-    statusPpdb: "Dibuka",
-  },
-  {
-    id: 3,
-    urut: 3,
-    kode: "MI",
-    nama: "MTQU",
-    keterangan: "Jenjang MTQU",
-    jumlahKelas: 12,
-    jumlahSantri: 221,
-    statusUnit: "Aktif",
-    statusPpdb: "Dibuka",
-  },
-  {
-    id: 4,
-    urut: 4,
-    kode: "MTS",
-    nama: "MUTAWASITHAH",
-    keterangan: "Jenjang MUTAWASITHAH",
-    jumlahKelas: 6,
-    jumlahSantri: 102,
-    statusUnit: "Aktif",
-    statusPpdb: "Dibuka",
-  },
-  {
-    id: 5,
-    urut: 5,
-    kode: "MA",
-    nama: "ALIYAH",
-    keterangan: "Jenjang ALIYAH",
-    jumlahKelas: 6,
-    jumlahSantri: 37,
-    statusUnit: "Aktif",
-    statusPpdb: "Dibuka",
-  },
-]
+const toNumber = (value: unknown, fallback = 0): number => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
 
-const exportHeaders = [
-  "No Urut",
-  "Kode Unit",
-  "Nama Unit",
-  "Keterangan",
-  "Jumlah Kelas",
-  "Jumlah Santri",
-  "Status Unit",
-  "Status PPDB",
-]
+const toText = (value: unknown): string => {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return ""
+}
 
-const toCsvSafe = (value: string | number) => {
-  const escaped = String(value).replace(/"/g, '""')
-  return `"${escaped}"`
+const toBackendStatus = (status: UnitStatus): BackendStatus => (status === "Aktif" ? "AKTIF" : "NONAKTIF")
+
+const fromBackendStatus = (status: unknown): UnitStatus => {
+  const normalized = toText(status).toUpperCase()
+  return normalized === "NONAKTIF" ? "Nonaktif" : "Aktif"
+}
+
+const toBackendPpdbStatus = (status: PpdbStatus): BackendStatus => (status === "Dibuka" ? "AKTIF" : "NONAKTIF")
+
+const fromBackendPpdbStatus = (status: unknown): PpdbStatus => {
+  const normalized = toText(status).toUpperCase()
+  return normalized === "NONAKTIF" ? "Ditutup" : "Dibuka"
+}
+
+const normalizeUnitRow = (raw: DataUnitApiItem): UnitRow => ({
+  id: toNumber(raw.id_unit ?? raw.id, -1),
+  urut: toNumber(raw.nomor_urut, 0),
+  kode: toText(raw.kode_unit),
+  nama: toText(raw.nama_unit),
+  keterangan: toText(raw.keterangan) || "-",
+  jumlahKelas: toNumber(raw.jumlah_kelas ?? raw.kelas_count, 0),
+  jumlahSantri: toNumber(raw.jumlah_santri ?? raw.santri_count, 0),
+  statusUnit: fromBackendStatus(raw.status),
+  statusPpdb: fromBackendPpdbStatus(raw.status_ppdb),
+})
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (!error || typeof error !== "object") return fallback
+  const err = error as {
+    response?: {
+      data?: {
+        message?: string
+      }
+    }
+    message?: string
+  }
+
+  return err.response?.data?.message || err.message || fallback
 }
 
 export default function UnitPage() {
-  const [unitRows, setUnitRows] = useState<UnitRow[]>(initialUnits)
+  const { toast } = useToast()
+
+  const [unitRows, setUnitRows] = useState<UnitRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [isLoading, setIsLoading] = useState(false)
 
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState("")
@@ -192,29 +180,21 @@ export default function UnitPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>("urut")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [formData, setFormData] = useState<UnitFormData>(defaultFormState)
 
-  const filteredUnits = useMemo(() => {
-    const query = searchKeyword.trim().toLowerCase()
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingFormData, setEditingFormData] = useState<UnitFormData>(defaultFormState)
 
-    return unitRows.filter((unit) => {
-      const matchesQuery =
-        !query ||
-        [unit.kode, unit.nama, unit.keterangan].some((value) => value.toLowerCase().includes(query))
-
-      const matchesUnitStatus = unitStatusFilter === "all" || unit.statusUnit === unitStatusFilter
-      const matchesPpdbStatus = ppdbStatusFilter === "all" || unit.statusPpdb === ppdbStatusFilter
-
-      return matchesQuery && matchesUnitStatus && matchesPpdbStatus
-    })
-  }, [unitRows, searchKeyword, unitStatusFilter, ppdbStatusFilter])
+  const rowsLimit = Number(rowsPerPage)
 
   const sortedUnits = useMemo(() => {
-    return [...filteredUnits].sort((a, b) => {
+    return [...unitRows].sort((a, b) => {
       const sortSign = sortDirection === "asc" ? 1 : -1
-
       const aValue = a[sortField]
       const bValue = b[sortField]
 
@@ -224,24 +204,49 @@ export default function UnitPage() {
 
       return String(aValue).localeCompare(String(bValue), "id", { sensitivity: "base" }) * sortSign
     })
-  }, [filteredUnits, sortField, sortDirection])
+  }, [unitRows, sortField, sortDirection])
 
-  const rowsLimit = Number(rowsPerPage)
-  const totalPages = Math.max(1, Math.ceil(sortedUnits.length / rowsLimit))
+  const fetchUnits = async () => {
+    setIsLoading(true)
+    try {
+      const params: DataUnitListParams = {
+        page: currentPage,
+        per_page: rowsLimit,
+      }
+
+      const query = searchKeyword.trim()
+      if (query) params.q = query
+      if (unitStatusFilter !== "all") params.status = toBackendStatus(unitStatusFilter)
+      if (ppdbStatusFilter !== "all") params.status_ppdb = toBackendPpdbStatus(ppdbStatusFilter)
+
+      const result = await dataUnitService.getAll(params)
+      const rows = result.data.map(normalizeUnitRow).filter((row) => row.id > 0)
+
+      setUnitRows(rows)
+      setTotalItems(toNumber(result.meta?.total, rows.length))
+      setTotalPages(Math.max(1, toNumber(result.meta?.last_page, 1)))
+      setCurrentPage(toNumber(result.meta?.current_page, currentPage))
+    } catch (error) {
+      toast({
+        title: "Gagal Memuat Data",
+        description: getErrorMessage(error, "Data unit gagal dimuat."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchKeyword, unitStatusFilter, ppdbStatusFilter, rowsPerPage])
 
   useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages)
-    }
-  }, [currentPage, totalPages])
+    setSelectedIds([])
+    void fetchUnits()
+  }, [currentPage, rowsPerPage, searchKeyword, unitStatusFilter, ppdbStatusFilter])
 
-  const startIndex = (currentPage - 1) * rowsLimit
-  const pagedUnits = sortedUnits.slice(startIndex, startIndex + rowsLimit)
-
+  const pagedUnits = sortedUnits
   const pagedIds = pagedUnits.map((unit) => unit.id)
   const isAllCurrentPageSelected = pagedIds.length > 0 && pagedIds.every((id) => selectedIds.includes(id))
   const isSomeCurrentPageSelected = pagedIds.some((id) => selectedIds.includes(id)) && !isAllCurrentPageSelected
@@ -274,119 +279,192 @@ export default function UnitPage() {
     setSelectedIds((prev) => prev.filter((id) => id !== rowId))
   }
 
-  const updateSelectedUnitStatus = (status: UnitStatus) => {
-    if (selectedIds.length === 0) return
-
-    setUnitRows((prev) => prev.map((unit) => (selectedIds.includes(unit.id) ? { ...unit, statusUnit: status } : unit)))
-  }
-
-  const updateSelectedPpdbStatus = (status: PpdbStatus) => {
-    if (selectedIds.length === 0) return
-
-    setUnitRows((prev) => prev.map((unit) => (selectedIds.includes(unit.id) ? { ...unit, statusPpdb: status } : unit)))
-  }
-
   const deleteSelectedRows = () => {
-    if (selectedIds.length === 0) return
+    const run = async () => {
+      if (selectedIds.length === 0) return
 
-    setUnitRows((prev) => prev.filter((unit) => !selectedIds.includes(unit.id)))
-    setSelectedIds([])
-  }
+      setIsLoading(true)
+      try {
+        await Promise.all(selectedIds.map((id) => dataUnitService.remove(id)))
 
-  const toggleUnitStatus = (rowId: number) => {
-    setUnitRows((prev) =>
-      prev.map((unit) => {
-        if (unit.id !== rowId) return unit
+        toast({
+          title: "Berhasil",
+          description: "Data unit terpilih berhasil dihapus.",
+        })
 
-        return {
-          ...unit,
-          statusUnit: unit.statusUnit === "Aktif" ? "Nonaktif" : "Aktif",
-        }
-      }),
-    )
-  }
+        setSelectedIds([])
+        await fetchUnits()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menghapus data unit terpilih."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  const togglePpdbStatus = (rowId: number) => {
-    setUnitRows((prev) =>
-      prev.map((unit) => {
-        if (unit.id !== rowId) return unit
-
-        return {
-          ...unit,
-          statusPpdb: unit.statusPpdb === "Dibuka" ? "Ditutup" : "Dibuka",
-        }
-      }),
-    )
+    void run()
   }
 
   const deleteOneRow = (rowId: number) => {
-    setUnitRows((prev) => prev.filter((unit) => unit.id !== rowId))
-    setSelectedIds((prev) => prev.filter((id) => id !== rowId))
-  }
-
-  const handleMockImport = () => {
-    const nextId = unitRows.length ? Math.max(...unitRows.map((unit) => unit.id)) + 1 : 1
-
-    const newImportedUnit: UnitRow = {
-      id: nextId,
-      urut: nextId,
-      kode: `UNIT-${nextId}`,
-      nama: `UNIT BARU ${nextId}`,
-      keterangan: "Data hasil impor",
-      jumlahKelas: 0,
-      jumlahSantri: 0,
-      statusUnit: "Aktif",
-      statusPpdb: "Ditutup",
+    const run = async () => {
+      setIsLoading(true)
+      try {
+        await dataUnitService.remove(rowId)
+        setSelectedIds((prev) => prev.filter((id) => id !== rowId))
+        toast({
+          title: "Berhasil",
+          description: "Data unit berhasil dihapus.",
+        })
+        await fetchUnits()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menghapus data unit."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    setUnitRows((prev) => [newImportedUnit, ...prev])
+    void run()
   }
 
-  const handleExportCsv = () => {
-    const csvRows = sortedUnits.map((unit) => [
-      unit.urut,
-      unit.kode,
-      unit.nama,
-      unit.keterangan,
-      unit.jumlahKelas,
-      unit.jumlahSantri,
-      unit.statusUnit,
-      unit.statusPpdb,
-    ])
+  const openDetailDialog = (unit: UnitRow) => {
+    setEditingId(unit.id)
+    setEditingFormData({
+      urut: String(unit.urut),
+      kode: unit.kode,
+      nama: unit.nama,
+      keterangan: unit.keterangan === "-" ? "" : unit.keterangan,
+      jumlahKelas: String(unit.jumlahKelas),
+      jumlahSantri: String(unit.jumlahSantri),
+      statusUnit: unit.statusUnit,
+      statusPpdb: unit.statusPpdb,
+    })
+    setIsDetailDialogOpen(true)
+  }
 
-    const csvContent = [exportHeaders.map(toCsvSafe).join(","), ...csvRows.map((row) => row.map(toCsvSafe).join(","))].join("\n")
+  const handleSaveDetail = () => {
+    const run = async () => {
+      if (!editingId) return
+      if (!editingFormData.kode.trim() || !editingFormData.nama.trim()) {
+        toast({
+          title: "Validasi",
+          description: "Kode unit dan nama unit wajib diisi.",
+          variant: "destructive",
+        })
+        return
+      }
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const url = URL.createObjectURL(blob)
-    const anchor = document.createElement("a")
+      setIsLoading(true)
+      try {
+        await dataUnitService.update(editingId, {
+          kode_unit: editingFormData.kode,
+          nama_unit: editingFormData.nama,
+          nomor_urut: editingFormData.urut ? Number(editingFormData.urut) : null,
+          keterangan: editingFormData.keterangan || null,
+          status: toBackendStatus(editingFormData.statusUnit),
+          status_ppdb: toBackendPpdbStatus(editingFormData.statusPpdb),
+        })
 
-    anchor.href = url
-    anchor.download = `data-unit-${new Date().toISOString().slice(0, 10)}.csv`
-    anchor.click()
+        toast({
+          title: "Berhasil",
+          description: "Detail unit berhasil diperbarui.",
+        })
 
-    URL.revokeObjectURL(url)
+        setIsDetailDialogOpen(false)
+        await fetchUnits()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menyimpan perubahan unit."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
+  }
+
+  const handleExportExcel = () => {
+    const run = async () => {
+      setIsLoading(true)
+      try {
+        const params: Omit<DataUnitListParams, "per_page" | "page"> = {}
+        const query = searchKeyword.trim()
+        if (query) params.q = query
+        if (unitStatusFilter !== "all") params.status = toBackendStatus(unitStatusFilter)
+        if (ppdbStatusFilter !== "all") params.status_ppdb = toBackendPpdbStatus(ppdbStatusFilter)
+
+        const blob = await dataUnitService.exportExcel(params)
+        const url = URL.createObjectURL(blob)
+        const anchor = document.createElement("a")
+        anchor.href = url
+        anchor.download = `data-unit-${new Date().toISOString().slice(0, 10)}.xlsx`
+        anchor.click()
+        URL.revokeObjectURL(url)
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal mengekspor data unit Excel."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
   }
 
   const handleCreateUnit = () => {
-    if (!formData.kode.trim() || !formData.nama.trim()) return
+    const run = async () => {
+      if (!formData.kode.trim() || !formData.nama.trim()) {
+        toast({
+          title: "Validasi",
+          description: "Kode unit dan nama unit wajib diisi.",
+          variant: "destructive",
+        })
+        return
+      }
 
-    const nextId = unitRows.length ? Math.max(...unitRows.map((unit) => unit.id)) + 1 : 1
+      setIsLoading(true)
+      try {
+        await dataUnitService.create({
+          kode_unit: formData.kode,
+          nama_unit: formData.nama,
+          nomor_urut: formData.urut ? Number(formData.urut) : null,
+          keterangan: formData.keterangan || null,
+          status: toBackendStatus(formData.statusUnit),
+          status_ppdb: toBackendPpdbStatus(formData.statusPpdb),
+        })
 
-    const newUnit: UnitRow = {
-      id: nextId,
-      urut: Number(formData.urut) || nextId,
-      kode: formData.kode.trim().toUpperCase(),
-      nama: formData.nama.trim().toUpperCase(),
-      keterangan: formData.keterangan.trim() || "-",
-      jumlahKelas: Number(formData.jumlahKelas) || 0,
-      jumlahSantri: Number(formData.jumlahSantri) || 0,
-      statusUnit: formData.statusUnit,
-      statusPpdb: formData.statusPpdb,
+        toast({
+          title: "Berhasil",
+          description: "Data unit berhasil dibuat.",
+        })
+
+        setFormData(defaultFormState)
+        setIsAddDialogOpen(false)
+        await fetchUnits()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal membuat data unit."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
 
-    setUnitRows((prev) => [...prev, newUnit])
-    setFormData(defaultFormState)
-    setIsAddDialogOpen(false)
+    void run()
   }
 
   const resetFilter = () => {
@@ -396,8 +474,8 @@ export default function UnitPage() {
   }
 
   const selectedCount = selectedIds.length
-  const visibleStart = sortedUnits.length === 0 ? 0 : startIndex + 1
-  const visibleEnd = Math.min(startIndex + rowsLimit, sortedUnits.length)
+  const visibleStart = totalItems === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
+  const visibleEnd = Math.min(currentPage * rowsLimit, totalItems)
 
   return (
     <div className="space-y-6">
@@ -464,30 +542,6 @@ export default function UnitPage() {
 
                 <div className="grid gap-2 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="unit-jumlah-kelas">Jumlah Kelas</Label>
-                    <Input
-                      id="unit-jumlah-kelas"
-                      type="number"
-                      min={0}
-                      value={formData.jumlahKelas}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, jumlahKelas: event.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="unit-jumlah-santri">Jumlah Santri</Label>
-                    <Input
-                      id="unit-jumlah-santri"
-                      type="number"
-                      min={0}
-                      value={formData.jumlahSantri}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, jumlahSantri: event.target.value }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="space-y-2">
                     <Label>Status Unit</Label>
                     <Select
                       value={formData.statusUnit}
@@ -525,17 +579,21 @@ export default function UnitPage() {
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Batal
                 </Button>
-                <Button onClick={handleCreateUnit}>Simpan</Button>
+                <Button onClick={handleCreateUnit} disabled={isLoading}>
+                  Simpan
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
-          <Button variant="default" className="h-10 gap-2 px-4" onClick={handleMockImport}>
-            <ImportIcon className="h-4 w-4" />
-            Impor
-          </Button>
+          <Link href="/dashboard/unit/import">
+            <Button variant="default" className="h-10 gap-2 px-4" disabled={isLoading}>
+              <ImportIcon className="h-4 w-4" />
+              Impor
+            </Button>
+          </Link>
 
-          <Button variant="default" className="h-10 gap-2 px-4" onClick={handleExportCsv}>
+          <Button variant="default" className="h-10 gap-2 px-4" onClick={handleExportExcel} disabled={isLoading}>
             <Download className="h-4 w-4" />
             Ekspor
           </Button>
@@ -626,19 +684,13 @@ export default function UnitPage() {
             <div className="flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-10 gap-2" disabled={selectedCount === 0}>
+                  <Button variant="outline" className="h-10 gap-2" disabled={selectedCount === 0 || isLoading}>
                     Aksi Masal
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuLabel>Pilih Aksi</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => updateSelectedUnitStatus("Aktif")}>Aktifkan Unit</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateSelectedUnitStatus("Nonaktif")}>Nonaktifkan Unit</DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => updateSelectedPpdbStatus("Dibuka")}>Buka PPDB</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => updateSelectedPpdbStatus("Ditutup")}>Tutup PPDB</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="text-destructive" onClick={deleteSelectedRows}>
                     Hapus Terpilih
@@ -738,7 +790,7 @@ export default function UnitPage() {
                 {pagedUnits.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">
-                      Data unit tidak ditemukan.
+                      {isLoading ? "Memuat data..." : "Data unit tidak ditemukan."}
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -751,7 +803,7 @@ export default function UnitPage() {
                           aria-label={`Pilih baris unit ${unit.nama}`}
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{startIndex + index + 1}</TableCell>
+                      <TableCell className="font-medium">{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
                       <TableCell>{unit.urut}</TableCell>
                       <TableCell>{unit.kode}</TableCell>
                       <TableCell>{unit.nama}</TableCell>
@@ -797,20 +849,9 @@ export default function UnitPage() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Aksi Unit</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openDetailDialog(unit)}>
                               <Eye className="mr-2 h-4 w-4" />
-                              Lihat Detail
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <PencilLine className="mr-2 h-4 w-4" />
-                              Edit Unit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => toggleUnitStatus(unit.id)}>
-                              Ubah Status Unit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => togglePpdbStatus(unit.id)}>
-                              Ubah Status PPDB
+                              Detail
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => deleteOneRow(unit.id)}>
@@ -829,7 +870,7 @@ export default function UnitPage() {
 
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-muted-foreground">
-              Menampilkan {visibleStart} - {visibleEnd} dari {sortedUnits.length} data unit
+              Menampilkan {visibleStart} - {visibleEnd} dari {totalItems} data unit
             </p>
 
             <div className="flex items-center gap-2">
@@ -837,7 +878,7 @@ export default function UnitPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
+                disabled={currentPage === 1 || isLoading}
               >
                 Sebelumnya
               </Button>
@@ -848,7 +889,7 @@ export default function UnitPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || isLoading}
               >
                 Selanjutnya
               </Button>
@@ -856,6 +897,100 @@ export default function UnitPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Detail Unit</DialogTitle>
+            <DialogDescription>Ubah status Unit/PPDB melalui form detail ini.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="detail-urut">No. Urut</Label>
+                <Input
+                  id="detail-urut"
+                  type="number"
+                  min={1}
+                  value={editingFormData.urut}
+                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, urut: event.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="detail-kode">Kode Unit</Label>
+                <Input
+                  id="detail-kode"
+                  value={editingFormData.kode}
+                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, kode: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="detail-nama">Nama Unit</Label>
+              <Input
+                id="detail-nama"
+                value={editingFormData.nama}
+                onChange={(event) => setEditingFormData((prev) => ({ ...prev, nama: event.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="detail-keterangan">Keterangan</Label>
+              <Input
+                id="detail-keterangan"
+                value={editingFormData.keterangan}
+                onChange={(event) => setEditingFormData((prev) => ({ ...prev, keterangan: event.target.value }))}
+              />
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Status Unit</Label>
+                <Select
+                  value={editingFormData.statusUnit}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, statusUnit: value as UnitStatus }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aktif">Aktif</SelectItem>
+                    <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Status PPDB</Label>
+                <Select
+                  value={editingFormData.statusPpdb}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, statusPpdb: value as PpdbStatus }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dibuka">Dibuka</SelectItem>
+                    <SelectItem value="Ditutup">Ditutup</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDetailDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveDetail} disabled={isLoading}>
+              Simpan Perubahan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,18 +1,13 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import Link from "next/link"
+import { useEffect, useMemo, useState } from "react"
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import {
   Dialog,
   DialogContent,
@@ -22,356 +17,1038 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
 import {
-  Search,
-  Plus,
-  Filter,
-  Users,
-  GraduationCap,
-  School,
-  Edit,
-  Trash2,
-  Eye,
-} from "lucide-react"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { useToast } from "@/hooks/use-toast"
+import { BackendStatus, dataUnitService } from "@/lib/services/unit.service"
+import { dataKelasService, DataKelasApiItem } from "@/lib/services/kelas.service"
+import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
+import { ArrowUpDown, ChevronDown, Download, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
-const kelasData = [
-  {
-    id: "K001",
-    nama: "12 IPA",
-    jenjang: "SMA",
-    waliKelas: "Ustadzah Fatimah Azzahra, S.Pd",
-    jumlahSantri: 32,
-    putra: 15,
-    putri: 17,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K002",
-    nama: "12 IPS",
-    jenjang: "SMA",
-    waliKelas: "Ustadz Ibrahim Malik, M.Pd",
-    jumlahSantri: 28,
-    putra: 12,
-    putri: 16,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K003",
-    nama: "11 IPA",
-    jenjang: "SMA",
-    waliKelas: "Ustadz Ahmad Ridwan, S.Pd.I",
-    jumlahSantri: 30,
-    putra: 14,
-    putri: 16,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K004",
-    nama: "9A",
-    jenjang: "SMP",
-    waliKelas: "Ustadzah Khadijah Nur, S.Ag",
-    jumlahSantri: 25,
-    putra: 12,
-    putri: 13,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K005",
-    nama: "9B",
-    jenjang: "SMP",
-    waliKelas: "Ustadz Umar Hasan, S.Pd",
-    jumlahSantri: 24,
-    putra: 11,
-    putri: 13,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K006",
-    nama: "6A",
-    jenjang: "SD",
-    waliKelas: "Ustadzah Maryam Salma, S.Pd",
-    jumlahSantri: 28,
-    putra: 15,
-    putri: 13,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K007",
-    nama: "TK-B",
-    jenjang: "TK",
-    waliKelas: "Ustadzah Aisyah Putri, S.Pd",
-    jumlahSantri: 20,
-    putra: 10,
-    putri: 10,
-    tahunAjaran: "2024/2025",
-  },
-  {
-    id: "K008",
-    nama: "PAUD-A",
-    jenjang: "PAUD",
-    waliKelas: "Ustadzah Zahra Kamila, S.Pd",
-    jumlahSantri: 15,
-    putra: 8,
-    putri: 7,
-    tahunAjaran: "2024/2025",
-  },
-]
+type UiStatus = "Aktif" | "Nonaktif"
+type UiPpdbStatus = "Dibuka" | "Ditutup"
+
+interface KelasRow {
+  id: number
+  namaUnit: string
+  kodeUnit: string
+  kodeKelas: string
+  namaKelas: string
+  namaJurusan: string
+  tahunAjaran: string
+  santriAktif: number
+  santriLulus: number
+  santriKeluar: number
+  status: UiStatus
+  statusPpdb: UiPpdbStatus
+}
+
+interface KelasFormData {
+  kodeUnit: string
+  kodeKelas: string
+  namaKelas: string
+  namaJurusan: string
+  tahunAjaran: string
+  status: UiStatus
+  statusPpdb: UiPpdbStatus
+}
+
+interface UnitOption {
+  value: string
+  label: string
+}
+
+interface TahunAjaranOption {
+  value: string
+  label: string
+}
+
+const defaultFormState: KelasFormData = {
+  kodeUnit: "",
+  kodeKelas: "",
+  namaKelas: "",
+  namaJurusan: "",
+  tahunAjaran: "",
+  status: "Aktif",
+  statusPpdb: "Dibuka",
+}
+
+const toText = (value: unknown): string => {
+  if (value == null) return ""
+  if (typeof value === "string") return value
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return ""
+}
+
+const toNumber = (value: unknown, fallback = 0): number => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : fallback
+}
+
+const toBackendStatus = (status: UiStatus): BackendStatus => (status === "Aktif" ? "AKTIF" : "NONAKTIF")
+const fromBackendStatus = (status: unknown): UiStatus => (toText(status).toUpperCase() === "NONAKTIF" ? "Nonaktif" : "Aktif")
+
+const toBackendPpdbStatus = (status: UiPpdbStatus): BackendStatus => (status === "Dibuka" ? "AKTIF" : "NONAKTIF")
+const fromBackendPpdbStatus = (status: unknown): UiPpdbStatus => (toText(status).toUpperCase() === "AKTIF" ? "Dibuka" : "Ditutup")
+
+const normalizeKelasRow = (raw: DataKelasApiItem): KelasRow => ({
+  id: toNumber(raw.id_kelas ?? raw.id, -1),
+  namaUnit: toText(raw.unit?.nama_unit) || toText(raw.kode_unit) || "-",
+  kodeUnit: toText(raw.kode_unit),
+  kodeKelas: toText(raw.kode_kelas),
+  namaKelas: toText(raw.nama_kelas),
+  namaJurusan: toText(raw.nama_jurusan),
+  tahunAjaran: toText(raw.tahun_ajaran),
+  santriAktif: toNumber(raw.jumlah_santri_aktif),
+  santriLulus: toNumber(raw.jumlah_santri_lulus),
+  santriKeluar: toNumber(raw.jumlah_santri_keluar),
+  status: fromBackendStatus(raw.status),
+  statusPpdb: fromBackendPpdbStatus(raw.status_ppdb),
+})
+
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (!error || typeof error !== "object") return fallback
+
+  const err = error as {
+    response?: {
+      data?: {
+        message?: string
+        errors?: Record<string, string[]>
+      }
+    }
+    message?: string
+  }
+
+  const firstFieldError = err.response?.data?.errors
+    ? Object.values(err.response.data.errors).flat().find(Boolean)
+    : undefined
+
+  return firstFieldError || err.response?.data?.message || err.message || fallback
+}
+
+const downloadBlob = (blob: Blob, filename: string): void => {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
 
 export default function KelasPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedJenjang, setSelectedJenjang] = useState("all")
+  const { toast } = useToast()
+
+  const [rows, setRows] = useState<KelasRow[]>([])
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [rowsPerPage, setRowsPerPage] = useState("25")
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
 
-  const filteredData = kelasData.filter((kelas) => {
-    const matchesSearch =
-      kelas.nama.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      kelas.waliKelas.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesJenjang =
-      selectedJenjang === "all" || kelas.jenjang === selectedJenjang
-    return matchesSearch && matchesJenjang
-  })
+  const [formData, setFormData] = useState<KelasFormData>(defaultFormState)
+  const [editingFormData, setEditingFormData] = useState<KelasFormData>(defaultFormState)
 
-  const totalSantri = kelasData.reduce((acc, kelas) => acc + kelas.jumlahSantri, 0)
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
+  const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
+
+  const [draftKeyword, setDraftKeyword] = useState("")
+  const [draftUnit, setDraftUnit] = useState("all")
+  const [draftKelas, setDraftKelas] = useState("all")
+  const [draftTahun, setDraftTahun] = useState("all")
+  const [draftStatus, setDraftStatus] = useState("all")
+
+  const [keyword, setKeyword] = useState("")
+  const [unitFilter, setUnitFilter] = useState("all")
+  const [kelasFilter, setKelasFilter] = useState("all")
+  const [tahunFilter, setTahunFilter] = useState("all")
+  const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+
+  const rowsLimit = Number(rowsPerPage)
+
+  const visibleRows = useMemo(() => {
+    if (kelasFilter === "all") return rows
+    return rows.filter((row) => row.kodeKelas === kelasFilter)
+  }, [rows, kelasFilter])
+
+  const kelasFilterOptions = useMemo(() => {
+    const seen = new Set<string>()
+    const options: Array<{ value: string; label: string }> = []
+
+    for (const row of rows) {
+      if (!row.kodeKelas || seen.has(row.kodeKelas)) continue
+      seen.add(row.kodeKelas)
+      options.push({ value: row.kodeKelas, label: row.namaKelas || row.kodeKelas })
+    }
+
+    return options
+  }, [rows])
+
+  const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
+  const someVisibleSelected = visibleRows.some((row) => selectedIds.includes(row.id))
+
+  const fetchRows = async () => {
+    setIsLoading(true)
+    try {
+      const params: {
+        page: number
+        per_page: number
+        q?: string
+        kode_unit?: string
+        tahun_ajaran?: string
+        status?: BackendStatus
+      } = {
+        page: currentPage,
+        per_page: rowsLimit,
+      }
+
+      const q = keyword.trim()
+      if (q) params.q = q
+      if (unitFilter !== "all") params.kode_unit = unitFilter
+      if (tahunFilter !== "all") params.tahun_ajaran = tahunFilter
+      if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
+
+      const result = await dataKelasService.getAll(params)
+      const mappedRows = result.data.map(normalizeKelasRow).filter((row) => row.id > 0)
+
+      setRows(mappedRows)
+      setSelectedIds([])
+      setTotalItems(toNumber(result.meta?.total, mappedRows.length))
+      setTotalPages(Math.max(1, toNumber(result.meta?.last_page, 1)))
+      setCurrentPage(toNumber(result.meta?.current_page, currentPage))
+    } catch (error) {
+      toast({
+        title: "Gagal Memuat Data",
+        description: getErrorMessage(error, "Data kelas gagal dimuat."),
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [unitResult, tahunResult] = await Promise.all([
+          dataUnitService.getAll({ page: 1, per_page: 200 }),
+          tahunAjaranService.getAll({ page: 1, per_page: 200 }),
+        ])
+
+        const units: UnitOption[] = []
+        for (const item of unitResult.data) {
+          const code = toText(item.kode_unit).trim()
+          if (!code) continue
+          units.push({ value: code, label: toText(item.nama_unit).trim() || code })
+        }
+
+        const years: TahunAjaranOption[] = []
+        for (const item of tahunResult.data) {
+          const code = toText(item.kode_tahun).trim()
+          if (!code) continue
+          years.push({ value: code, label: toText(item.nama_tahun).trim() || code })
+        }
+
+        setUnitOptions(units)
+        setTahunOptions(years)
+      } catch {
+        setUnitOptions([])
+        setTahunOptions([])
+      }
+    }
+
+    void loadOptions()
+  }, [])
+
+  useEffect(() => {
+    void fetchRows()
+  }, [currentPage, rowsPerPage, keyword, unitFilter, tahunFilter, statusFilter])
+
+  const applyFilter = () => {
+    setKeyword(draftKeyword)
+    setUnitFilter(draftUnit)
+    setKelasFilter(draftKelas)
+    setTahunFilter(draftTahun)
+    setStatusFilter(draftStatus as UiStatus | "all")
+    setCurrentPage(1)
+  }
+
+  const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftUnit("all")
+    setDraftKelas("all")
+    setDraftTahun("all")
+    setDraftStatus("all")
+
+    setKeyword("")
+    setUnitFilter("all")
+    setKelasFilter("all")
+    setTahunFilter("all")
+    setStatusFilter("all")
+    setCurrentPage(1)
+  }
+
+  const toggleSelectAll = (checked: boolean | "indeterminate") => {
+    const visibleIds = visibleRows.map((row) => row.id)
+    if (checked !== true) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)))
+      return
+    }
+
+    setSelectedIds((prev) => {
+      const merged = new Set([...prev, ...visibleIds])
+      return Array.from(merged)
+    })
+  }
+
+  const toggleSelectOne = (id: number, checked: boolean | "indeterminate") => {
+    if (checked === true) {
+      setSelectedIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
+      return
+    }
+
+    setSelectedIds((prev) => prev.filter((item) => item !== id))
+  }
+
+  const openEditDialog = (rowId: number) => {
+    const target = rows.find((row) => row.id === rowId)
+    if (!target) return
+
+    setEditingId(rowId)
+    setEditingFormData({
+      kodeUnit: target.kodeUnit,
+      kodeKelas: target.kodeKelas,
+      namaKelas: target.namaKelas,
+      namaJurusan: target.namaJurusan,
+      tahunAjaran: target.tahunAjaran,
+      status: target.status,
+      statusPpdb: target.statusPpdb,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleCreate = () => {
+    const run = async () => {
+      if (!formData.kodeUnit || !formData.kodeKelas.trim() || !formData.namaKelas.trim() || !formData.tahunAjaran) {
+        toast({
+          title: "Validasi",
+          description: "Kode unit, kode kelas, nama kelas, dan tahun ajaran wajib diisi.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        await dataKelasService.create({
+          kode_unit: formData.kodeUnit,
+          kode_kelas: formData.kodeKelas,
+          nama_kelas: formData.namaKelas,
+          nama_jurusan: formData.namaJurusan || null,
+          tahun_ajaran: formData.tahunAjaran,
+          status: toBackendStatus(formData.status),
+          status_ppdb: toBackendPpdbStatus(formData.statusPpdb),
+        })
+
+        toast({
+          title: "Berhasil",
+          description: "Data kelas berhasil dibuat.",
+        })
+
+        setIsAddDialogOpen(false)
+        setFormData(defaultFormState)
+        setCurrentPage(1)
+        await fetchRows()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menambahkan data kelas."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
+  }
+
+  const handleUpdate = () => {
+    const run = async () => {
+      if (!editingId) return
+      if (!editingFormData.kodeUnit || !editingFormData.kodeKelas.trim() || !editingFormData.namaKelas.trim() || !editingFormData.tahunAjaran) {
+        toast({
+          title: "Validasi",
+          description: "Kode unit, kode kelas, nama kelas, dan tahun ajaran wajib diisi.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setIsLoading(true)
+      try {
+        await dataKelasService.update(editingId, {
+          kode_unit: editingFormData.kodeUnit,
+          kode_kelas: editingFormData.kodeKelas,
+          nama_kelas: editingFormData.namaKelas,
+          nama_jurusan: editingFormData.namaJurusan || null,
+          tahun_ajaran: editingFormData.tahunAjaran,
+          status: toBackendStatus(editingFormData.status),
+          status_ppdb: toBackendPpdbStatus(editingFormData.statusPpdb),
+        })
+
+        toast({
+          title: "Berhasil",
+          description: "Data kelas berhasil diperbarui.",
+        })
+
+        setIsEditDialogOpen(false)
+        setEditingId(null)
+        setEditingFormData(defaultFormState)
+        await fetchRows()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal memperbarui data kelas."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
+  }
+
+  const deleteOne = (id: number) => {
+    const run = async () => {
+      setIsLoading(true)
+      try {
+        await dataKelasService.remove(id)
+        setSelectedIds((prev) => prev.filter((item) => item !== id))
+        toast({
+          title: "Berhasil",
+          description: "Data kelas dipindahkan ke trash.",
+        })
+        await fetchRows()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menghapus data kelas."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
+  }
+
+  const deleteSelected = () => {
+    const run = async () => {
+      if (selectedIds.length === 0) return
+
+      setIsLoading(true)
+      try {
+        await Promise.all(selectedIds.map((id) => dataKelasService.remove(id)))
+        setSelectedIds([])
+        toast({
+          title: "Berhasil",
+          description: "Data kelas terpilih dipindahkan ke trash.",
+        })
+        await fetchRows()
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal menghapus data kelas terpilih."),
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    void run()
+  }
+
+  const handleExport = () => {
+    const run = async () => {
+      try {
+        const blob = await dataKelasService.exportExcel({
+          q: keyword.trim() || undefined,
+          kode_unit: unitFilter === "all" ? undefined : unitFilter,
+          tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
+          status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
+        })
+
+        downloadBlob(blob, `data-kelas-${new Date().toISOString().slice(0, 10)}.xlsx`)
+      } catch (error) {
+        toast({
+          title: "Gagal",
+          description: getErrorMessage(error, "Gagal mengekspor data kelas."),
+          variant: "destructive",
+        })
+      }
+    }
+
+    void run()
+  }
+
+  const visibleStart = visibleRows.length === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
+  const visibleEnd = visibleRows.length === 0 ? 0 : Math.min((currentPage - 1) * rowsLimit + visibleRows.length, totalItems)
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="space-y-3">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Data Kelas</h1>
-          <p className="text-muted-foreground">Kelola data kelas dan wali kelas</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">DAFTAR KELAS</h1>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="bg-primary text-primary-foreground">
-              <Plus className="w-4 h-4 mr-2" />
-              Tambah Kelas
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[450px]">
-            <DialogHeader>
-              <DialogTitle>Tambah Kelas Baru</DialogTitle>
-              <DialogDescription>
-                Isi data kelas baru dengan lengkap
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-10 gap-2 px-4">
+                <PlusCircle className="h-4 w-4" />
+                Tambah
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[560px]">
+              <DialogHeader>
+                <DialogTitle>Tambah Kelas</DialogTitle>
+                <DialogDescription>Lengkapi data kelas baru.</DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Kode Unit</Label>
+                    <Select value={formData.kodeUnit} onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {unitOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="create-kode-kelas">Kode Kelas</Label>
+                    <Input
+                      id="create-kode-kelas"
+                      value={formData.kodeKelas}
+                      onChange={(event) => setFormData((prev) => ({ ...prev, kodeKelas: event.target.value }))}
+                      placeholder="Contoh: A-PA"
+                    />
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="namaKelas">Nama Kelas</Label>
-                  <Input id="namaKelas" placeholder="Contoh: 12 IPA" />
+                  <Label htmlFor="create-nama-kelas">Nama Kelas</Label>
+                  <Input
+                    id="create-nama-kelas"
+                    value={formData.namaKelas}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, namaKelas: event.target.value }))}
+                    placeholder="Contoh: TK A PUTRA"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="create-nama-jurusan">Nama Jurusan (opsional)</Label>
+                  <Input
+                    id="create-nama-jurusan"
+                    value={formData.namaJurusan}
+                    onChange={(event) => setFormData((prev) => ({ ...prev, namaJurusan: event.target.value }))}
+                    placeholder="Contoh: IPA"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>Tahun Ajaran</Label>
+                    <Select
+                      value={formData.tahunAjaran}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, tahunAjaran: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih tahun ajaran" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tahunOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, status: value as UiStatus }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Aktif">Aktif</SelectItem>
+                        <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status PPDB</Label>
+                    <Select
+                      value={formData.statusPpdb}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, statusPpdb: value as UiPpdbStatus }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih status PPDB" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Dibuka">Dibuka</SelectItem>
+                        <SelectItem value="Ditutup">Ditutup</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
+                  Batal
+                </Button>
+                <Button disabled={isLoading} onClick={handleCreate}>
+                  Simpan
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Link href="/dashboard/kelas/import">
+            <Button className="h-10 gap-2 px-4" variant="default">
+              <Upload className="h-4 w-4" />
+              Impor
+            </Button>
+          </Link>
+
+          <Button className="h-10 gap-2 px-4" variant="default" onClick={handleExport}>
+            <Download className="h-4 w-4" />
+            Ekspor
+          </Button>
+
+          <Link href="/dashboard/kelas/trash">
+            <Button className="h-10 gap-2 px-4" variant="default">
+              <Trash2 className="h-4 w-4" />
+              Dihapus
+            </Button>
+          </Link>
+        </div>
+      </div>
+
+      <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <button type="button" className="flex w-full items-center justify-between px-6 py-5 text-left">
+              <span className="flex items-center gap-2 text-3xl font-semibold tracking-tight text-foreground">
+                <Filter className="h-5 w-5" />
+                Filter Data
+              </span>
+              <ChevronDown className={cn("h-5 w-5 text-muted-foreground transition-transform", isFilterOpen && "rotate-180")} />
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="border-t pt-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+                <div className="space-y-2">
+                  <Label htmlFor="kelas-keyword">Kata Kunci</Label>
+                  <Input
+                    id="kelas-keyword"
+                    placeholder="Masukan kata kunci pencarian"
+                    value={draftKeyword}
+                    onChange={(event) => setDraftKeyword(event.target.value)}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="jenjang">Jenjang</Label>
-                  <Select>
+                  <Label>Pilih Unit</Label>
+                  <Select value={draftUnit} onValueChange={setDraftUnit}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih jenjang" />
+                      <SelectValue placeholder="Pilih Unit" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="paud">PAUD</SelectItem>
-                      <SelectItem value="tk">TK</SelectItem>
-                      <SelectItem value="sd">SD</SelectItem>
-                      <SelectItem value="smp">SMP</SelectItem>
-                      <SelectItem value="sma">SMA</SelectItem>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Pilih Kelas</Label>
+                  <Select value={draftKelas} onValueChange={setDraftKelas}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {kelasFilterOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tahun Ajaran</Label>
+                  <Select value={draftTahun} onValueChange={setDraftTahun}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Tahun Ajaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {tahunOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select value={draftStatus} onValueChange={setDraftStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="Aktif">Aktif</SelectItem>
+                      <SelectItem value="Nonaktif">Nonaktif</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="waliKelas">Wali Kelas</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih wali kelas" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="guru1">Ustadz Ahmad Ridwan, S.Pd.I</SelectItem>
-                    <SelectItem value="guru2">Ustadzah Fatimah Azzahra, S.Pd</SelectItem>
-                    <SelectItem value="guru3">Ustadz Ibrahim Malik, M.Pd</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tahunAjaran">Tahun Ajaran</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tahun ajaran" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2024-2025">2024/2025</SelectItem>
-                    <SelectItem value="2025-2026">2025/2026</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-                Batal
-              </Button>
-              <Button className="bg-primary text-primary-foreground" onClick={() => setIsAddDialogOpen(false)}>
-                Simpan
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <School className="w-5 h-5 text-primary" />
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Button onClick={applyFilter}>Terapkan Filter</Button>
+                <Button variant="outline" onClick={resetFilter}>
+                  Reset Filter
+                </Button>
               </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{kelasData.length}</p>
-                <p className="text-xs text-muted-foreground">Total Kelas</p>
-              </div>
-            </div>
-          </CardContent>
+            </CardContent>
+          </CollapsibleContent>
         </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <Users className="w-5 h-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{totalSantri}</p>
-                <p className="text-xs text-muted-foreground">Total Santri</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-chart-3/10 flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-chart-3" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">{kelasData.length}</p>
-                <p className="text-xs text-muted-foreground">Wali Kelas</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                <School className="w-5 h-5 text-secondary-foreground" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-foreground">5</p>
-                <p className="text-xs text-muted-foreground">Jenjang</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      </Collapsible>
 
-      {/* Filters */}
-      <Card className="border-border/50">
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama kelas atau wali kelas..."
-                className="pl-9"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={selectedJenjang} onValueChange={setSelectedJenjang}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <Filter className="w-4 h-4 mr-2" />
-                <SelectValue placeholder="Jenjang" />
+      <Card>
+        <CardContent className="p-5">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-10 gap-2" disabled={selectedIds.length === 0 || isLoading}>
+                  Aksi Masal
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Pilih Aksi</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="text-destructive" onClick={deleteSelected}>
+                  Hapus Terpilih
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <Select value={rowsPerPage} onValueChange={(value) => {
+              setRowsPerPage(value)
+              setCurrentPage(1)
+            }}>
+              <SelectTrigger className="h-10 w-full sm:w-[88px]">
+                <SelectValue placeholder="25" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Semua Jenjang</SelectItem>
-                <SelectItem value="PAUD">PAUD</SelectItem>
-                <SelectItem value="TK">TK</SelectItem>
-                <SelectItem value="SD">SD</SelectItem>
-                <SelectItem value="SMP">SMP</SelectItem>
-                <SelectItem value="SMA">SMA</SelectItem>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="overflow-hidden rounded-lg border bg-background">
+            <Table className="min-w-[1200px]">
+              <TableHeader>
+                <TableRow className="bg-muted/30 hover:bg-muted/30">
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={allVisibleSelected ? true : someVisibleSelected ? "indeterminate" : false}
+                      onCheckedChange={toggleSelectAll}
+                      aria-label="Pilih semua data kelas"
+                    />
+                  </TableHead>
+                  <TableHead className="w-12 text-xs font-semibold uppercase tracking-wide text-muted-foreground">#</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA UNIT</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KODE KELAS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA KELAS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    <button type="button" className="inline-flex items-center gap-1">
+                      TAHUN AJARAN
+                      <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </button>
+                  </TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI AKTIF</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI LULUS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI KELUAR</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS PPDB</TableHead>
+                  <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">AKSI</TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {visibleRows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={12} className="py-10 text-center text-muted-foreground">
+                      {isLoading ? "Memuat data kelas..." : "Data kelas tidak ditemukan."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  visibleRows.map((row, index) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(row.id)}
+                          onCheckedChange={(checked) => toggleSelectOne(row.id, checked)}
+                          aria-label={`Pilih baris ${row.namaKelas}`}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
+                      <TableCell>{row.namaUnit}</TableCell>
+                      <TableCell>{row.kodeKelas}</TableCell>
+                      <TableCell>{row.namaKelas}</TableCell>
+                      <TableCell>{row.tahunAjaran}</TableCell>
+                      <TableCell>{row.santriAktif}</TableCell>
+                      <TableCell>{row.santriLulus}</TableCell>
+                      <TableCell>{row.santriKeluar}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={row.status === "Aktif" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
+                          {row.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className={row.statusPpdb === "Dibuka" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}>
+                          {row.statusPpdb}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-8 gap-1 px-2 text-xs font-semibold">
+                              <MoreVertical className="h-3.5 w-3.5" />
+                              AKSI
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Aksi Kelas</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => openEditDialog(row.id)}>
+                              <PencilLine className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem className="text-destructive" onClick={() => deleteOne(row.id)}>
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-muted-foreground">Tampil {visibleStart}-{visibleEnd} dari {totalItems}</p>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || isLoading}
+              >
+                Previous
+              </Button>
+              <Button size="sm" className="h-8 min-w-8 px-2">
+                {currentPage}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages || isLoading}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Class Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredData.map((kelas) => (
-          <Card key={kelas.id} className="border-border/50 hover:shadow-md transition-shadow">
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-primary-foreground font-bold ${
-                    kelas.jenjang === "SMA"
-                      ? "bg-chart-4"
-                      : kelas.jenjang === "SMP"
-                        ? "bg-accent"
-                        : kelas.jenjang === "SD"
-                          ? "bg-primary"
-                          : kelas.jenjang === "TK"
-                            ? "bg-chart-2"
-                            : "bg-chart-1"
-                  }`}>
-                    {kelas.nama.slice(0, 2)}
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg text-foreground">{kelas.nama}</CardTitle>
-                    <Badge variant="secondary" className="mt-1 bg-primary/10 text-primary">
-                      {kelas.jenjang}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                </div>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={(open) => {
+          setIsEditDialogOpen(open)
+          if (!open) {
+            setEditingId(null)
+            setEditingFormData(defaultFormState)
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Edit Kelas</DialogTitle>
+            <DialogDescription>Perbarui data kelas terpilih.</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Kode Unit</Label>
+                <Select
+                  value={editingFormData.kodeUnit}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, kodeUnit: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unitOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Avatar className="w-7 h-7">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {kelas.waliKelas.split(" ").filter(n => !n.includes(".")).map(n => n[0]).join("").slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Wali Kelas</p>
-                    <p className="text-sm font-medium text-foreground truncate">{kelas.waliKelas}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-2 pt-2 border-t border-border">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">{kelas.jumlahSantri}</p>
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div className="text-center border-x border-border">
-                    <p className="text-lg font-bold text-primary">{kelas.putra}</p>
-                    <p className="text-xs text-muted-foreground">Putra</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-accent">{kelas.putri}</p>
-                    <p className="text-xs text-muted-foreground">Putri</p>
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-kode-kelas">Kode Kelas</Label>
+                <Input
+                  id="edit-kode-kelas"
+                  value={editingFormData.kodeKelas}
+                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, kodeKelas: event.target.value }))}
+                />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-nama-kelas">Nama Kelas</Label>
+              <Input
+                id="edit-nama-kelas"
+                value={editingFormData.namaKelas}
+                onChange={(event) => setEditingFormData((prev) => ({ ...prev, namaKelas: event.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-nama-jurusan">Nama Jurusan (opsional)</Label>
+              <Input
+                id="edit-nama-jurusan"
+                value={editingFormData.namaJurusan}
+                onChange={(event) => setEditingFormData((prev) => ({ ...prev, namaJurusan: event.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Tahun Ajaran</Label>
+                <Select
+                  value={editingFormData.tahunAjaran}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, tahunAjaran: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih tahun ajaran" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tahunOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={editingFormData.status}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, status: value as UiStatus }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Aktif">Aktif</SelectItem>
+                    <SelectItem value="Nonaktif">Nonaktif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status PPDB</Label>
+                <Select
+                  value={editingFormData.statusPpdb}
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, statusPpdb: value as UiPpdbStatus }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih status PPDB" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dibuka">Dibuka</SelectItem>
+                    <SelectItem value="Ditutup">Ditutup</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Batal
+            </Button>
+            <Button disabled={isLoading} onClick={handleUpdate}>
+              Simpan Perubahan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
