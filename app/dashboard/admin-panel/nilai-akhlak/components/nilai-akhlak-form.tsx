@@ -16,6 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle, Check } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
+import { authService } from "@/lib/services/auth.service"
 import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 
 interface NilaiAkhlakFormPayload {
@@ -25,6 +26,7 @@ interface NilaiAkhlakFormPayload {
   nilai_angka: number
   aspek?: string
   deskripsi?: string
+  id_petugas_input?: number
 }
 
 interface NilaiAkhlakFormProps {
@@ -55,6 +57,30 @@ const toErrorMessage = (error: any): string => {
   return "Gagal menyimpan nilai akhlak"
 }
 
+const extractPetugasInputId = (me: any): number | undefined => {
+  const candidates = [
+    me?.user?.id_petugas,
+    me?.user?.petugas_id,
+    me?.user?.idDataPetugas,
+    me?.user?.data_petugas?.id,
+    me?.id_petugas,
+    me?.petugas_id,
+    me?.idDataPetugas,
+    me?.data_petugas?.id,
+    me?.user?.id,
+    me?.id,
+  ]
+
+  for (const candidate of candidates) {
+    const id = Number(candidate)
+    if (Number.isFinite(id) && id > 0) {
+      return id
+    }
+  }
+
+  return undefined
+}
+
 export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlakFormProps) {
   const [nomorInduk, setNomorInduk] = useState(initialData?.nomor_induk ?? "")
   const [selectedNama, setSelectedNama] = useState("")
@@ -69,6 +95,8 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
   const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka ?? 80)
   const [aspek, setAspek] = useState(initialData?.aspek ?? "AKHLAK")
   const [deskripsi, setDeskripsi] = useState(initialData?.deskripsi ?? "")
+  const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
+  const [isUserReady, setIsUserReady] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -80,6 +108,17 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
     setOpenSantriPopover(false)
     setError("")
   }
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const me = await authService.me()
+      const id = extractPetugasInputId(me)
+      setPetugasInputId(id)
+      setIsUserReady(true)
+    }
+
+    loadUser()
+  }, [])
 
   useEffect(() => {
     if (!initialData) return
@@ -155,6 +194,16 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
       return
     }
 
+    if (!isUserReady) {
+      setError("Data user belum siap, tunggu sebentar lalu coba simpan lagi")
+      return
+    }
+
+    if (!petugasInputId) {
+      setError("ID petugas input tidak ditemukan dari akun login. Silakan refresh halaman atau cek data akun petugas")
+      return
+    }
+
     try {
       setIsSubmitting(true)
       setError("")
@@ -166,6 +215,7 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
         nilai_angka: nilaiAngka,
         aspek: aspek || "AKHLAK",
         deskripsi: deskripsi.trim() || undefined,
+        id_petugas_input: petugasInputId,
       })
     } catch (err) {
       setError(toErrorMessage(err))
