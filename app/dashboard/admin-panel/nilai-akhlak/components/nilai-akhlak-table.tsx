@@ -63,7 +63,7 @@ export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: 
                 <TableRow className="bg-muted/50">
                   <TableHead>Nomor Induk</TableHead>
                   <TableHead>Nama Santri</TableHead>
-                  <TableHead>Tahun Ajaran</TableHead>
+                  <TableHead>Tahun</TableHead>
                   <TableHead className="text-center">Semester</TableHead>
                   <TableHead className="text-center">Nilai Angka</TableHead>
                   <TableHead>Aspek</TableHead>
@@ -99,6 +99,7 @@ export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: 
 
                 {!isLoading && !error && items.map((item, index) => {
                   const hasValidId = Number.isFinite(item.id) && item.id > 0
+                  const tahunDisplay = item.tahun_ajaran?.trim() || "-"
                   const rowKey = hasValidId
                     ? `akhlak-${item.id}`
                     : `akhlak-fallback-${item.nomor_induk}-${item.tahun_ajaran}-${item.semester}-${index}`
@@ -107,7 +108,7 @@ export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: 
                     <TableRow key={rowKey} className="hover:bg-muted/30">
                       <TableCell className="font-medium">{item.nomor_induk || "-"}</TableCell>
                       <TableCell>{item.nama_santri || "-"}</TableCell>
-                      <TableCell>{item.tahun_ajaran || "-"}</TableCell>
+                      <TableCell>{tahunDisplay}</TableCell>
                       <TableCell className="text-center">{item.semester || "-"}</TableCell>
                       <TableCell className="text-center">
                         <Badge className="bg-primary/10 text-primary border-0">{item.nilai_angka}</Badge>

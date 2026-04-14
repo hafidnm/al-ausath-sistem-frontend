@@ -9,6 +9,7 @@ import { NilaiAkhlakItem, nilaiAkhlakService } from "@/lib/services/nilai-akhlak
 
 export default function NilaiAkhlakPage() {
   const router = useRouter()
+  const [nomorInduk, setNomorInduk] = useState("")
   const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("all")
   const [aspek, setAspek] = useState("all")
@@ -22,12 +23,19 @@ export default function NilaiAkhlakPage() {
       setIsLoading(true)
       setError("")
 
-      const data = await nilaiAkhlakService.getAllBar({
+      const sharedParams = {
         tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
         semester: semester === "all" ? undefined : semester,
         aspek: aspek === "all" ? undefined : aspek,
         per_page: perPage,
-      })
+      }
+
+      const data = nomorInduk.trim()
+        ? await nilaiAkhlakService.getAll({
+          ...sharedParams,
+          nomor_induk: nomorInduk.trim(),
+        })
+        : await nilaiAkhlakService.getAllBar(sharedParams)
 
       setItems(data)
     } catch (err: any) {
@@ -36,7 +44,7 @@ export default function NilaiAkhlakPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [aspek, perPage, semester, tahunAjaran])
+  }, [aspek, nomorInduk, perPage, semester, tahunAjaran])
 
   useEffect(() => {
     fetchNilaiAkhlak()
@@ -59,6 +67,8 @@ export default function NilaiAkhlakPage() {
       />
 
       <NilaiAkhlakFilters
+        nomorInduk={nomorInduk}
+        onNomorIndukChange={setNomorInduk}
         tahunAjaran={tahunAjaran}
         onTahunAjaranChange={setTahunAjaran}
         semester={semester}

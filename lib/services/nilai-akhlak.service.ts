@@ -13,6 +13,7 @@ export interface NilaiAkhlakItem {
 }
 
 export interface GetNilaiAkhlakParams {
+  nomor_induk?: string
   tahun_ajaran?: string
   semester?: string
   aspek?: string
@@ -104,7 +105,7 @@ export const nilaiAkhlakService = {
     return extractList(response.data).map(normalizeNilaiAkhlakItem)
   },
 
-  async getAllBar(params?: Omit<GetNilaiAkhlakParams, "nomor_induk">): Promise<NilaiAkhlakItem[]> {
+  async getAllBar(params?: GetNilaiAkhlakParams): Promise<NilaiAkhlakItem[]> {
     const response = await api.get("/akademik/nilai-akhlak/bar", { params })
     return extractList(response.data).map(normalizeNilaiAkhlakItem)
   },
