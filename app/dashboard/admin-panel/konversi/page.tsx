@@ -21,13 +21,36 @@ export default function KonversiPage() {
       setIsLoading(true)
       setError("")
 
+      const queryTrimmed = query.trim()
+      const normalizedQuery = queryTrimmed.toLowerCase()
+
       const data = await konversiService.getAll({
-        q: query || undefined,
+        // Beberapa backend tidak support q, jadi kita tetap filter di frontend.
+        q: queryTrimmed || undefined,
         kode_unit: kodeUnit === "all" || kodeUnit === "global" ? undefined : kodeUnit,
         per_page: perPage,
       })
 
-      setItems(data)
+      const filtered = data.filter((item) => {
+        const matchesUnit = kodeUnit === "all"
+          ? true
+          : kodeUnit === "global"
+            ? !item.kode_unit || item.kode_unit.toLowerCase() === "global"
+            : item.kode_unit?.toLowerCase() === kodeUnit.toLowerCase()
+
+        if (!matchesUnit) return false
+        if (!normalizedQuery) return true
+
+        return (
+          (item.nilai_huruf ?? "").toLowerCase().includes(normalizedQuery)
+          || (item.predikat ?? "").toLowerCase().includes(normalizedQuery)
+          || (item.keterangan ?? "").toLowerCase().includes(normalizedQuery)
+          || (item.unit_nama ?? "").toLowerCase().includes(normalizedQuery)
+          || (item.kode_unit ?? "").toLowerCase().includes(normalizedQuery)
+        )
+      })
+
+      setItems(filtered)
     } catch (err: any) {
       setError(err?.response?.data?.message || "Gagal memuat data konversi")
     } finally {
