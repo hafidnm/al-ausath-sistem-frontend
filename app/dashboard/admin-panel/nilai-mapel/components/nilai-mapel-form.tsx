@@ -24,6 +24,7 @@ import {
 import { kkmService } from "@/lib/services/kkm.service"
 import { authService } from "@/lib/services/auth.service"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
+import { mataPelajaranService, type MataPelajaranItem } from "@/lib/services/mata-pelajaran.service"
 import { semesterOptions, tahunAjaranOptions, jenisTugasOptions } from "../utils/constants"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
 
@@ -102,6 +103,11 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const [santriSearchError, setSantriSearchError] = useState("")
   const [openSantriPopover, setOpenSantriPopover] = useState(false)
   const [kodeMapel, setKodeMapel] = useState("")
+  const [mapelSearchInput, setMapelSearchInput] = useState("")
+  const [mapelResults, setMapelResults] = useState<MataPelajaranItem[]>([])
+  const [isLoadingMapel, setIsLoadingMapel] = useState(false)
+  const [mapelSearchError, setMapelSearchError] = useState("")
+  const [openMapelPopover, setOpenMapelPopover] = useState(false)
   const [kodeKelas, setKodeKelas] = useState("")
   const [tahunAjaran, setTahunAjaran] = useState("")
   const [semester, setSemester] = useState("")
@@ -165,6 +171,42 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       clearTimeout(timer)
     }
   }, [searchInput])
+
+  useEffect(() => {
+    if (!mapelSearchInput.trim()) {
+      setMapelResults([])
+      setMapelSearchError("")
+      return
+    }
+
+    let cancelled = false
+
+    const searchMapel = async () => {
+      try {
+        setIsLoadingMapel(true)
+        setMapelSearchError("")
+        const results = await mataPelajaranService.search(mapelSearchInput.trim())
+        if (!cancelled) {
+          setMapelResults(results)
+        }
+      } catch {
+        if (!cancelled) {
+          setMapelResults([])
+          setMapelSearchError("Gagal mengambil data mata pelajaran dari server")
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingMapel(false)
+        }
+      }
+    }
+
+    const timer = setTimeout(searchMapel, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [mapelSearchInput])
 
   useEffect(() => {
     if (!selectedSantriId || selectedSantriId < 1) {
@@ -429,7 +471,68 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             </div>
             <div className="space-y-2">
               <Label>Kode Mapel</Label>
-              <Input value={kodeMapel} onChange={(e) => setKodeMapel(e.target.value)} placeholder="MATH-01" />
+              <div className="relative">
+                <Input
+                  placeholder="Cari berdasarkan kode atau nama mapel..."
+                  value={mapelSearchInput}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setMapelSearchInput(value)
+                    setKodeMapel("")
+                    setOpenMapelPopover(true)
+                  }}
+                  onFocus={() => setOpenMapelPopover(true)}
+                  onBlur={() => {
+                    setTimeout(() => setOpenMapelPopover(false), 120)
+                  }}
+                />
+
+                {openMapelPopover && (mapelSearchInput.trim() || isLoadingMapel || mapelResults.length > 0) && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
+                    {isLoadingMapel && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari mapel...</div>
+                    )}
+
+                    {!isLoadingMapel && mapelSearchError && (
+                      <div className="px-2 py-4 text-center text-sm text-destructive">{mapelSearchError}</div>
+                    )}
+
+                    {!isLoadingMapel && !mapelSearchError && mapelResults.length === 0 && mapelSearchInput.trim() && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada mata pelajaran ditemukan</div>
+                    )}
+
+                    {!isLoadingMapel && mapelResults.length > 0 && (
+                      <div className="max-h-60 overflow-auto">
+                        {mapelResults.map((mapel) => (
+                          <button
+                            key={mapel.id}
+                            type="button"
+                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              setKodeMapel(mapel.kode_mapel)
+                              setMapelSearchInput("")
+                              setOpenMapelPopover(false)
+                            }}
+                          >
+                            <Check
+                              className={`mt-0.5 h-4 w-4 ${
+                                kodeMapel === mapel.kode_mapel ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{mapel.kode_mapel} - {mapel.nama_mapel}</div>
+                              {mapel.kelompok_mapel && (
+                                <div className="text-xs text-muted-foreground">{mapel.kelompok_mapel}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Kode Kelas</Label>
