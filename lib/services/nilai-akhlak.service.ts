@@ -42,8 +42,10 @@ const toText = (value: unknown): string | undefined => {
   if (typeof value === "object") {
     const obj = value as Record<string, unknown>
     return (
-      (typeof obj.nama === "string" && obj.nama)
-      || (typeof obj.nama_santri === "string" && obj.nama_santri)
+      (typeof obj.nama_santri === "string" && obj.nama_santri)
+      || (typeof obj.nama_lengkap_santri === "string" && obj.nama_lengkap_santri)
+      || (typeof obj.nama_lengkap === "string" && obj.nama_lengkap)
+      || (typeof obj.nama === "string" && obj.nama)
       || (typeof obj.label === "string" && obj.label)
       || (typeof obj.value === "string" && obj.value)
       || undefined
@@ -76,7 +78,17 @@ const normalizeNilaiAkhlakItem = (raw: any): NilaiAkhlakItem => {
   return {
     id: toNumber(rawId, -1),
     nomor_induk: toText(raw?.nomor_induk ?? raw?.santri?.nomor_induk) ?? "",
-    nama_santri: toText(raw?.nama_santri ?? raw?.santri?.nama_lengkap ?? raw?.santri?.nama),
+    nama_santri: toText(
+      raw?.nama_santri
+      ?? raw?.nama_lengkap_santri
+      ?? raw?.nama_lengkap
+      ?? raw?.santri?.nama_lengkap_santri
+      ?? raw?.santri?.nama_lengkap
+      ?? raw?.santri?.nama
+      ?? raw?.data_santri?.nama_lengkap_santri
+      ?? raw?.data_santri?.nama_lengkap
+      ?? raw?.data_santri?.nama
+    ),
     tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
     semester: toNumber(raw?.semester, 0),
     nilai_angka: toNumber(raw?.nilai_angka ?? raw?.nilai, 0),
