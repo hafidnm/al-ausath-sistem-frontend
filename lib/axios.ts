@@ -1,4 +1,3 @@
-import axios, { AxiosHeaders } from 'axios';
 import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 
 export const PPDB_AUTH_TOKEN_STORAGE_KEY = 'ppdb_portal_auth_token';
