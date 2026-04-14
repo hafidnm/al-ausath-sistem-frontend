@@ -107,6 +107,9 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const [isLoadingMapel, setIsLoadingMapel] = useState(false)
   const [mapelSearchError, setMapelSearchError] = useState("")
   const [openMapelPopover, setOpenMapelPopover] = useState(false)
+  const [selectedNamaMapel, setSelectedNamaMapel] = useState("")
+  const [selectedMapelId, setSelectedMapelId] = useState<number | null>(null)
+  const [isKodeMapelManual, setIsKodeMapelManual] = useState(true)
   const [kodeKelas, setKodeKelas] = useState("")
   const [isKodeKelasManual, setIsKodeKelasManual] = useState(true)
   const [tahunAjaran, setTahunAjaran] = useState("")
@@ -140,6 +143,15 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
 
     setSearchInput("")
     setOpenSantriPopover(false)
+  }
+
+  const applySelectedMapel = (mapel: MataPelajaranItem) => {
+    setKodeMapel(mapel.kode_mapel)
+    setSelectedNamaMapel(mapel.nama_mapel ?? "")
+    setSelectedMapelId(mapel.id)
+    setIsKodeMapelManual(false)
+    setMapelSearchInput("")
+    setOpenMapelPopover(false)
   }
 
   useEffect(() => {
@@ -199,6 +211,18 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       applySelectedSantri(exact)
     }
   }, [santriResults, searchInput, selectedSantriId])
+
+  useEffect(() => {
+    const query = mapelSearchInput.trim().toLowerCase()
+    if (!query || selectedMapelId) return
+
+    const exact = mapelResults.find(
+      (item) => item.kode_mapel.trim().toLowerCase() === query || item.nama_mapel?.trim().toLowerCase() === query
+    )
+    if (exact) {
+      applySelectedMapel(exact)
+    }
+  }, [mapelResults, mapelSearchInput, selectedMapelId])
 
   useEffect(() => {
     if (!mapelSearchInput.trim()) {
@@ -468,16 +492,31 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             </div>
             <div className="space-y-2">
               <Label>Kode Mapel</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Cari berdasarkan kode atau nama mapel..."
-                  value={mapelSearchInput}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setMapelSearchInput(value)
-                    setKodeMapel("")
-                    setOpenMapelPopover(true)
-                  }}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Input
+                    placeholder="Cari berdasarkan kode atau nama mapel..."
+                    value={kodeMapel && !mapelSearchInput ? `${kodeMapel}${selectedNamaMapel ? " - " + selectedNamaMapel : ""}` : mapelSearchInput}
+                    disabled={!isKodeMapelManual && Boolean(selectedMapelId) && Boolean(kodeMapel.trim())}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return
+                      e.preventDefault()
+
+                      const query = mapelSearchInput.trim().toLowerCase()
+                      if (!query || mapelResults.length === 0) return
+
+                      const exact = mapelResults.find((item) => item.kode_mapel.trim().toLowerCase() === query || item.nama_mapel?.trim().toLowerCase() === query)
+                      applySelectedMapel(exact ?? mapelResults[0])
+                    }}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setMapelSearchInput(value)
+                      setKodeMapel("")
+                      setSelectedNamaMapel("")
+                      setSelectedMapelId(null)
+                      setIsKodeMapelManual(true)
+                      setOpenMapelPopover(true)
+                    }}
                   onFocus={() => setOpenMapelPopover(true)}
                   onBlur={() => {
                     setTimeout(() => setOpenMapelPopover(false), 120)
@@ -506,15 +545,11 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                             type="button"
                             className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
                             onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => {
-                              setKodeMapel(mapel.kode_mapel)
-                              setMapelSearchInput("")
-                              setOpenMapelPopover(false)
-                            }}
+                            onClick={() => applySelectedMapel(mapel)}
                           >
                             <Check
                               className={`mt-0.5 h-4 w-4 ${
-                                kodeMapel === mapel.kode_mapel ? "opacity-100" : "opacity-0"
+                                selectedMapelId === mapel.id ? "opacity-100" : "opacity-0"
                               }`}
                             />
                             <div className="flex-1">
@@ -529,7 +564,21 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                     )}
                   </div>
                 )}
+                </div>
+                {!isKodeMapelManual && Boolean(selectedMapelId) && Boolean(kodeMapel.trim()) && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="bg-transparent"
+                    onClick={() => setIsKodeMapelManual(true)}
+                  >
+                    Ubah Manual
+                  </Button>
+                )}
               </div>
+              {!isKodeMapelManual && Boolean(selectedMapelId) && selectedNamaMapel && (
+                <p className="text-xs text-muted-foreground">Kode mapel diisi otomatis dari opsi mapel yang tersedia.</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Kode Kelas</Label>
