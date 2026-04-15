@@ -59,6 +59,17 @@ const firstNonEmpty = (...values: Array<string | number | null | undefined>) => 
   return ""
 }
 
+const getRaporIdentity = (item: RaporItem) => {
+  if (item.id > 0) return `id:${item.id}`
+
+  return [
+    item.nomor_induk || "-",
+    item.kode_kelas || "-",
+    item.tahun_ajaran || "-",
+    String(item.semester ?? "-"),
+  ].join("|")
+}
+
 export default function AdminPanelRaporPage() {
   const router = useRouter()
   const [query, setQuery] = useState("")
@@ -79,6 +90,7 @@ export default function AdminPanelRaporPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [catatanForm, setCatatanForm] = useState<CatatanFormState>(initialCatatanForm)
+  const selectedIdentity = selected ? getRaporIdentity(selected) : null
 
   const selectedParams = useMemo(() => {
     const nomorInduk = selected?.nomor_induk || catatanForm.nomor_induk.trim()
@@ -168,7 +180,7 @@ export default function AdminPanelRaporPage() {
 
       setItems(data)
 
-      if (selected && !data.some((item) => item.id === selected.id)) {
+      if (selectedIdentity && !data.some((item) => getRaporIdentity(item) === selectedIdentity)) {
         setSelected(null)
         setDetail(null)
         setCatatanForm(initialCatatanForm)
@@ -179,7 +191,7 @@ export default function AdminPanelRaporPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeKelas, perPage, query, selected, semester, status, tahunAjaran])
+  }, [kodeKelas, perPage, query, selectedIdentity, semester, status, tahunAjaran])
 
   useEffect(() => {
     fetchReports()
@@ -495,11 +507,13 @@ export default function AdminPanelRaporPage() {
                     </TableRow>
                   )}
 
-                  {!isLoading && !error && items.map((item) => {
-                    const isSelected = selected?.id === item.id
+                  {!isLoading && !error && items.map((item, index) => {
+                    const rowIdentity = getRaporIdentity(item)
+                    const isSelected = selectedIdentity === rowIdentity
+                    const rowKey = `${rowIdentity}-${index}`
 
                     return (
-                      <TableRow key={item.id} className={isSelected ? "bg-primary/5" : undefined}>
+                      <TableRow key={rowKey} className={isSelected ? "bg-primary/5" : undefined}>
                         <TableCell>
                           <div className="space-y-1">
                             <p className="font-medium text-foreground">{item.nama_santri || "-"}</p>
