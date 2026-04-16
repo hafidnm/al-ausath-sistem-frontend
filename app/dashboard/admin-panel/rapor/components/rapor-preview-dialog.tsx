@@ -9,7 +9,7 @@ interface RaporPreviewDialogProps {
   namaSantri?: string
 }
 
-export function RaporPreviewDialog({
+export default function RaporPreviewDialog({
   isOpen,
   onOpenChange,
   pdfPreviewUrl,
