@@ -1,4 +1,4 @@
-import axios, { AxiosHeaders } from 'axios';
+import axios, { AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 
 export const PPDB_AUTH_TOKEN_STORAGE_KEY = 'ppdb_portal_auth_token';
 export const PPDB_AUTH_COOKIE_NAME = 'ppdb_auth';
@@ -63,16 +63,19 @@ const api = axios.create({
 });
 
 api.interceptors.request.use(
-    (config) => {
-        const headers = new AxiosHeaders(config.headers);
+    (config: InternalAxiosRequestConfig) => {
+        const headers =
+            config.headers instanceof AxiosHeaders
+                ? config.headers
+                : AxiosHeaders.from(config.headers);
         const token = getCookieValue('XSRF-TOKEN');
         if (token) {
-            headers['X-XSRF-TOKEN'] = decodeURIComponent(token);
+            headers.set('X-XSRF-TOKEN', decodeURIComponent(token));
         }
 
         const bearerToken = getStoredPpdbToken();
-        if (bearerToken && !headers.Authorization) {
-            headers.Authorization = `Bearer ${bearerToken}`;
+        if (bearerToken && !headers.get('Authorization')) {
+            headers.set('Authorization', `Bearer ${bearerToken}`);
         }
 
         config.headers = headers;
@@ -116,11 +119,13 @@ api.interceptors.response.use(
                 
                 const newToken = getCookieValue('XSRF-TOKEN');
                 if (newToken) {
-                    if (!originalRequest.headers) {
-                        originalRequest.headers = {};
-                    }
+                    const headers =
+                        originalRequest.headers instanceof AxiosHeaders
+                            ? originalRequest.headers
+                            : AxiosHeaders.from(originalRequest.headers);
 
-                    (originalRequest.headers as Record<string, string>)['X-XSRF-TOKEN'] = decodeURIComponent(newToken);
+                    headers.set('X-XSRF-TOKEN', decodeURIComponent(newToken));
+                    originalRequest.headers = headers;
                 }
                 
                 return api.request(originalRequest);

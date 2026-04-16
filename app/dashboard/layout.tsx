@@ -28,6 +28,7 @@ import {
   Bell,
   Menu,
   X,
+  ChevronLeft,
   ChevronDown,
   LogOut,
   User,
@@ -75,6 +76,7 @@ export default function DashboardLayout({
 }) {
   const [mounted, setMounted] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true)
   const [user, setUser] = useState<any>(null)
   const pathname = usePathname()
 
@@ -134,8 +136,9 @@ export default function DashboardLayout({
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-50 h-full w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-200 ease-in-out lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed top-0 left-0 z-50 h-full w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-200 ease-in-out",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full",
+          isDesktopSidebarOpen ? "lg:translate-x-0" : "lg:-translate-x-full"
         )}
       >
         <div className="flex flex-col h-full">
@@ -150,14 +153,25 @@ export default function DashboardLayout({
                 <p className="text-xs text-sidebar-foreground/60">Pesantren</p>
               </div>
             </Link>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="lg:hidden text-sidebar-foreground hover:bg-sidebar-accent"
-              onClick={() => setSidebarOpen(false)}
-            >
-              <X className="w-5 h-5" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden lg:inline-flex text-sidebar-foreground hover:bg-sidebar-accent"
+                onClick={() => setIsDesktopSidebarOpen(false)}
+                aria-label="Tutup sidebar"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden text-sidebar-foreground hover:bg-sidebar-accent"
+                onClick={() => setSidebarOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -168,6 +182,7 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
+                  onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                     isActive
@@ -204,7 +219,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <div className="lg:pl-64">
+      <div className={cn("transition-[padding] duration-200", isDesktopSidebarOpen ? "lg:pl-64" : "lg:pl-0")}>
         {/* Top Header */}
         <header className="sticky top-0 z-30 bg-card border-b border-border">
           <div className="flex items-center justify-between px-4 py-3 lg:px-6">
@@ -217,6 +232,17 @@ export default function DashboardLayout({
               >
                 <Menu className="w-5 h-5" />
               </Button>
+              {!isDesktopSidebarOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="hidden lg:inline-flex"
+                  onClick={() => setIsDesktopSidebarOpen(true)}
+                  aria-label="Buka sidebar"
+                >
+                  <Menu className="w-5 h-5" />
+                </Button>
+              )}
               <div>
                 <h2 className="font-semibold text-foreground">
                   {menuItems.find((item) => item.href === pathname)?.label || "Dashboard"}
