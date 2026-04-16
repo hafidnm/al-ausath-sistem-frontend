@@ -68,7 +68,16 @@ export interface DataKelasPaginationMeta {
   last_page?: number
   per_page?: number
   total?: number
+  summary_global?: DataKelasSummaryGlobal
   [key: string]: unknown
+}
+
+export interface DataKelasSummaryGlobal {
+  total_kelas?: number
+  total_santri?: number
+  total_santri_aktif?: number
+  total_santri_lulus?: number
+  total_santri_keluar?: number
 }
 
 export interface DataKelasListApiResponse extends DataKelasPaginationMeta {

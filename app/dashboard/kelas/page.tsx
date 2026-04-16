@@ -46,6 +46,7 @@ interface KelasRow {
   namaKelas: string
   namaJurusan: string
   tahunAjaran: string
+  santriTotal: number
   santriAktif: number
   santriLulus: number
   santriKeluar: number
@@ -66,6 +67,12 @@ interface KelasFormData {
 interface UnitOption {
   value: string
   label: string
+}
+
+interface KelasOption {
+  value: string
+  label: string
+  kodeUnit: string
 }
 
 interface TahunAjaranOption {
@@ -109,6 +116,7 @@ const normalizeKelasRow = (raw: DataKelasApiItem): KelasRow => ({
   namaKelas: toText(raw.nama_kelas),
   namaJurusan: toText(raw.nama_jurusan),
   tahunAjaran: toText(raw.tahun_ajaran),
+  santriTotal: toNumber(raw.jumlah_santri),
   santriAktif: toNumber(raw.jumlah_santri_aktif),
   santriLulus: toNumber(raw.jumlah_santri_lulus),
   santriKeluar: toNumber(raw.jumlah_santri_keluar),
@@ -163,12 +171,7 @@ export default function KelasPage() {
 
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
-
-  const [draftKeyword, setDraftKeyword] = useState("")
-  const [draftUnit, setDraftUnit] = useState("all")
-  const [draftKelas, setDraftKelas] = useState("all")
-  const [draftTahun, setDraftTahun] = useState("all")
-  const [draftStatus, setDraftStatus] = useState("all")
+  const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
 
   const [keyword, setKeyword] = useState("")
   const [unitFilter, setUnitFilter] = useState("all")
@@ -179,7 +182,6 @@ export default function KelasPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
-
   const rowsLimit = Number(rowsPerPage)
 
   const visibleRows = useMemo(() => {
@@ -190,15 +192,18 @@ export default function KelasPage() {
   const kelasFilterOptions = useMemo(() => {
     const seen = new Set<string>()
     const options: Array<{ value: string; label: string }> = []
+    const source = unitFilter === "all"
+      ? kelasOptions
+      : kelasOptions.filter((option) => option.kodeUnit === unitFilter)
 
-    for (const row of rows) {
-      if (!row.kodeKelas || seen.has(row.kodeKelas)) continue
-      seen.add(row.kodeKelas)
-      options.push({ value: row.kodeKelas, label: row.namaKelas || row.kodeKelas })
+    for (const option of source) {
+      if (!option.value || seen.has(option.value)) continue
+      seen.add(option.value)
+      options.push({ value: option.value, label: option.label || option.value })
     }
 
     return options
-  }, [rows])
+  }, [unitFilter, kelasOptions])
 
   const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
   const someVisibleSelected = visibleRows.some((row) => selectedIds.includes(row.id))
@@ -246,9 +251,10 @@ export default function KelasPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [unitResult, tahunResult] = await Promise.all([
+        const [unitResult, tahunResult, kelasResult] = await Promise.all([
           dataUnitService.getAll({ page: 1, per_page: 200 }),
           tahunAjaranService.getAll({ page: 1, per_page: 200 }),
+          dataKelasService.getAll({ page: 1, per_page: 500 }),
         ])
 
         const units: UnitOption[] = []
@@ -265,11 +271,26 @@ export default function KelasPage() {
           years.push({ value: code, label: toText(item.nama_tahun).trim() || code })
         }
 
+        const kelasSeen = new Set<string>()
+        const mappedKelas: KelasOption[] = []
+        for (const item of kelasResult.data) {
+          const kodeKelas = toText(item.kode_kelas).trim()
+          if (!kodeKelas || kelasSeen.has(kodeKelas)) continue
+          kelasSeen.add(kodeKelas)
+          mappedKelas.push({
+            value: kodeKelas,
+            label: toText(item.nama_kelas).trim() || kodeKelas,
+            kodeUnit: toText(item.kode_unit || item.unit?.kode_unit).trim(),
+          })
+        }
+
         setUnitOptions(units)
         setTahunOptions(years)
+        setKelasOptions(mappedKelas)
       } catch {
         setUnitOptions([])
         setTahunOptions([])
+        setKelasOptions([])
       }
     }
 
@@ -277,25 +298,19 @@ export default function KelasPage() {
   }, [])
 
   useEffect(() => {
-    void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, unitFilter, tahunFilter, statusFilter])
+    if (kelasFilter === "all") return
+    const exists = kelasFilterOptions.some((option) => option.value === kelasFilter)
+    if (!exists) {
+      setKelasFilter("all")
+      setCurrentPage(1)
+    }
+  }, [kelasFilter, kelasFilterOptions])
 
-  const applyFilter = () => {
-    setKeyword(draftKeyword)
-    setUnitFilter(draftUnit)
-    setKelasFilter(draftKelas)
-    setTahunFilter(draftTahun)
-    setStatusFilter(draftStatus as UiStatus | "all")
-    setCurrentPage(1)
-  }
+  useEffect(() => {
+    void fetchRows()
+  }, [currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
 
   const resetFilter = () => {
-    setDraftKeyword("")
-    setDraftUnit("all")
-    setDraftKelas("all")
-    setDraftTahun("all")
-    setDraftStatus("all")
-
     setKeyword("")
     setUnitFilter("all")
     setKelasFilter("all")
@@ -685,13 +700,22 @@ export default function KelasPage() {
                   <Input
                     id="kelas-keyword"
                     placeholder="Masukan kata kunci pencarian"
-                    value={draftKeyword}
-                    onChange={(event) => setDraftKeyword(event.target.value)}
+                    value={keyword}
+                    onChange={(event) => {
+                      setKeyword(event.target.value)
+                      setCurrentPage(1)
+                    }}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Pilih Unit</Label>
-                  <Select value={draftUnit} onValueChange={setDraftUnit}>
+                  <Select
+                    value={unitFilter}
+                    onValueChange={(value) => {
+                      setUnitFilter(value)
+                      setCurrentPage(1)
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Unit" />
                     </SelectTrigger>
@@ -707,7 +731,13 @@ export default function KelasPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>
-                  <Select value={draftKelas} onValueChange={setDraftKelas}>
+                  <Select
+                    value={kelasFilter}
+                    onValueChange={(value) => {
+                      setKelasFilter(value)
+                      setCurrentPage(1)
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Kelas" />
                     </SelectTrigger>
@@ -723,7 +753,13 @@ export default function KelasPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Tahun Ajaran</Label>
-                  <Select value={draftTahun} onValueChange={setDraftTahun}>
+                  <Select
+                    value={tahunFilter}
+                    onValueChange={(value) => {
+                      setTahunFilter(value)
+                      setCurrentPage(1)
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Tahun Ajaran" />
                     </SelectTrigger>
@@ -739,7 +775,13 @@ export default function KelasPage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={draftStatus} onValueChange={setDraftStatus}>
+                  <Select
+                    value={statusFilter}
+                    onValueChange={(value) => {
+                      setStatusFilter(value as UiStatus | "all")
+                      setCurrentPage(1)
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Status" />
                     </SelectTrigger>
@@ -753,7 +795,6 @@ export default function KelasPage() {
               </div>
 
               <div className="mt-6 flex flex-wrap gap-2">
-                <Button onClick={applyFilter}>Terapkan Filter</Button>
                 <Button variant="outline" onClick={resetFilter}>
                   Reset Filter
                 </Button>
