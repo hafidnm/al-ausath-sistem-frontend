@@ -149,18 +149,19 @@ export default function AdminPanelRaporPage() {
     }
   }, [hydrateCatatanForm])
 
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (searchOverride?: string) => {
     try {
       setIsLoading(true)
       setError("")
       setSuccess("")
 
-      const searchText = query.trim()
+      const searchText = (searchOverride ?? query).trim()
+      const searchIsNomorInduk = /^\d+$/.test(searchText)
       const includeNilaiMapel = status === "TERBIT"
 
       const data = await raporService.getAll({
         q: searchText || undefined,
-        nama: searchText || undefined,
+        nama: searchIsNomorInduk ? undefined : searchText || undefined,
         nomor_induk: searchText || undefined,
         kode_kelas: kodeKelas === "all" ? undefined : kodeKelas,
         tahun_ajaran: tahunAjaran || undefined,
@@ -282,6 +283,8 @@ export default function AdminPanelRaporPage() {
     setSelected(null)
     setDetail(null)
     setCatatanForm(initialCatatanForm)
+    setError("")
+    setSuccess("")
   }
 
   const handleGenerate = async () => {
