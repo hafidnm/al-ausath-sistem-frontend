@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { raporService, type RaporDetail, type RaporItem } from "@/lib/services/rapor.service"
+import { santriService } from "@/lib/services/santri.service"
 
 type CatatanFormState = {
   nomor_induk: string
@@ -90,6 +91,7 @@ export default function AdminPanelRaporPage() {
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
   const [catatanForm, setCatatanForm] = useState<CatatanFormState>(initialCatatanForm)
+  const [santriNameByNomorInduk, setSantriNameByNomorInduk] = useState<Record<string, string>>({})
   const selectedIdentity = selected ? getRaporIdentity(selected) : null
 
   const selectedParams = useMemo(() => {
@@ -178,9 +180,58 @@ export default function AdminPanelRaporPage() {
         include_nilai_mapel: includeNilaiMapel,
       })
 
-      setItems(data)
+      const missingNomorInduk = Array.from(
+        new Set(
+          data
+            .filter((item) => !firstNonEmpty(item.nama_santri, santriNameByNomorInduk[item.nomor_induk]) && item.nomor_induk)
+            .map((item) => item.nomor_induk),
+        ),
+      )
 
-      if (selectedIdentity && !data.some((item) => getRaporIdentity(item) === selectedIdentity)) {
+      const fetchedNameMap: Record<string, string> = {}
+
+      if (missingNomorInduk.length > 0) {
+        const resolved = await Promise.all(
+          missingNomorInduk.map(async (nomorInduk) => {
+            try {
+              const santriRows = await santriService.getAll({
+                q: nomorInduk,
+                per_page: "1",
+              })
+
+              const matched = santriRows.find((row) => row.nomor_induk === nomorInduk) ?? santriRows[0]
+              return {
+                nomorInduk,
+                nama: matched?.nama_lengkap?.trim() || "",
+              }
+            } catch {
+              return {
+                nomorInduk,
+                nama: "",
+              }
+            }
+          }),
+        )
+
+        for (const item of resolved) {
+          if (item.nama) {
+            fetchedNameMap[item.nomorInduk] = item.nama
+          }
+        }
+      }
+
+      if (Object.keys(fetchedNameMap).length > 0) {
+        setSantriNameByNomorInduk((current) => ({ ...current, ...fetchedNameMap }))
+      }
+
+      const nextItems = data.map((item) => ({
+        ...item,
+        nama_santri: firstNonEmpty(item.nama_santri, fetchedNameMap[item.nomor_induk], santriNameByNomorInduk[item.nomor_induk]) || undefined,
+      }))
+
+      setItems(nextItems)
+
+      if (selectedIdentity && !nextItems.some((item) => getRaporIdentity(item) === selectedIdentity)) {
         setSelected(null)
         setDetail(null)
         setCatatanForm(initialCatatanForm)
@@ -191,7 +242,7 @@ export default function AdminPanelRaporPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeKelas, perPage, query, selectedIdentity, semester, status, tahunAjaran])
+  }, [kodeKelas, perPage, query, santriNameByNomorInduk, selectedIdentity, semester, status, tahunAjaran])
 
   useEffect(() => {
     fetchReports()
@@ -437,7 +488,7 @@ export default function AdminPanelRaporPage() {
             <div>
               <Label>Per halaman</Label>
               <Select value={perPage} onValueChange={setPerPage}>
-                <SelectTrigger className="mt-2">
+                <SelectTrigger className="mt8-2">
                   <SelectValue placeholder="Per halaman" />
                 </SelectTrigger>
                 <SelectContent>
