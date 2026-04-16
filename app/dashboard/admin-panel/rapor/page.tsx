@@ -2,19 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertCircle, Download, Eye, FileText, Loader2, RefreshCw, Save, Search, Sparkles, UserSearch } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { raporService, type RaporDetail, type RaporItem } from "@/lib/services/rapor.service"
 import { santriService } from "@/lib/services/santri.service"
+import { RaporCatatanCard } from "./components/rapor-catatan-card"
+import { RaporFeedbackAlert } from "./components/rapor-feedback-alert"
+import { RaporFiltersCard } from "./components/rapor-filters-card"
+import { RaporGenerateCard } from "./components/rapor-generate-card"
+import { RaporHeader } from "./components/rapor-header"
+import { RaporPreviewDialog } from "./components/rapor-preview-dialog"
+import { RaporSummaryCards } from "./components/rapor-summary-cards"
+import { RaporTable } from "./components/rapor-table"
 
 type CatatanFormState = {
   nomor_induk: string
@@ -38,16 +35,6 @@ const initialCatatanForm: CatatanFormState = {
   keseharian_kebersihan: "",
   keseharian_kerapian: "",
   keseharian_keterampilan: "",
-}
-
-const reportStatusBadge = (status?: string) => {
-  const normalized = (status || "DRAFT").toUpperCase()
-
-  if (normalized === "TERBIT") {
-    return <Badge className="bg-primary/10 text-primary border-0">TERBIT</Badge>
-  }
-
-  return <Badge variant="secondary" className="bg-amber-500/10 text-amber-700 border-0">DRAFT</Badge>
 }
 
 const firstNonEmpty = (...values: Array<string | number | null | undefined>) => {
@@ -419,444 +406,92 @@ export default function AdminPanelRaporPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Rapor Operasional</h1>
-          <p className="text-muted-foreground">Cari santri, generate rapor, preview PDF, dan isi catatan wali dalam satu halaman</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="bg-transparent" onClick={fetchReports}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Refresh
-          </Button>
-          <Button variant="outline" size="sm" className="bg-transparent" onClick={() => router.push("/dashboard/admin-panel") }>
-            <FileText className="mr-2 h-4 w-4" />
-            Panel Admin
-          </Button>
-        </div>
-      </div>
+      <RaporHeader onRefresh={fetchReports} onBackToAdmin={() => router.push("/dashboard/admin-panel")} />
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Total Rapor</p>
-            <p className="mt-1 text-3xl font-bold text-foreground">{items.length}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Rapor Terbit</p>
-            <p className="mt-1 text-3xl font-bold text-primary">{totalTerbit}</p>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Rapor Draft</p>
-            <p className="mt-1 text-3xl font-bold text-amber-600">{totalDraft}</p>
-          </CardContent>
-        </Card>
-      </div>
+      <RaporSummaryCards total={items.length} totalTerbit={totalTerbit} totalDraft={totalDraft} />
 
-      <Card className="border-border/50">
-        <CardHeader>
-          <CardTitle className="text-lg text-foreground">Filter Pencarian</CardTitle>
-          <CardDescription>Gunakan nama atau nomor induk untuk mencari data rapor yang sudah ada</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <Label htmlFor="search-rapor">Cari nama / nomor induk</Label>
-              <div className="relative mt-2">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="search-rapor"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Contoh: Ahmad Fauzi atau 2025001"
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="tahun-ajaran">Tahun ajaran</Label>
-              <Input id="tahun-ajaran" className="mt-2" value={tahunAjaran} onChange={(event) => setTahunAjaran(event.target.value)} />
-            </div>
-          </div>
+      <RaporFiltersCard
+        query={query}
+        onQueryChange={setQuery}
+        tahunAjaran={tahunAjaran}
+        onTahunAjaranChange={setTahunAjaran}
+        kodeKelas={kodeKelas}
+        onKodeKelasChange={setKodeKelas}
+        semester={semester}
+        onSemesterChange={setSemester}
+        status={status}
+        onStatusChange={setStatus}
+        perPage={perPage}
+        onPerPageChange={setPerPage}
+        isLoading={isLoading}
+        onSearch={fetchReports}
+        onReset={handleReset}
+      />
 
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <Label>Kelas</Label>
-              <Input className="mt-2" value={kodeKelas} onChange={(event) => setKodeKelas(event.target.value)} placeholder="Kode kelas / all" />
-            </div>
-            <div>
-              <Label>Semester</Label>
-              <Select value={semester} onValueChange={setSemester}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Semester" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua</SelectItem>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Status</Label>
-              <Select value={status} onValueChange={setStatus}>
-                <SelectTrigger className="mt-2">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua</SelectItem>
-                  <SelectItem value="DRAFT">DRAFT</SelectItem>
-                  <SelectItem value="TERBIT">TERBIT</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Per halaman</Label>
-              <Select value={perPage} onValueChange={setPerPage}>
-                <SelectTrigger className="mt8-2">
-                  <SelectValue placeholder="Per halaman" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10</SelectItem>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={fetchReports} disabled={isLoading}>
-              {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-              Cari
-            </Button>
-            <Button variant="outline" className="bg-transparent" onClick={handleReset}>
-              Reset
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {(error || success) && (
-        <div className={`rounded-lg border p-4 ${error ? "border-destructive/30 bg-destructive/5 text-destructive" : "border-primary/30 bg-primary/5 text-primary"}`}>
-          <div className="flex items-start gap-3">
-            <AlertCircle className="mt-0.5 h-4 w-4" />
-            <p className="text-sm">{error || success}</p>
-          </div>
-        </div>
-      )}
+      <RaporFeedbackAlert error={error} success={success} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]">
-        <Card className="border-border/50">
-          <CardHeader>
-            <CardTitle className="text-lg text-foreground">Daftar Rapor</CardTitle>
-            <CardDescription>Hasil pencarian laporan santri berdasarkan filter yang dipilih</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Santri</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Semester</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Rata-rata</TableHead>
-                    <TableHead className="text-center">Ranking</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                        Memuat data rapor...
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {!isLoading && !error && items.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
-                        Data rapor tidak ditemukan
-                      </TableCell>
-                    </TableRow>
-                  )}
-
-                  {!isLoading && !error && items.map((item, index) => {
-                    const rowIdentity = getRaporIdentity(item)
-                    const isSelected = selectedIdentity === rowIdentity
-                    const rowKey = `${rowIdentity}-${index}`
-
-                    return (
-                      <TableRow key={rowKey} className={isSelected ? "bg-primary/5" : undefined}>
-                        <TableCell>
-                          <div className="space-y-1">
-                            <p className="font-medium text-foreground">{item.nama_santri || "-"}</p>
-                            <p className="text-xs text-muted-foreground">{item.nomor_induk}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{item.kode_kelas || "-"}</TableCell>
-                        <TableCell>{item.semester} / {item.tahun_ajaran}</TableCell>
-                        <TableCell>{reportStatusBadge(item.status)}</TableCell>
-                        <TableCell className="text-center font-semibold text-primary">{item.nilai_rata ?? "-"}</TableCell>
-                        <TableCell className="text-center">{item.ranking ? `#${item.ranking}` : "-"}</TableCell>
-                        <TableCell>
-                          <div className="flex justify-end gap-2">
-                            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => loadReportDetail(item)} disabled={isSelecting}>
-                              <UserSearch className="mr-2 h-4 w-4" />
-                              Pilih
-                            </Button>
-                            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => loadReportDetail(item)} disabled={isSelecting}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Detail
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
+        <RaporTable
+          items={items}
+          isLoading={isLoading}
+          error={error}
+          isSelecting={isSelecting}
+          selectedIdentity={selectedIdentity}
+          getIdentity={getRaporIdentity}
+          onSelect={loadReportDetail}
+        />
 
         <div className="space-y-6">
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Generate & Preview</CardTitle>
-              <CardDescription>Gunakan panel ini untuk generate rapor dan membuka PDF</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <Label>Nomor induk</Label>
-                  <Input
-                    className="mt-2"
-                    value={catatanForm.nomor_induk}
-                    onChange={(event) => {
-                      const value = event.target.value
-                      setCatatanForm((current) => ({ ...current, nomor_induk: value }))
-                      setSantriSearch(value)
-                    }}
-                    placeholder="Cari nama santri atau nomor induk"
-                  />
+          <RaporGenerateCard
+            catatanForm={catatanForm}
+            onCatatanFormChange={setCatatanForm}
+            isSearchingSantri={isSearchingSantri}
+            santriOptions={santriOptions}
+            onNomorIndukSearchChange={setSantriSearch}
+            onSantriOptionPick={(option) => {
+              setCatatanForm((current) => ({
+                ...current,
+                nomor_induk: option.nomor_induk,
+                kode_kelas: current.kode_kelas || option.kode_kelas || "",
+              }))
 
-                  {(isSearchingSantri || santriOptions.length > 0) && (
-                    <div className="mt-2 rounded-md border border-border bg-background">
-                      {isSearchingSantri && (
-                        <p className="px-3 py-2 text-xs text-muted-foreground">Mencari santri...</p>
-                      )}
+              if (option.nama_lengkap) {
+                setSantriNameByNomorInduk((current) => ({
+                  ...current,
+                  [option.nomor_induk]: option.nama_lengkap || "",
+                }))
+              }
 
-                      {!isSearchingSantri && santriOptions.length > 0 && (
-                        <div className="max-h-44 overflow-y-auto">
-                          {santriOptions.map((option) => (
-                            <button
-                              key={`${option.nomor_induk}-${option.kode_kelas || "kelas"}`}
-                              type="button"
-                              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/50"
-                              onClick={() => {
-                                setCatatanForm((current) => ({
-                                  ...current,
-                                  nomor_induk: option.nomor_induk,
-                                  kode_kelas: current.kode_kelas || option.kode_kelas || "",
-                                }))
+              setSantriOptions([])
+              setSantriSearch("")
+            }}
+            isGenerating={isGenerating}
+            isReportReady={isReportReady}
+            onGenerate={handleGenerate}
+            onPreviewPdf={openPdfPreview}
+            onDownloadPdf={downloadPdf}
+          />
 
-                                if (option.nama_lengkap) {
-                                  setSantriNameByNomorInduk((current) => ({
-                                    ...current,
-                                    [option.nomor_induk]: option.nama_lengkap || "",
-                                  }))
-                                }
-
-                                setSantriOptions([])
-                                setSantriSearch("")
-                              }}
-                            >
-                              <span className="text-sm text-foreground">{option.nama_lengkap || "Tanpa nama"}</span>
-                              <span className="text-xs text-muted-foreground">{option.nomor_induk}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <Label>Kode kelas</Label>
-                  <Input className="mt-2" value={catatanForm.kode_kelas} onChange={(event) => setCatatanForm((current) => ({ ...current, kode_kelas: event.target.value }))} />
-                </div>
-                <div>
-                  <Label>Tahun ajaran</Label>
-                  <Input className="mt-2" value={catatanForm.tahun_ajaran} onChange={(event) => setCatatanForm((current) => ({ ...current, tahun_ajaran: event.target.value }))} />
-                </div>
-                <div>
-                  <Label>Semester</Label>
-                  <Select value={catatanForm.semester} onValueChange={(value) => setCatatanForm((current) => ({ ...current, semester: value }))}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Semester" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1</SelectItem>
-                      <SelectItem value="2">2</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleGenerate} disabled={isGenerating}>
-                  {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-                  Generate Rapor
-                </Button>
-                <Button variant="outline" className="bg-transparent" onClick={openPdfPreview} disabled={!isReportReady}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Preview PDF
-                </Button>
-                <Button variant="outline" className="bg-transparent" onClick={downloadPdf} disabled={!isReportReady}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Download PDF
-                </Button>
-              </div>
-
-              <p className="text-sm text-muted-foreground">
-                Catatan wali baru bisa diisi setelah rapor berhasil di-generate.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Panel Catatan Wali</CardTitle>
-              <CardDescription>Catatan wali, keseharian, dan status rapor aktif</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Santri</p>
-                  <p className="mt-1 font-medium text-foreground">{detail?.nama_santri || selected?.nama_santri || "Belum dipilih"}</p>
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">Status</p>
-                  <div className="mt-1">{reportStatusBadge(detail?.status || selected?.status)}</div>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="catatan-wali">Catatan wali</Label>
-                  <Textarea
-                    id="catatan-wali"
-                    className="mt-2 min-h-30"
-                    value={catatanForm.catatan_wali}
-                    onChange={(event) => setCatatanForm((current) => ({ ...current, catatan_wali: event.target.value }))}
-                    disabled={!isReportReady}
-                    placeholder={isReportReady ? "Tulis catatan pengembangan diri, akhlak, akademis, dan pesan wali kelas" : "Generate rapor dulu untuk mengisi catatan wali"}
-                  />
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div>
-                    <Label>Kebersihan</Label>
-                    <Input className="mt-2" value={catatanForm.keseharian_kebersihan} onChange={(event) => setCatatanForm((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
-                  </div>
-                  <div>
-                    <Label>Kerapian</Label>
-                    <Input className="mt-2" value={catatanForm.keseharian_kerapian} onChange={(event) => setCatatanForm((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
-                  </div>
-                  <div>
-                    <Label>Keterampilan</Label>
-                    <Input className="mt-2" value={catatanForm.keseharian_keterampilan} onChange={(event) => setCatatanForm((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <Label>ID wali kelas</Label>
-                    <Input className="mt-2" value={catatanForm.id_wali_kelas} onChange={(event) => setCatatanForm((current) => ({ ...current, id_wali_kelas: event.target.value }))} disabled={!isReportReady} placeholder="Opsional" />
-                  </div>
-                  <div>
-                    <Label>Semester aktif</Label>
-                    <Input className="mt-2" value={catatanForm.semester} disabled />
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Button onClick={handleSaveCatatan} disabled={!isReportReady || isSaving}>
-                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Simpan Catatan
-                </Button>
-                <Button variant="outline" className="bg-transparent" onClick={() => selected && loadReportDetail(selected)} disabled={!selected || isSelecting}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Muat Ulang Detail
-                </Button>
-              </div>
-
-              {!isReportReady && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700">
-                  Generate rapor dulu sebelum catatan wali bisa diinput.
-                </div>
-              )}
-
-              {detail?.nilai_mapel?.length ? (
-                <div className="space-y-3">
-                  <Separator />
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Preview Nilai Mapel</h3>
-                    <p className="text-xs text-muted-foreground">Detail ringkas nilai mapel untuk rapor yang dipilih</p>
-                  </div>
-                  <div className="max-h-64 overflow-auto rounded-lg border border-border/50">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Mapel</TableHead>
-                          <TableHead className="text-center">Nilai</TableHead>
-                          <TableHead className="text-center">Predikat</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {detail.nilai_mapel.map((item, index) => (
-                          <TableRow key={`${item.kode_mapel || "mapel"}-${index}`}>
-                            <TableCell>{item.mapel || item.kode_mapel || "-"}</TableCell>
-                            <TableCell className="text-center">{item.nilai ?? "-"}</TableCell>
-                            <TableCell className="text-center">{item.predikat || "-"}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
+          <RaporCatatanCard
+            detail={detail}
+            selected={selected}
+            catatanForm={catatanForm}
+            isReportReady={isReportReady}
+            isSaving={isSaving}
+            isSelecting={isSelecting}
+            onCatatanFormChange={setCatatanForm}
+            onSaveCatatan={handleSaveCatatan}
+            onReloadDetail={() => selected && loadReportDetail(selected)}
+          />
         </div>
       </div>
 
-      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle>Preview PDF Rapor</DialogTitle>
-            <DialogDescription>
-              {selected?.nama_santri || detail?.nama_santri || "Santri belum dipilih"}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="h-[75vh] overflow-hidden rounded-lg border border-border">
-            {pdfPreviewUrl ? (
-              <iframe title="Preview PDF Rapor" src={pdfPreviewUrl} className="h-full w-full" />
-            ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">Memuat preview PDF...</div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <RaporPreviewDialog
+        isOpen={isPreviewOpen}
+        onOpenChange={setIsPreviewOpen}
+        pdfPreviewUrl={pdfPreviewUrl}
+        namaSantri={selected?.nama_santri || detail?.nama_santri}
+      />
     </div>
   )
 }
