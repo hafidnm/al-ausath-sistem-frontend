@@ -128,23 +128,41 @@ export function RaporCatatanCard({
             <Separator />
             <div>
               <h3 className="text-sm font-semibold text-foreground">Preview Nilai Mapel</h3>
-              <p className="text-xs text-muted-foreground">Detail ringkas nilai mapel untuk rapor yang dipilih</p>
+              <p className="text-xs text-muted-foreground">Detail lengkap nilai mapel untuk rapor yang dipilih</p>
             </div>
-            <div className="max-h-64 overflow-auto rounded-lg border border-border/50">
+            <div className="max-h-96 overflow-auto rounded-lg border border-border/50">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Mapel</TableHead>
-                    <TableHead className="text-center">Nilai</TableHead>
-                    <TableHead className="text-center">Predikat</TableHead>
+                  <TableRow className="bg-muted/50 sticky top-0">
+                    <TableHead className="whitespace-nowrap">Mapel</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">Harian</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">UTS</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">UAS</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">Akhir</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">Rapor</TableHead>
+                    <TableHead className="text-center whitespace-nowrap">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {detail.nilai_mapel.map((item, index) => (
                     <TableRow key={`${item.kode_mapel || "mapel"}-${index}`}>
-                      <TableCell>{item.mapel || item.kode_mapel || "-"}</TableCell>
-                      <TableCell className="text-center">{item.nilai ?? "-"}</TableCell>
-                      <TableCell className="text-center">{item.predikat || "-"}</TableCell>
+                      <TableCell className="font-medium">{item.mapel || item.kode_mapel || "-"}</TableCell>
+                      <TableCell className="text-center text-sm">{item.nilai_harian ?? "-"}</TableCell>
+                      <TableCell className="text-center text-sm">{item.nilai_uts ?? "-"}</TableCell>
+                      <TableCell className="text-center text-sm">{item.nilai_uas ?? "-"}</TableCell>
+                      <TableCell className="text-center font-semibold">{item.nilai_akhir_mapel ?? item.nilai ?? "-"}</TableCell>
+                      <TableCell className="text-center font-semibold text-blue-600">{item.nilai_rapor_tampil ?? item.nilai ?? "-"}</TableCell>
+                      <TableCell className="text-center text-xs">
+                        <span className={`inline-block rounded px-2 py-1 ${
+                          item.status_ketuntasan === "TUNTAS" 
+                            ? "bg-green-100 text-green-700" 
+                            : item.status_ketuntasan === "TIDAK_TUNTAS"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}>
+                          {item.status_ketuntasan || "-"}
+                        </span>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

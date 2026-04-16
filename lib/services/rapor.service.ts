@@ -16,10 +16,18 @@ export interface RaporItem {
 
 export interface RaporDetail extends RaporItem {
   nilai_mapel?: Array<{
+    id_nilai?: number
     kode_mapel?: string
     mapel?: string
+    nilai_harian?: number | string
+    nilai_uts?: number | string
+    nilai_uas?: number | string
+    nilai_akhir_mapel?: number | string
+    nilai_rapor_tampil?: number | string
     nilai?: number
     predikat?: string
+    flag_warna_rapor?: string
+    status_ketuntasan?: string
     status_kkm?: string
   }>
   nilai_akhlak?: Array<{
@@ -131,11 +139,19 @@ const normalizeRaporDetail = (raw: any): RaporDetail => {
     ...rapor,
     nilai_mapel: Array.isArray(raw?.nilai_mapel)
       ? raw.nilai_mapel.map((item: any) => ({
+          id_nilai: item?.id_nilai != null ? toNumber(item?.id_nilai, 0) : undefined,
           kode_mapel: toText(item?.kode_mapel),
           mapel: toText(item?.mapel ?? item?.nama_mapel),
-          nilai: item?.nilai != null ? toNumber(item?.nilai, 0) : undefined,
+          nilai_harian: item?.nilai_harian != null ? toNumber(item?.nilai_harian, 0) : undefined,
+          nilai_uts: item?.nilai_uts != null ? toNumber(item?.nilai_uts, 0) : undefined,
+          nilai_uas: item?.nilai_uas != null ? toNumber(item?.nilai_uas, 0) : undefined,
+          nilai_akhir_mapel: item?.nilai_akhir_mapel != null ? toNumber(item?.nilai_akhir_mapel, 0) : undefined,
+          nilai_rapor_tampil: item?.nilai_rapor_tampil != null ? toNumber(item?.nilai_rapor_tampil, 0) : undefined,
+          nilai: item?.nilai != null ? toNumber(item?.nilai, 0) : (item?.nilai_akhir_mapel != null ? toNumber(item?.nilai_akhir_mapel, 0) : undefined),
           predikat: toText(item?.predikat),
-          status_kkm: toText(item?.status_kkm),
+          flag_warna_rapor: toText(item?.flag_warna_rapor),
+          status_ketuntasan: toText(item?.status_ketuntasan),
+          status_kkm: toText(item?.status_kkm ?? item?.status_ketuntasan),
         }))
       : undefined,
     nilai_akhlak: Array.isArray(raw?.nilai_akhlak)
