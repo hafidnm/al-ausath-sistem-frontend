@@ -9,7 +9,7 @@ import { RaporFeedbackAlert } from "./components/rapor-feedback-alert"
 import { RaporFiltersCard } from "./components/rapor-filters-card"
 import { RaporGenerateCard } from "./components/rapor-generate-card"
 import { RaporHeader } from "./components/rapor-header"
-import { RaporPreviewDialog } from "./components/rapor-preview-dialog"
+import RaporPreviewDialog from "./components/rapor-preview-dialog"
 import { RaporSummaryCards } from "./components/rapor-summary-cards"
 import { RaporTable } from "./components/rapor-table"
 
