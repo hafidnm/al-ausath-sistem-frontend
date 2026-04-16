@@ -250,7 +250,7 @@ export default function LoginPage() {
               <div className="mt-6 pt-6 border-t border-border">
                 <p className="text-center text-sm text-muted-foreground">
                   Belum punya akun?{" "}
-                  <Link href="/#ppdb" className="text-primary hover:text-primary/80 font-medium transition-colors">
+                  <Link href="/ppdb/register" className="text-primary hover:text-primary/80 font-medium transition-colors">
                     Daftar PPDB
                   </Link>
                   {" "}atau{" "}

@@ -12,6 +12,8 @@ const PPDB_PORTAL_ACCOUNT_ID_HINT_KEY = 'ppdb_portal_account_id_hint';
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
 const PHONE_PATTERN = /^\+?\d{8,15}$/;
 
+import type { TestQuestion } from './ppdb.types';
+
 export type PpdbVerificationStatus = 'Menunggu' | 'Terverifikasi' | 'Diterima' | 'Ditolak';
 
 export type PpdbPortalStep =
@@ -44,6 +46,7 @@ export interface PpdbPortalFormRequest {
   namaLengkap?: string;
   program?: string;
   jenjang?: string;
+  noHpCalon?: string;
   nomorUmi?: string;
   asalKota?: string;
   asalSekolah?: string;
@@ -65,9 +68,15 @@ export interface PpdbPortalFormRequest {
   dokumenAktaKk?: File | null;
   dokumenRekomendasiUstadz?: File | null;
   dokumenSuratPernyataan?: File | null;
+  fileAktaPath?: string;
+  fileKkPath?: string;
+  fileSuratRekomendasiPath?: string;
+  suratPernyataanSetuju?: 'accepted';
+  suratPernyataanFilePath?: string;
   alamat?: string;
   emailPpdb?: string;
   idAkun?: string;
+  idPendaftaran?: string;
 }
 
 export interface PpdbPortalDashboard {
@@ -105,12 +114,38 @@ export interface PpdbPortalDashboard {
   status: PpdbVerificationStatus;
   tesRequired: boolean;
   tesAvailable: boolean;
+  fiturSoalAktif: boolean;
+  showHalamanTes: boolean;
+  pendaftaranSelesai: boolean;
+  soalTes: string;
   tesTitle: string;
   tesDescription: string;
   pengumumanDate: string;
   pengumumanOpen: boolean;
   formCompleted: boolean;
   step: PpdbPortalStep;
+}
+
+export interface PpdbPortalTesStatus {
+  canAccessTes: boolean;
+  showHalamanTes: boolean;
+  pendaftaranSelesai: boolean;
+  fiturSoalAktif: boolean;
+  soalTes: string;
+  formSchema?: TestQuestion[];
+  tesRequired: boolean;
+  tesAvailable: boolean;
+  tesFinished: boolean;
+  tesSubmitted: boolean;
+  tesTitle: string;
+  tesDescription: string;
+  step: PpdbPortalStep;
+  message: string;
+}
+
+export interface PpdbPortalTesJawabRequest {
+  soalJawab: string;
+  idPendaftaran?: string;
 }
 
 export interface PpdbPortalAnnouncementResult {
@@ -134,6 +169,25 @@ const toStringOrEmpty = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'bigint') return String(value);
   return '';
+};
+
+const toFileReferenceString = (value: unknown): string => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
+    return String(value);
+  }
+
+  if (!value || typeof value !== 'object') return '';
+
+  const record = value as ApiRecord;
+  return toStringOrEmpty(
+    record.url ??
+      record.path ??
+      record.file ??
+      record.file_path ??
+      record.storage_path ??
+      record.original_url ??
+      record.download_url,
+  );
 };
 
 const toBoolean = (value: unknown): boolean => {
@@ -160,6 +214,63 @@ const normalizeStatus = (value: unknown): PpdbVerificationStatus => {
   if (raw === 'rejected' || raw === 'ditolak' || raw === 'gagal') return 'Ditolak';
 
   return 'Menunggu';
+};
+
+const toNullableString = (value: unknown): string => toStringOrEmpty(value).trim();
+
+const getPublicApiBaseUrl = (): string => {
+  return (process.env.NEXT_PUBLIC_API_URL || '')
+    .replace(/\/api\/?$/, '')
+    .replace(/\/+$/, '');
+};
+
+const resolvePublicFileUrl = (value: unknown): string => {
+  const raw = toNullableString(value);
+
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
+
+  const baseApiUrl = getPublicApiBaseUrl();
+  const slashNormalizedRaw = raw.replace(/\\/g, '/').trim();
+
+  let normalizedRaw = slashNormalizedRaw
+    .replace(/^\/?public\//i, '')
+    .replace(/^\/?app\/public\//i, 'storage/');
+
+  if (normalizedRaw.startsWith('/public/storage/')) {
+    normalizedRaw = normalizedRaw.replace('/public/storage/', '/storage/');
+  }
+
+  if (normalizedRaw.startsWith('public/storage/')) {
+    normalizedRaw = normalizedRaw.replace('public/storage/', 'storage/');
+  }
+
+  if (/^\/?storage\/app\/public\//i.test(normalizedRaw)) {
+    normalizedRaw = normalizedRaw.replace(/^\/?storage\/app\/public\//i, 'storage/');
+  }
+
+  const storageAppPublicMarker = '/storage/app/public/';
+  const storageAppPublicIdx = normalizedRaw.toLowerCase().indexOf(storageAppPublicMarker);
+  if (storageAppPublicIdx >= 0) {
+    normalizedRaw = `storage/${normalizedRaw.slice(storageAppPublicIdx + storageAppPublicMarker.length)}`;
+  }
+
+  if (normalizedRaw.startsWith('/storage/')) {
+    return baseApiUrl ? `${baseApiUrl}${normalizedRaw}` : normalizedRaw;
+  }
+
+  if (normalizedRaw.startsWith('storage/')) {
+    return baseApiUrl ? `${baseApiUrl}/${normalizedRaw}` : `/${normalizedRaw}`;
+  }
+
+  if (normalizedRaw.startsWith('/')) {
+    return baseApiUrl ? `${baseApiUrl}${normalizedRaw}` : normalizedRaw;
+  }
+
+  return baseApiUrl
+    ? `${baseApiUrl}/storage/${normalizedRaw}`
+    : `/storage/${normalizedRaw}`;
 };
 
 const resolveRecord = (payload: unknown): ApiRecord => {
@@ -470,7 +581,7 @@ const getErrorStatus = (error: unknown): number | undefined => {
 
 const deriveStep = (
   formCompleted: boolean,
-  tesRequired: boolean,
+  showHalamanTes: boolean,
   pengumumanOpen: boolean,
   status: PpdbVerificationStatus,
 ): PpdbPortalStep => {
@@ -480,7 +591,7 @@ const deriveStep = (
     return 'pengumuman';
   }
 
-  if (tesRequired) return 'tes';
+  if (showHalamanTes) return 'tes';
   if (pengumumanOpen) return 'pengumuman';
   return 'menunggu-pengumuman';
 };
@@ -533,6 +644,9 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
         ? pendaftaranFromUser
         : pendaftaranFromData;
 
+  const flow = resolveNestedRecord(data, 'flow');
+  const tesData = resolveNestedRecord(data, 'tes');
+
   const resolvedNamaCalon = toStringOrEmpty(
     profile.nama_calon ??
       identity.nama_calon ??
@@ -568,31 +682,101 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   );
 
   const resolvedAsalSekolah = toStringOrEmpty(
-    profile.asal_sekolah ?? identity.asal_sekolah ?? pendaftaran.asal_sekolah,
+    profile.asalSekolah ??
+      profile.asal_sekolah ??
+      profile.sekolah_asal ??
+      profile.asal ??
+      profile.asal_kota ??
+      identity.asalSekolah ??
+      identity.asal_sekolah ??
+      identity.sekolah_asal ??
+      identity.asal ??
+      identity.asal_kota ??
+      pendaftaran.asalSekolah ??
+      pendaftaran.asal_sekolah ??
+      pendaftaran.sekolah_asal ??
+      pendaftaran.asal ??
+      pendaftaran.asal_kota ??
+      data.asalSekolah ??
+      data.asal_sekolah ??
+      data.sekolah_asal ??
+      data.asal ??
+      data.asal_kota,
   );
 
   const resolvedTempatLahir = toStringOrEmpty(
-    profile.tempat_lahir ?? identity.tempat_lahir ?? pendaftaran.tempat_lahir,
+    profile.tempatLahir ??
+      profile.tempat_lahir ??
+      profile.tempat_lahir_calon ??
+      identity.tempatLahir ??
+      identity.tempat_lahir ??
+      identity.tempat_lahir_calon ??
+      pendaftaran.tempatLahir ??
+      pendaftaran.tempat_lahir ??
+      pendaftaran.tempat_lahir_calon ??
+      data.tempatLahir ??
+      data.tempat_lahir ??
+      data.tempat_lahir_calon,
   );
 
   const resolvedTanggalLahir = toStringOrEmpty(
-    profile.tanggal_lahir ?? identity.tanggal_lahir ?? pendaftaran.tanggal_lahir,
+    profile.tanggalLahir ??
+      profile.tanggal_lahir ??
+      profile.tanggal_lahir_calon ??
+      identity.tanggalLahir ??
+      identity.tanggal_lahir ??
+      identity.tanggal_lahir_calon ??
+      pendaftaran.tanggalLahir ??
+      pendaftaran.tanggal_lahir ??
+      pendaftaran.tanggal_lahir_calon ??
+      data.tanggalLahir ??
+      data.tanggal_lahir ??
+      data.tanggal_lahir_calon,
   );
 
   const resolvedJenisKelamin = toStringOrEmpty(
-    profile.jenis_kelamin ?? identity.jenis_kelamin ?? pendaftaran.jenis_kelamin,
+    profile.jenisKelamin ??
+      profile.jenis_kelamin ??
+      identity.jenisKelamin ??
+      identity.jenis_kelamin ??
+      pendaftaran.jenisKelamin ??
+      pendaftaran.jenis_kelamin ??
+      data.jenisKelamin ??
+      data.jenis_kelamin,
   );
 
   const resolvedAlamat = toStringOrEmpty(
-    profile.alamat ?? identity.alamat ?? pendaftaran.alamat,
+    profile.alamatLengkap ??
+      profile.alamat_lengkap ??
+      profile.alamat_lengkap_calon ??
+      profile.alamat_calon ??
+      profile.alamat ??
+      identity.alamatLengkap ??
+      identity.alamat_lengkap ??
+      identity.alamat_lengkap_calon ??
+      identity.alamat_calon ??
+      identity.alamat ??
+      pendaftaran.alamatLengkap ??
+      pendaftaran.alamat_lengkap ??
+      pendaftaran.alamat_lengkap_calon ??
+      pendaftaran.alamat_calon ??
+      pendaftaran.alamat ??
+      data.alamatLengkap ??
+      data.alamat_lengkap ??
+      data.alamat_lengkap_calon ??
+      data.alamat_calon ??
+      data.alamat,
   );
 
   const resolvedProgram = toStringOrEmpty(
-    profile.program ??
+    profile.program_pendaftaran ??
+      profile.program ??
       profile.program_daftar ??
       profile.program_pilihan ??
+      identity.program_pendaftaran ??
       identity.program ??
       identity.program_daftar ??
+      pendaftaran.program_pendaftaran ??
       pendaftaran.program ??
       pendaftaran.program_daftar,
   );
@@ -628,8 +812,11 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   const resolvedNoHpAyah = toStringOrEmpty(
     profile.no_hp_ayah ??
       profile.hp_ayah ??
+      profile.no_hp_calon ??
       identity.no_hp_ayah ??
-      pendaftaran.no_hp_ayah,
+      identity.no_hp_calon ??
+      pendaftaran.no_hp_ayah ??
+      pendaftaran.no_hp_calon,
   );
 
   const resolvedNamaIbu = toStringOrEmpty(
@@ -650,6 +837,49 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       pendaftaran.soal_jawab,
   );
 
+  const fiturSoalAktif = toBoolean(
+    flow.fitur_soal_aktif ??
+      flow.fiturSoalAktif ??
+      tesData.fitur_soal_aktif ??
+      tesData.fiturSoalAktif ??
+    data.fitur_soal_aktif ??
+      data.fiturSoalAktif ??
+      data.tes_aktif ??
+      data.soal_aktif ??
+      profile.fitur_soal_aktif ??
+      pendaftaran.fitur_soal_aktif,
+  );
+
+  const soalTes = toStringOrEmpty(
+    tesData.soal_tes ??
+      tesData.soalTes ??
+      tesData.pertanyaan_tes ??
+    data.soal_tes ??
+      data.soalTes ??
+      data.pertanyaan_tes ??
+      profile.soal_tes ??
+      profile.soalTes ??
+      pendaftaran.soal_tes ??
+      pendaftaran.soalTes,
+  );
+
+  const tesFinished = toBoolean(
+    flow.tes_selesai ??
+      flow.tesSelesai ??
+      tesData.tes_selesai ??
+      tesData.tesSubmitted ??
+      tesData.tes_submitted ??
+      tesData.jawaban_sudah_diisi ??
+    data.tes_selesai ??
+      data.tes_sudah_selesai ??
+      data.tes_submitted ??
+      data.tes_dikerjakan ??
+      profile.tes_selesai ??
+      profile.tes_submitted ??
+      pendaftaran.tes_selesai ??
+      pendaftaran.tes_submitted,
+  );
+
   const resolvedSuratPernyataanText = toStringOrEmpty(
     profile.surat_pernyataan_text ??
       profile.surat_pernyataan ??
@@ -657,43 +887,69 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       pendaftaran.surat_pernyataan_text,
   );
 
-  const resolvedBerkasAktaUrl = toStringOrEmpty(
+  const resolvedBerkasAktaPath = toFileReferenceString(
     profile.berkas_akta_url ??
       profile.akta_url ??
       profile.file_akta ??
+      profile.file_akta_path ??
       identity.berkas_akta_url ??
-      pendaftaran.berkas_akta_url,
+      identity.file_akta_path ??
+      pendaftaran.berkas_akta_url ??
+      pendaftaran.file_akta_path ??
+      data.berkas_akta_url ??
+      data.file_akta ??
+      data.file_akta_path,
   );
 
-  const resolvedBerkasKkUrl = toStringOrEmpty(
+  const resolvedBerkasKkPath = toFileReferenceString(
     profile.berkas_kk_url ??
       profile.kk_url ??
       profile.file_kk ??
+      profile.file_kk_path ??
       identity.berkas_kk_url ??
-      pendaftaran.berkas_kk_url,
+      identity.file_kk_path ??
+      pendaftaran.berkas_kk_url ??
+      pendaftaran.file_kk_path ??
+      data.berkas_kk_url ??
+      data.file_kk ??
+      data.file_kk_path,
   );
 
-  const resolvedBerkasAktaKkUrl = toStringOrEmpty(
+  const resolvedBerkasAktaKkPath = toFileReferenceString(
     profile.berkas_akta_kk_url ??
       profile.akta_kk_url ??
       profile.file_akta_kk ??
       identity.berkas_akta_kk_url ??
-      pendaftaran.berkas_akta_kk_url,
+      pendaftaran.berkas_akta_kk_url ??
+      data.berkas_akta_kk_url ??
+      data.file_akta_kk,
   );
 
-  const resolvedBerkasRekomendasiUstadzUrl = toStringOrEmpty(
+  const resolvedBerkasRekomendasiUstadzPath = toFileReferenceString(
     profile.berkas_rekomendasi_ustadz_url ??
       profile.rekomendasi_ustadz_url ??
       profile.file_rekomendasi_ustadz ??
+      profile.file_surat_rekomendasi_path ??
       identity.berkas_rekomendasi_ustadz_url ??
-      pendaftaran.berkas_rekomendasi_ustadz_url,
+      identity.file_surat_rekomendasi_path ??
+      pendaftaran.berkas_rekomendasi_ustadz_url ??
+      pendaftaran.file_surat_rekomendasi_path ??
+      data.berkas_rekomendasi_ustadz_url ??
+      data.file_rekomendasi_ustadz ??
+      data.file_surat_rekomendasi_path,
   );
 
-  const resolvedBerkasSuratPernyataanUrl = toStringOrEmpty(
+  const resolvedBerkasSuratPernyataanPath = toFileReferenceString(
     profile.berkas_surat_pernyataan_url ??
       profile.file_surat_pernyataan ??
+      profile.surat_pernyataan_file_path ??
       identity.berkas_surat_pernyataan_url ??
-      pendaftaran.berkas_surat_pernyataan_url,
+      identity.surat_pernyataan_file_path ??
+      pendaftaran.berkas_surat_pernyataan_url ??
+      pendaftaran.surat_pernyataan_file_path ??
+      data.berkas_surat_pernyataan_url ??
+      data.file_surat_pernyataan ??
+      data.surat_pernyataan_file_path,
   );
 
   const resolvedEmail = toStringOrEmpty(
@@ -776,34 +1032,15 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       data.status,
   );
 
-  const tesRequired = toBoolean(
-    data.tes_required ??
-      data.tes_wajib ??
-      data.has_tes ??
-      data.is_tes_required ??
-        profile.tes_required ??
-        pendaftaran.tes_required,
-  );
-
-  const tesAvailable = toBoolean(
-    data.tes_available ??
-      data.tes_dibuka ??
-      data.tes_ready ??
-      profile.tes_available ??
-      pendaftaran.tes_available,
-  );
-
-  const pengumumanOpen = toBoolean(
-    data.pengumuman_open ??
-      data.pengumuman_dibuka ??
-      data.is_pengumuman_open ??
-      profile.pengumuman_open ??
-      pendaftaran.pengumuman_open,
-  );
-
   const formCompleted =
-    data.form_completed !== undefined
-      ? toBoolean(data.form_completed)
+    toBoolean(
+      flow.is_form_lengkap ??
+        flow.isFormLengkap ??
+        data.is_form_lengkap ??
+        data.form_completed ??
+        data.pendaftaran_selesai,
+    )
+      ? true
       : Boolean(
           resolvedNamaCalon &&
             resolvedJenjang &&
@@ -811,13 +1048,115 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
             resolvedAlamat,
         );
 
-  const step = deriveStep(formCompleted, tesRequired, pengumumanOpen, status);
+  const explicitShowHalamanTes = toBoolean(
+    flow.show_halaman_tes ??
+      flow.showHalamanTes ??
+      tesData.show_halaman_tes ??
+      tesData.showHalamanTes ??
+      tesData.can_access_tes,
+  );
+
+  const tesRequired = explicitShowHalamanTes
+    ? true
+    : toBoolean(
+      flow.tes_required ??
+        flow.tesRequired ??
+        tesData.tes_required ??
+        tesData.tesRequired ??
+        data.tes_required ??
+        data.tes_wajib ??
+        data.has_tes ??
+        data.is_tes_required ??
+        profile.tes_required ??
+        pendaftaran.tes_required,
+    );
+
+  const tesAvailable = toBoolean(
+    flow.tes_available ??
+      flow.tesAvailable ??
+      tesData.soal_tersedia ??
+      tesData.tes_available ??
+      tesData.tesAvailable ??
+    data.tes_available ??
+      data.tes_dibuka ??
+      data.tes_ready ??
+      data.can_access_tes ??
+      profile.tes_available ??
+      pendaftaran.tes_available,
+  );
+
+  const derivedShowHalamanTes = Boolean(
+    formCompleted
+      && fiturSoalAktif
+      && soalTes.trim().length > 0
+      && tesRequired
+      && !tesFinished,
+  );
+
+  const hasExplicitShowHalamanTes =
+    flow.show_halaman_tes !== undefined
+    || flow.showHalamanTes !== undefined
+    || tesData.show_halaman_tes !== undefined
+    || tesData.showHalamanTes !== undefined
+    || tesData.can_access_tes !== undefined;
+
+  const showHalamanTes = hasExplicitShowHalamanTes
+    ? explicitShowHalamanTes
+    : derivedShowHalamanTes;
+
+  const pendaftaranSelesaiFlag = toBoolean(
+    flow.pendaftaran_selesai ??
+      flow.pendaftaranSelesai ??
+      data.pendaftaran_selesai ??
+      data.pendaftaranSelesai ??
+      profile.pendaftaran_selesai ??
+      pendaftaran.pendaftaran_selesai,
+  );
+
+  const hasExplicitPendaftaranSelesai =
+    flow.pendaftaran_selesai !== undefined
+    || flow.pendaftaranSelesai !== undefined
+    || data.pendaftaran_selesai !== undefined
+    || data.pendaftaranSelesai !== undefined;
+
+  const pendaftaranSelesai = hasExplicitPendaftaranSelesai
+    ? pendaftaranSelesaiFlag
+    : (!showHalamanTes && formCompleted);
+
+  const pengumumanOpen = toBoolean(
+    flow.is_pengumuman_dibuka ??
+      flow.isPengumumanDibuka ??
+    data.pengumuman_open ??
+      data.pengumuman_dibuka ??
+      data.is_pengumuman_open ??
+      profile.pengumuman_open ??
+      pendaftaran.pengumuman_open,
+  );
+
+  const step = deriveStep(formCompleted, showHalamanTes, pengumumanOpen, status);
 
   return {
     idPendaftar,
     noPendaftaran,
     waktuPendaftaran: toStringOrEmpty(
-      data.created_at ?? pendaftaran.created_at ?? profile.created_at,
+      data.waktu_pendaftaran ??
+        data.waktuPendaftaran ??
+        data.tanggal_daftar ??
+        data.tanggalDaftar ??
+        data.registered_at ??
+        data.created_at ??
+        pendaftaran.waktu_pendaftaran ??
+        pendaftaran.waktuPendaftaran ??
+        pendaftaran.tanggal_daftar ??
+        pendaftaran.tanggalDaftar ??
+        pendaftaran.registered_at ??
+        pendaftaran.created_at ??
+        profile.waktu_pendaftaran ??
+        profile.waktuPendaftaran ??
+        profile.tanggal_daftar ??
+        profile.tanggalDaftar ??
+        profile.registered_at ??
+        profile.created_at,
     ),
     email: resolvedEmail,
     phone: resolvedPhone,
@@ -841,20 +1180,31 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     noHpIbu: resolvedNoHpIbu,
     soalJawab: resolvedSoalJawab,
     suratPernyataanText: resolvedSuratPernyataanText,
-    berkasAktaUrl: resolvedBerkasAktaUrl || resolvedBerkasAktaKkUrl,
-    berkasKkUrl: resolvedBerkasKkUrl || resolvedBerkasAktaKkUrl,
-    berkasAktaKkUrl: resolvedBerkasAktaKkUrl,
-    berkasRekomendasiUstadzUrl: resolvedBerkasRekomendasiUstadzUrl,
-    berkasSuratPernyataanUrl: resolvedBerkasSuratPernyataanUrl,
+    berkasAktaUrl: resolvePublicFileUrl(resolvedBerkasAktaPath || resolvedBerkasAktaKkPath),
+    berkasKkUrl: resolvePublicFileUrl(resolvedBerkasKkPath || resolvedBerkasAktaKkPath),
+    berkasAktaKkUrl: resolvePublicFileUrl(resolvedBerkasAktaKkPath),
+    berkasRekomendasiUstadzUrl: resolvePublicFileUrl(resolvedBerkasRekomendasiUstadzPath),
+    berkasSuratPernyataanUrl: resolvePublicFileUrl(resolvedBerkasSuratPernyataanPath),
     alamat: resolvedAlamat,
     status,
     tesRequired,
     tesAvailable,
+    fiturSoalAktif,
+    showHalamanTes,
+    pendaftaranSelesai,
+    soalTes,
     tesTitle: toStringOrEmpty(
-      data.tes_title ?? data.judul_tes ?? profile.tes_title ?? pendaftaran.tes_title,
+      tesData.tes_title ??
+        tesData.judul_tes ??
+        data.tes_title ??
+        data.judul_tes ??
+        profile.tes_title ??
+        pendaftaran.tes_title,
     ),
     tesDescription: toStringOrEmpty(
-      data.tes_description ??
+      tesData.tes_description ??
+        tesData.deskripsi_tes ??
+        data.tes_description ??
         data.deskripsi_tes ??
         profile.tes_description ??
         pendaftaran.tes_description,
@@ -882,6 +1232,106 @@ const normalizeAnnouncement = (payload: unknown): PpdbPortalAnnouncementResult =
     status: normalizeStatus(data.status_verifikasi ?? data.hasil_verifikasi ?? data.status),
     message: toStringOrEmpty(data.message ?? (payload as ApiRecord)?.message),
   };
+};
+
+const normalizeTesStatus = (payload: unknown): PpdbPortalTesStatus => {
+  const data = resolveRecord(payload);
+  const pendaftar = resolveNestedRecordCandidates(data, ['pendaftar', 'peserta', 'calon', 'profil', 'profile']);
+  const source = hasRecordData(pendaftar) ? pendaftar : data;
+
+  const soalTes = toStringOrEmpty(
+    data.soal_tes ??
+      data.soalTes ??
+      data.pertanyaan_tes ??
+      source.soal_tes ??
+      source.soalTes ??
+      source.pertanyaan_tes,
+  );
+
+  let formSchema: TestQuestion[] | undefined = undefined;
+  try {
+    const rawSchema = data.form_schema ?? data.formSchema ?? source.form_schema ?? source.formSchema;
+    if (typeof rawSchema === 'string') {
+      formSchema = JSON.parse(rawSchema);
+    } else if (Array.isArray(rawSchema)) {
+      formSchema = rawSchema;
+    }
+  } catch (err) {
+    console.warn('Failed to parse form schema', err);
+  }
+
+  const tesRequired = toBoolean(
+    data.tes_required ??
+      data.tes_wajib ??
+      data.has_tes ??
+      data.is_tes_required ??
+      source.tes_required,
+  );
+
+  const fiturSoalAktif = toBoolean(
+    data.fitur_soal_aktif ??
+      data.fiturSoalAktif ??
+      data.tes_aktif ??
+      source.fitur_soal_aktif ??
+      source.fiturSoalAktif,
+  );
+
+  const tesSubmitted = toBoolean(
+    data.tes_submitted ??
+      data.tes_selesai ??
+      data.tes_sudah_selesai ??
+      source.tes_submitted ??
+      source.tes_selesai,
+  );
+
+  const showHalamanTes = toBoolean(
+    data.show_halaman_tes ??
+      data.showHalamanTes ??
+      data.can_access_tes ??
+      source.show_halaman_tes ??
+      source.can_access_tes,
+  );
+
+  const pendaftaranSelesai = toBoolean(
+    data.pendaftaran_selesai ??
+      data.pendaftaranSelesai ??
+      source.pendaftaran_selesai ??
+      source.pendaftaranSelesai,
+  );
+
+  const tesAvailable = toBoolean(
+    data.tes_available ??
+      data.tes_dibuka ??
+      data.tes_ready ??
+      data.can_access_tes ??
+      source.tes_available ??
+      source.can_access_tes,
+  );
+
+  const canAccessTes = Boolean(showHalamanTes || (tesRequired && fiturSoalAktif && soalTes && !tesSubmitted));
+  const step = canAccessTes ? 'tes' : pendaftaranSelesai ? 'menunggu-pengumuman' : 'lengkapi-form';
+
+  return {
+    canAccessTes,
+    showHalamanTes: canAccessTes,
+    pendaftaranSelesai,
+    fiturSoalAktif,
+    soalTes,
+    formSchema,
+    tesRequired,
+    tesAvailable,
+    tesFinished: tesSubmitted,
+    tesSubmitted,
+    tesTitle: toStringOrEmpty(data.tes_title ?? data.judul_tes ?? source.tes_title),
+    tesDescription: toStringOrEmpty(data.tes_description ?? data.deskripsi_tes ?? source.tes_description),
+    step,
+    message: toStringOrEmpty(data.message ?? (payload as ApiRecord)?.message),
+  };
+};
+
+const isNotFoundAliasError = (error: unknown): boolean => {
+  const status = getErrorStatus(error);
+  return status === 404 || status === 405;
 };
 
 const normalizeRegisterResponse = (payload: unknown): PpdbPortalRegisterResponse => {
@@ -989,22 +1439,39 @@ export const ppdbPortalService = {
   },
 
   register: async (data: PpdbPortalRegisterRequest): Promise<PpdbPortalRegisterResponse> => {
+    const endpointCandidates = [
+      `${PPDB_PORTAL_BASE_PATH}/auth/register`,
+      `${PPDB_PORTAL_BASE_PATH}/register`,
+    ];
+
     try {
       await getCsrfToken();
 
       const payload = {
-        email: data.email,
         email_ppdb: data.email,
-        phone: data.phone,
         phone_ppdb: data.phone,
         password: data.password,
         password_confirmation: data.password_confirmation,
+        role: 'ppdb',
         nama_calon: data.namaCalon,
         nama: data.namaCalon,
       };
 
-      const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/register`, payload);
-      return normalizeRegisterResponse(response.data);
+      let lastError: unknown;
+
+      for (const endpoint of endpointCandidates) {
+        try {
+          const response = await api.post(endpoint, payload);
+          return normalizeRegisterResponse(response.data);
+        } catch (error) {
+          lastError = error;
+          if (!isNotFoundAliasError(error)) {
+            throw error;
+          }
+        }
+      }
+
+      throw lastError ?? new Error('Gagal mendaftarkan akun PPDB');
     } catch (error) {
       const message = extractErrorMessage(error, 'Gagal mendaftarkan akun PPDB');
       throw new Error(message);
@@ -1013,36 +1480,46 @@ export const ppdbPortalService = {
 
   login: async (data: PpdbPortalLoginRequest) => {
     let lastError: unknown = null;
+    const endpointCandidates = [`${PPDB_PORTAL_BASE_PATH}/auth/login`, `${PPDB_PORTAL_BASE_PATH}/login`];
 
     try {
       await getCsrfToken();
 
       const payloadCandidates = buildPpdbLoginPayloadCandidates(data.login, data.password);
 
-      for (const payload of payloadCandidates) {
-        try {
-          const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/login`, payload);
-          const authToken = resolveAuthTokenFromResponse(response.data, response.headers);
+      for (const endpoint of endpointCandidates) {
+        for (const payload of payloadCandidates) {
+          try {
+            const response = await api.post(endpoint, payload);
+            const authToken = resolveAuthTokenFromResponse(response.data, response.headers);
 
-          const identityFromResponse = resolveIdentityFromAuthPayload(response.data);
-          setStoredPpdbIdentityHints({
-            emailPpdb: identityFromResponse.emailPpdb || (EMAIL_PATTERN.test(data.login) ? data.login : ''),
-            idAkun: identityFromResponse.idAkun,
-          });
+            const identityFromResponse = resolveIdentityFromAuthPayload(response.data);
+            setStoredPpdbIdentityHints({
+              emailPpdb:
+                identityFromResponse.emailPpdb || (EMAIL_PATTERN.test(data.login) ? data.login : ''),
+              idAkun: identityFromResponse.idAkun,
+            });
 
-          if (authToken) {
-            setStoredPpdbToken(authToken);
-          }
+            if (authToken) {
+              setStoredPpdbToken(authToken);
+            }
 
-          // Marker cookie helps middleware allow PPDB protected pages even when backend session cookie name differs.
-          setPpdbAuthMarker();
+            // Marker cookie helps middleware allow PPDB protected pages even when backend session cookie name differs.
+            setPpdbAuthMarker();
 
-          return response.data;
-        } catch (error) {
-          lastError = error;
+            return response.data;
+          } catch (error) {
+            lastError = error;
 
-          const status = getErrorStatus(error);
-          if (status !== 401 && status !== 422) {
+            const status = getErrorStatus(error);
+            if (status === 401 || status === 422) {
+              continue;
+            }
+
+            if (isNotFoundAliasError(error)) {
+              break;
+            }
+
             throw error;
           }
         }
@@ -1074,41 +1551,84 @@ export const ppdbPortalService = {
     }
   },
 
+  getTesStatus: async (): Promise<PpdbPortalTesStatus> => {
+    try {
+      const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/tes`);
+      return normalizeTesStatus(response.data);
+    } catch (error) {
+      const message = extractErrorMessage(error, 'Gagal memuat status tes PPDB');
+      throw new Error(message);
+    }
+  },
+
+  submitTesJawab: async (data: PpdbPortalTesJawabRequest) => {
+    try {
+      const payload = {
+        soal_jawab: data.soalJawab,
+        id_pendaftaran: data.idPendaftaran,
+        soalJawab: data.soalJawab,
+      };
+
+      const response = await api.put(`${PPDB_PORTAL_BASE_PATH}/tes/jawab`, payload);
+      return response.data;
+    } catch (error) {
+      const message = extractErrorMessage(error, 'Gagal menyimpan jawaban tes PPDB');
+      throw new Error(message);
+    }
+  },
+
   updateForm: async (data: PpdbPortalFormRequest) => {
     const identityHints = getStoredPpdbIdentityHints();
     const resolvedEmailPpdb =
       toStringOrEmpty(data.emailPpdb).trim() || identityHints.emailPpdb;
     const resolvedIdAkun = toStringOrEmpty(data.idAkun).trim() || identityHints.idAkun;
 
+    const resolvedNoHpCalon = toStringOrEmpty(data.noHpCalon).trim() || toStringOrEmpty(data.noHpAyah).trim();
+
     const payload = {
-      nama_calon: data.namaCalon,
+      nama_calon: data.namaCalon ?? data.namaLengkap,
       nama: data.namaLengkap ?? data.namaCalon,
       nama_lengkap: data.namaLengkap ?? data.namaCalon,
+      program_pendaftaran: data.program,
       program: data.program,
       program_daftar: data.program,
       jenjang: data.jenjang,
-      nomor_umi: data.nomorUmi,
-      asal_kota: data.asalKota,
-      asal: data.asalKota,
-      asal_sekolah: data.asalSekolah,
-      tempat_lahir: data.tempatLahir,
-      tanggal_lahir: data.tanggalLahir,
       jenis_kelamin: data.jenisKelamin,
+      tempat_lahir: data.tempatLahir,
+      tempat_lahir_calon: data.tempatLahir,
+      tanggal_lahir: data.tanggalLahir,
+      tanggal_lahir_calon: data.tanggalLahir,
       nik_calon_santri: data.nikCalonSantri,
       nik: data.nikCalonSantri,
-      alamat: data.alamatLengkap ?? data.alamat,
       alamat_lengkap: data.alamatLengkap ?? data.alamat,
+      alamat_lengkap_calon: data.alamatLengkap ?? data.alamat,
+      alamat_calon: data.alamatLengkap ?? data.alamat,
+      alamat: data.alamatLengkap ?? data.alamat,
       riwayat_penyakit: data.riwayatPenyakit,
       nama_ayah: data.namaAyah,
       penghasilan_ayah: data.penghasilanAyah,
       penghasilan: data.penghasilanAyah,
+      no_hp_calon: resolvedNoHpCalon,
       no_hp_ayah: data.noHpAyah,
       nama_ibu: data.namaIbu,
       no_hp_ibu: data.noHpIbu,
-      soal_jawab: data.soalJawab,
-      jawaban_soal: data.soalJawab,
+      file_akta_path: data.fileAktaPath,
+      file_kk_path: data.fileKkPath,
+      file_surat_rekomendasi_path: data.fileSuratRekomendasiPath,
+      surat_pernyataan_setuju: data.suratPernyataanSetuju ?? 'accepted',
+      surat_pernyataan_file_path: data.suratPernyataanFilePath,
+      file_surat_pernyataan_path: data.suratPernyataanFilePath,
       surat_pernyataan_text: data.suratPernyataanText,
       surat_pernyataan: data.suratPernyataanText,
+      soal_jawab: data.soalJawab,
+      jawaban_soal: data.soalJawab,
+      nomor_umi: data.nomorUmi,
+      asal_kota: data.asalKota,
+      asal: data.asalKota,
+      asal_sekolah: data.asalSekolah,
+      sekolah_asal: data.asalSekolah,
+      phone_ppdb: resolvedNoHpCalon,
+      id_pendaftaran: data.idPendaftaran,
       email_ppdb: resolvedEmailPpdb,
       id_akun: resolvedIdAkun,
       email: resolvedEmailPpdb,
@@ -1135,19 +1655,29 @@ export const ppdbPortalService = {
           if (data.dokumenAkta) {
             formData.append('akta', data.dokumenAkta);
             formData.append('berkas_akta', data.dokumenAkta);
+            formData.append('file_akta', data.dokumenAkta);
+            formData.append('dokumen_akta', data.dokumenAkta);
           }
           if (data.dokumenKk) {
             formData.append('kk', data.dokumenKk);
             formData.append('berkas_kk', data.dokumenKk);
+            formData.append('file_kk', data.dokumenKk);
+            formData.append('dokumen_kk', data.dokumenKk);
           }
           if (data.dokumenAktaKk) {
             formData.append('akta_kk', data.dokumenAktaKk);
+            formData.append('berkas_akta_kk', data.dokumenAktaKk);
           }
           if (data.dokumenRekomendasiUstadz) {
             formData.append('surat_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
+            formData.append('berkas_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
+            formData.append('file_surat_rekomendasi', data.dokumenRekomendasiUstadz);
+            formData.append('dokumen_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
           }
           if (data.dokumenSuratPernyataan) {
             formData.append('surat_pernyataan_file', data.dokumenSuratPernyataan);
+            formData.append('file_surat_pernyataan', data.dokumenSuratPernyataan);
+            formData.append('dokumen_surat_pernyataan', data.dokumenSuratPernyataan);
           }
 
           return formData;
@@ -1157,12 +1687,28 @@ export const ppdbPortalService = {
     const requestConfig = hasFilePayload
       ? {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            Accept: 'application/json',
           },
         }
       : undefined;
 
-    // New backend flow: create identity first through dedicated endpoint.
+    // Primary endpoint on latest backend.
+    try {
+      const response = await api.put(
+        `${PPDB_PORTAL_BASE_PATH}/form`,
+        requestBody,
+        requestConfig,
+      );
+      return response.data;
+    } catch (error) {
+      const status = getErrorStatus(error);
+      if (status !== 404 && status !== 405) {
+        const message = extractErrorMessage(error, 'Gagal menyimpan form PPDB');
+        throw new Error(message);
+      }
+    }
+
+    // Backward-compatibility flow for deployments still using upload on legacy form endpoints.
     try {
       const response = await api.post(
         `${PPDB_PORTAL_BASE_PATH}/pendaftaran/create-identitas`,
@@ -1180,31 +1726,18 @@ export const ppdbPortalService = {
       }
     }
 
-    try {
-      const response = await api.put(
-        `${PPDB_PORTAL_BASE_PATH}/form`,
-        requestBody,
-        requestConfig,
-      );
-      return response.data;
-    } catch (error) {
-      const message = extractErrorMessage(error, 'Gagal menyimpan form PPDB');
-      throw new Error(message);
-    }
+    const response = await api.put(`${PPDB_PORTAL_BASE_PATH}/form`, requestBody, requestConfig);
+    return response.data;
   },
 
-  cekPengumuman: async (idPendaftaran: string): Promise<PpdbPortalAnnouncementResult> => {
+  getStatus: async (idPendaftaran?: string): Promise<PpdbPortalAnnouncementResult> => {
     try {
-      const payload = {
-        id_pendaftaran: idPendaftaran,
-        no_pendaftaran: idPendaftaran,
-        id: idPendaftaran,
-      };
-
-      const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/pengumuman/cek`, payload);
+      const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/status`, {
+        params: idPendaftaran ? { id_pendaftaran: idPendaftaran } : undefined,
+      });
       return normalizeAnnouncement(response.data);
     } catch (error) {
-      const message = extractErrorMessage(error, 'Gagal mengecek pengumuman PPDB');
+      const message = extractErrorMessage(error, 'Gagal mengambil status PPDB');
       throw new Error(message);
     }
   },

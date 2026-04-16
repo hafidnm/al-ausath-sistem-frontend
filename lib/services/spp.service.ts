@@ -1,99 +1,31 @@
 import api from '../axios';
+import type {
+  CreateSppPaymentRequest,
+  CreateSppSettingRequest,
+  SppPayment,
+  SppPaymentListResponse,
+  SppSetting,
+  SppSettingListResponse,
+  SppStatus,
+  SppTunggakanSummary,
+  UpdateSppPaymentRequest,
+  UpdateSppSettingRequest,
+  VerifySppPaymentRequest,
+} from './spp.types';
 
-export type SppStatus =
-  | 'Lunas'
-  | 'Cicilan'
-  | 'Belum Bayar'
-  | 'Terlambat'
-  | 'Menunggu Verifikasi'
-  | 'Terverifikasi';
-
-export interface SppPayment {
-  id: string;
-  noTagihan: string;
-  nis: string;
-  nama: string;
-  kelas: string;
-  bulan: string;
-  jatuhTempo: string;
-  nominal: number;
-  terbayar: number;
-  status: SppStatus;
-  channelPembayaran: string;
-  nomorWaPembayaran: string;
-  buktiBayarUrl: string;
-  kwitansiUrl: string;
-  verifikasiAt: string;
-  catatanVerifikasi: string;
-}
-
-export interface SppSetting {
-  id: string;
-  nama: string;
-  jenjang: string;
-  kelas: string;
-  tahunAjaran: string;
-  nominal: number;
-  jatuhTempoHari: number | null;
-  aktif: boolean;
-  keterangan: string;
-}
-
-export interface SppTunggakanSummary {
-  periode: string;
-  totalTagihan: number;
-  totalLunas: number;
-  totalCicilan: number;
-  totalBelumBayar: number;
-  totalTerlambat: number;
-  totalNominal: number;
-  totalTerbayar: number;
-  totalSisa: number;
-  jatuhTempoBerikutnya: string;
-}
-
-export interface SppPaymentListResponse {
-  data: SppPayment[];
-  message: string;
-}
-
-export interface SppSettingListResponse {
-  data: SppSetting[];
-  message: string;
-}
-
-export interface CreateSppPaymentRequest {
-  noTagihan?: string;
-  nis: string;
-  nama: string;
-  kelas: string;
-  bulan: string;
-  jatuhTempo: string;
-  nominal: number;
-  terbayar?: number;
-  status?: SppStatus;
-}
-
-export type UpdateSppPaymentRequest = Partial<CreateSppPaymentRequest>;
-
-export interface VerifySppPaymentRequest {
-  status?: 'verified' | 'rejected' | 'pending';
-  verified?: boolean;
-  catatan?: string;
-}
-
-export interface CreateSppSettingRequest {
-  nama: string;
-  jenjang?: string;
-  kelas?: string;
-  tahunAjaran?: string;
-  nominal: number;
-  jatuhTempoHari?: number | null;
-  aktif?: boolean;
-  keterangan?: string;
-}
-
-export type UpdateSppSettingRequest = Partial<CreateSppSettingRequest>;
+export type {
+  CreateSppPaymentRequest,
+  CreateSppSettingRequest,
+  SppPayment,
+  SppPaymentListResponse,
+  SppSetting,
+  SppSettingListResponse,
+  SppStatus,
+  SppTunggakanSummary,
+  UpdateSppPaymentRequest,
+  UpdateSppSettingRequest,
+  VerifySppPaymentRequest,
+} from './spp.types';
 
 type ApiRecord = Record<string, unknown>;
 
@@ -201,6 +133,33 @@ const requestWithBasePathFallback = async <T>(
   throw lastError;
 };
 
+const requestWithEndpointFallback = async <T>(
+  endpointCandidates: string[],
+  callback: (endpoint: string) => Promise<T>,
+): Promise<T> => {
+  let lastError: unknown;
+
+  for (let index = 0; index < endpointCandidates.length; index += 1) {
+    const endpoint = endpointCandidates[index];
+
+    try {
+      return await callback(endpoint);
+    } catch (error) {
+      lastError = error;
+      const status = getErrorStatus(error);
+      const isLast = index === endpointCandidates.length - 1;
+
+      if ((status !== 404 && status !== 405) || isLast) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+};
+
+const BILL_ENDPOINTS = ['/bill', '/pembayaran'];
+
 const isObjectArray = (value: unknown): value is ApiRecord[] => {
   return Array.isArray(value) && value.every((item) => item && typeof item === 'object');
 };
@@ -281,6 +240,9 @@ const normalizePaymentStatus = (
   jatuhTempo: string,
 ): SppStatus => {
   const raw = toStringOrEmpty(value).trim().toLowerCase();
+
+  if (raw === 'tagihan_dibuat' || raw === 'draft' || raw === 'created') return 'Tagihan Dibuat';
+  if (raw === 'ditolak' || raw === 'rejected') return 'Ditolak';
 
   if (raw === 'lunas' || raw === 'paid' || raw === 'selesai') return 'Lunas';
   if (
@@ -492,6 +454,15 @@ const normalizeSummary = (
 const mapPaymentPayload = (data: CreateSppPaymentRequest | UpdateSppPaymentRequest): ApiRecord => {
   const payload: ApiRecord = {};
 
+  if (data.idPendaftaran !== undefined) payload.id_pendaftaran = data.idPendaftaran;
+  if (data.idSantri !== undefined) payload.id_santri = data.idSantri;
+  if (data.idSetting !== undefined) payload.id_setting = data.idSetting;
+  if (data.jenjang !== undefined) payload.jenjang = data.jenjang;
+  if (data.nominalBayar !== undefined) payload.nominal_bayar = data.nominalBayar;
+  if (data.tanggalBayar !== undefined) payload.tanggal_bayar = data.tanggalBayar;
+  if (data.metodeBayar !== undefined) payload.metode_bayar = data.metodeBayar;
+  if (data.idRekening !== undefined) payload.id_rekening = data.idRekening;
+
   if (data.noTagihan !== undefined) payload.no_tagihan = data.noTagihan;
   if (data.nis !== undefined) payload.nis = data.nis;
   if (data.nama !== undefined) payload.nama = data.nama;
@@ -503,6 +474,20 @@ const mapPaymentPayload = (data: CreateSppPaymentRequest | UpdateSppPaymentReque
   if (data.status !== undefined) payload.status = data.status;
 
   return payload;
+};
+
+const normalizeVerificationStatusPayload = (
+  data?: VerifySppPaymentRequest,
+): 'tagihan_dibuat' | 'menunggu_verifikasi' | 'terverifikasi' | 'ditolak' => {
+  const raw = toStringOrEmpty(data?.status).trim().toLowerCase();
+
+  if (raw === 'tagihan_dibuat') return 'tagihan_dibuat';
+  if (raw === 'menunggu_verifikasi' || raw === 'pending') return 'menunggu_verifikasi';
+  if (raw === 'ditolak' || raw === 'rejected') return 'ditolak';
+  if (raw === 'terverifikasi' || raw === 'verified') return 'terverifikasi';
+
+  if (data?.verified === false) return 'ditolak';
+  return 'terverifikasi';
 };
 
 const mapSettingPayload = (data: CreateSppSettingRequest | UpdateSppSettingRequest): ApiRecord => {
@@ -549,8 +534,8 @@ export const sppService = {
 
   getPayments: async (): Promise<SppPaymentListResponse> => {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.get(buildPath(basePath, '/pembayaran')),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) => api.get(buildPath(basePath, endpoint))),
       );
       const data = extractList(response.data).map(normalizePayment);
 
@@ -566,8 +551,8 @@ export const sppService = {
 
   getPaymentDetail: async (id: string): Promise<SppPayment> => {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.get(buildPath(basePath, `/pembayaran/${id}`)),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) => api.get(buildPath(basePath, `${endpoint}/${id}`))),
       );
 
       const payload = response.data as ApiRecord;
@@ -586,8 +571,8 @@ export const sppService = {
   createPayment: async (data: CreateSppPaymentRequest) => {
     try {
       const payload = mapPaymentPayload(data);
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.post(buildPath(basePath, '/pembayaran'), payload),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) => api.post(buildPath(basePath, endpoint), payload)),
       );
       return response.data;
     } catch (error) {
@@ -599,8 +584,10 @@ export const sppService = {
   updatePayment: async (id: string, data: UpdateSppPaymentRequest) => {
     try {
       const payload = mapPaymentPayload(data);
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.put(buildPath(basePath, `/pembayaran/${id}`), payload),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) =>
+          api.put(buildPath(basePath, `${endpoint}/${id}`), payload),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -611,14 +598,19 @@ export const sppService = {
 
   verifyPayment: async (id: string, data?: VerifySppPaymentRequest) => {
     try {
+      const normalizedStatus = normalizeVerificationStatusPayload(data);
       const payload = {
-        status: data?.status ?? 'verified',
-        verified: data?.verified ?? true,
+        status: normalizedStatus,
+        id_petugas_verifikator: data?.idPetugasVerifikator,
+        tanggal_verifikasi: data?.tanggalVerifikasi,
+        verified: data?.verified ?? normalizedStatus === 'terverifikasi',
         catatan: data?.catatan,
       };
 
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.put(buildPath(basePath, `/pembayaran/${id}/verifikasi`), payload),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) =>
+          api.put(buildPath(basePath, `${endpoint}/${id}/verifikasi`), payload),
+        ),
       );
       return response.data;
     } catch (error) {
@@ -629,8 +621,8 @@ export const sppService = {
 
   deletePayment: async (id: string) => {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.delete(buildPath(basePath, `/pembayaran/${id}`)),
+      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
+        requestWithBasePathFallback((basePath) => api.delete(buildPath(basePath, `${endpoint}/${id}`))),
       );
       return response.data;
     } catch (error) {

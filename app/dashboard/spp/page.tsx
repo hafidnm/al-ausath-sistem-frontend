@@ -40,6 +40,7 @@ DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { SppStatusBadge } from "@/components/spp/spp-status-badge"
 import {
 Search,
 Plus,
@@ -76,199 +77,24 @@ useVerifySppPayment,
 import {
 SppPayment,
 SppSetting,
-SppStatus,
-SppTunggakanSummary,
 } from "@/lib/services/spp.service"
-
-type PaymentFormState = {
-noTagihan: string
-nis: string
-nama: string
-kelas: string
-bulan: string
-jatuhTempo: string
-nominal: string
-terbayar: string
-status: SppStatus
-}
-
-type SettingFormState = {
-nama: string
-jenjang: string
-kelas: string
-tahunAjaran: string
-nominal: string
-jatuhTempoHari: string
-aktif: "true" | "false"
-keterangan: string
-}
-
-const paymentStatusOptions: SppStatus[] = [
-"Menunggu Verifikasi",
-"Terverifikasi",
-"Lunas",
-"Cicilan",
-"Belum Bayar",
-"Terlambat",
-]
-
-const emptyPaymentForm: PaymentFormState = {
-noTagihan: "",
-nis: "",
-nama: "",
-kelas: "",
-bulan: "",
-jatuhTempo: "",
-nominal: "",
-terbayar: "0",
-status: "Belum Bayar",
-}
-
-const emptySettingForm: SettingFormState = {
-nama: "",
-jenjang: "",
-kelas: "",
-tahunAjaran: "",
-nominal: "",
-jatuhTempoHari: "",
-aktif: "true",
-keterangan: "",
-}
-
-const formatCurrency = (value: number) => {
-return new Intl.NumberFormat("id-ID", {
-style: "currency",
-currency: "IDR",
-maximumFractionDigits: 0,
-}).format(value)
-}
-
-const formatDate = (value: string) => {
-if (!value) return "-"
-
-const parsed = new Date(value)
-if (Number.isNaN(parsed.getTime())) return value
-
-return parsed.toLocaleDateString("id-ID", {
-day: "2-digit",
-month: "short",
-year: "numeric",
-})
-}
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-return error instanceof Error ? error.message : fallback
-}
-
-const parseNumberInput = (value: string): number => {
-const normalized = value.replace(/[^\d]/g, "")
-if (!normalized) return 0
-
-const parsed = Number(normalized)
-return Number.isFinite(parsed) ? parsed : 0
-}
-
-const getStatusBadge = (status: SppStatus) => {
-switch (status) {
-case "Lunas":
-return <Badge className="bg-primary/10 text-primary border-0">Lunas</Badge>
-case "Cicilan":
-return <Badge className="bg-accent/20 text-accent border-0">Cicilan</Badge>
-case "Menunggu Verifikasi":
-return <Badge className="bg-chart-3/20 text-chart-4 border-0">Menunggu Verifikasi</Badge>
-case "Terverifikasi":
-return <Badge className="bg-primary/10 text-primary border-0">Terverifikasi</Badge>
-case "Belum Bayar":
-return <Badge className="bg-chart-3/20 text-chart-4 border-0">Belum Bayar</Badge>
-case "Terlambat":
-return <Badge className="bg-destructive/10 text-destructive border-0">Terlambat</Badge>
-default:
-return <Badge variant="outline">-</Badge>
-}
-}
-
-const summarizeFromPayments = (payments: SppPayment[]): SppTunggakanSummary => {
-const totalTagihan = payments.length
-const totalLunas = payments.filter((item) => item.status === "Lunas").length
-const totalCicilan = payments.filter((item) => item.status === "Cicilan").length
-const totalBelumBayar = payments.filter((item) => item.status === "Belum Bayar").length
-const totalTerlambat = payments.filter((item) => item.status === "Terlambat").length
-const totalNominal = payments.reduce((sum, item) => sum + item.nominal, 0)
-const totalTerbayar = payments.reduce((sum, item) => sum + item.terbayar, 0)
-const totalSisa = Math.max(totalNominal - totalTerbayar, 0)
-
-const sortedDueDates = payments
-.map((item) => new Date(item.jatuhTempo))
-.filter((item) => !Number.isNaN(item.getTime()))
-.sort((a, b) => a.getTime() - b.getTime())
-
-const now = new Date()
-const nextDue = sortedDueDates.find((date) => date.getTime() >= now.getTime()) ?? sortedDueDates[0]
-
-return {
-periode: payments[0]?.bulan ?? "",
-totalTagihan,
-totalLunas,
-totalCicilan,
-totalBelumBayar,
-totalTerlambat,
-totalNominal,
-totalTerbayar,
-totalSisa,
-jatuhTempoBerikutnya: nextDue ? nextDue.toISOString() : "",
-}
-}
-
-const mergeSummary = (
-baseSummary: SppTunggakanSummary,
-apiSummary: SppTunggakanSummary | null,
-): SppTunggakanSummary => {
-if (!apiSummary) return baseSummary
-
-const pickNumber = (primary: number, fallback: number) => {
-return primary > 0 ? primary : fallback
-}
-
-return {
-periode: apiSummary.periode || baseSummary.periode,
-totalTagihan: pickNumber(apiSummary.totalTagihan, baseSummary.totalTagihan),
-totalLunas: pickNumber(apiSummary.totalLunas, baseSummary.totalLunas),
-totalCicilan: pickNumber(apiSummary.totalCicilan, baseSummary.totalCicilan),
-totalBelumBayar: pickNumber(apiSummary.totalBelumBayar, baseSummary.totalBelumBayar),
-totalTerlambat: pickNumber(apiSummary.totalTerlambat, baseSummary.totalTerlambat),
-totalNominal: pickNumber(apiSummary.totalNominal, baseSummary.totalNominal),
-totalTerbayar: pickNumber(apiSummary.totalTerbayar, baseSummary.totalTerbayar),
-totalSisa: pickNumber(apiSummary.totalSisa, baseSummary.totalSisa),
-jatuhTempoBerikutnya: apiSummary.jatuhTempoBerikutnya || baseSummary.jatuhTempoBerikutnya,
-}
-}
-
-const mapPaymentToForm = (payment: SppPayment): PaymentFormState => {
-return {
-noTagihan: payment.noTagihan,
-nis: payment.nis,
-nama: payment.nama,
-kelas: payment.kelas,
-bulan: payment.bulan,
-jatuhTempo: payment.jatuhTempo,
-nominal: payment.nominal.toString(),
-terbayar: payment.terbayar.toString(),
-status: payment.status,
-}
-}
-
-const mapSettingToForm = (setting: SppSetting): SettingFormState => {
-return {
-nama: setting.nama,
-jenjang: setting.jenjang,
-kelas: setting.kelas,
-tahunAjaran: setting.tahunAjaran,
-nominal: setting.nominal.toString(),
-jatuhTempoHari: setting.jatuhTempoHari?.toString() ?? "",
-aktif: setting.aktif ? "true" : "false",
-keterangan: setting.keterangan,
-}
-}
+import {
+	formatCurrency,
+	formatDate,
+	getErrorMessage,
+	mapPaymentToForm,
+	mapSettingToForm,
+	mergeSummary,
+	parseNumberInput,
+	summarizeFromPayments,
+} from "@/lib/spp/dashboard"
+import {
+	emptyPaymentForm,
+	emptySettingForm,
+	paymentStatusOptions,
+	PaymentFormState,
+	SettingFormState,
+} from "@/types/spp/dashboard"
 
 export default function SppPage() {
 const [searchQuery, setSearchQuery] = useState("")
@@ -691,7 +517,7 @@ setNewPaymentForm((prev) => ({ ...prev, terbayar: e.target.value }))
 <Select
 value={newPaymentForm.status}
 onValueChange={(value) =>
-setNewPaymentForm((prev) => ({ ...prev, status: value as SppStatus }))
+setNewPaymentForm((prev) => ({ ...prev, status: value as any }))
 }
 >
 <SelectTrigger>
@@ -915,7 +741,7 @@ return (
 <TableCell className={sisa > 0 ? "text-destructive font-medium" : "text-primary font-medium"}>
 {formatCurrency(sisa)}
 </TableCell>
-<TableCell>{getStatusBadge(item.status)}</TableCell>
+<TableCell><SppStatusBadge status={item.status} /></TableCell>
 <TableCell className="text-right">
 <DropdownMenu>
 <DropdownMenuTrigger asChild>
@@ -1239,7 +1065,7 @@ Memuat detail...
 <div className="col-span-2">
 <p className="text-muted-foreground">Status</p>
 <div className="mt-1">
-{currentDetail ? getStatusBadge(currentDetail.status) : <Badge variant="outline">-</Badge>}
+{currentDetail ? <SppStatusBadge status={currentDetail.status} /> : <Badge variant="outline">-</Badge>}
 </div>
 </div>
 
@@ -1365,7 +1191,7 @@ setEditPaymentForm((prev) => ({ ...prev, terbayar: e.target.value }))
 <Select
 value={editPaymentForm.status}
 onValueChange={(value) =>
-setEditPaymentForm((prev) => ({ ...prev, status: value as SppStatus }))
+setEditPaymentForm((prev) => ({ ...prev, status: value as any }))
 }
 >
 <SelectTrigger>

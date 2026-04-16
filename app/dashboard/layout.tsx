@@ -42,6 +42,7 @@ import {
   UserPlus,
   Wallet,
   Building2,
+  Megaphone,
 } from "lucide-react"
 
 const menuItems = [
@@ -59,6 +60,7 @@ const menuItems = [
   { icon: FileText, label: "Rapor", href: "/dashboard/rapor" },
   { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
   { icon: Wallet, label: "SPP", href: "/dashboard/spp" },
   { icon: UserCog, label: "Panel Guru", href: "/dashboard/guru-panel" },
   { icon: User, label: "Panel Santri", href: "/dashboard/santri-panel" },
