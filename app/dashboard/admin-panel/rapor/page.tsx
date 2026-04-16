@@ -92,6 +92,9 @@ export default function AdminPanelRaporPage() {
   const [success, setSuccess] = useState("")
   const [catatanForm, setCatatanForm] = useState<CatatanFormState>(initialCatatanForm)
   const [santriNameByNomorInduk, setSantriNameByNomorInduk] = useState<Record<string, string>>({})
+  const [santriSearch, setSantriSearch] = useState("")
+  const [isSearchingSantri, setIsSearchingSantri] = useState(false)
+  const [santriOptions, setSantriOptions] = useState<Array<{ nomor_induk: string; nama_lengkap?: string; kode_kelas?: string }>>([])
   const selectedIdentity = selected ? getRaporIdentity(selected) : null
 
   const selectedParams = useMemo(() => {
@@ -255,6 +258,32 @@ export default function AdminPanelRaporPage() {
       }
     }
   }, [pdfPreviewUrl])
+
+  useEffect(() => {
+    const keyword = santriSearch.trim()
+
+    if (keyword.length < 2) {
+      setSantriOptions([])
+      setIsSearchingSantri(false)
+      return
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        setIsSearchingSantri(true)
+        const rows = await santriService.search(keyword, 10)
+        setSantriOptions(rows)
+      } catch {
+        setSantriOptions([])
+      } finally {
+        setIsSearchingSantri(false)
+      }
+    }, 300)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [santriSearch])
 
   const handleReset = () => {
     setQuery("")
@@ -607,7 +636,56 @@ export default function AdminPanelRaporPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Nomor induk</Label>
-                  <Input className="mt-2" value={catatanForm.nomor_induk} onChange={(event) => setCatatanForm((current) => ({ ...current, nomor_induk: event.target.value }))} />
+                  <Input
+                    className="mt-2"
+                    value={catatanForm.nomor_induk}
+                    onChange={(event) => {
+                      const value = event.target.value
+                      setCatatanForm((current) => ({ ...current, nomor_induk: value }))
+                      setSantriSearch(value)
+                    }}
+                    placeholder="Cari nama santri atau nomor induk"
+                  />
+
+                  {(isSearchingSantri || santriOptions.length > 0) && (
+                    <div className="mt-2 rounded-md border border-border bg-background">
+                      {isSearchingSantri && (
+                        <p className="px-3 py-2 text-xs text-muted-foreground">Mencari santri...</p>
+                      )}
+
+                      {!isSearchingSantri && santriOptions.length > 0 && (
+                        <div className="max-h-44 overflow-y-auto">
+                          {santriOptions.map((option) => (
+                            <button
+                              key={`${option.nomor_induk}-${option.kode_kelas || "kelas"}`}
+                              type="button"
+                              className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/50"
+                              onClick={() => {
+                                setCatatanForm((current) => ({
+                                  ...current,
+                                  nomor_induk: option.nomor_induk,
+                                  kode_kelas: current.kode_kelas || option.kode_kelas || "",
+                                }))
+
+                                if (option.nama_lengkap) {
+                                  setSantriNameByNomorInduk((current) => ({
+                                    ...current,
+                                    [option.nomor_induk]: option.nama_lengkap || "",
+                                  }))
+                                }
+
+                                setSantriOptions([])
+                                setSantriSearch("")
+                              }}
+                            >
+                              <span className="text-sm text-foreground">{option.nama_lengkap || "Tanpa nama"}</span>
+                              <span className="text-xs text-muted-foreground">{option.nomor_induk}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label>Kode kelas</Label>
