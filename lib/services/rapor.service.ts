@@ -75,6 +75,7 @@ const toText = (value: unknown): string | undefined => {
     const obj = value as Record<string, unknown>
     return (
       (typeof obj.nama === "string" && obj.nama)
+      || (typeof obj.nama_lengkap_santri === "string" && obj.nama_lengkap_santri)
       || (typeof obj.nama_lengkap === "string" && obj.nama_lengkap)
       || (typeof obj.nama_santri === "string" && obj.nama_santri)
       || (typeof obj.label === "string" && obj.label)
@@ -96,8 +97,24 @@ const extractList = (payload: any): any[] => {
 
 const normalizeRaporItem = (raw: any): RaporItem => ({
   id: toNumber(raw?.id ?? raw?.id_rapor ?? raw?.rapor_id, -1),
-  nomor_induk: toText(raw?.nomor_induk ?? raw?.santri?.nomor_induk ?? raw?.nis) ?? "",
-  nama_santri: toText(raw?.nama_santri ?? raw?.santri?.nama_lengkap ?? raw?.santri?.nama),
+  nomor_induk: toText(raw?.nomor_induk ?? raw?.santri?.nomor_induk ?? raw?.data_santri?.nomor_induk ?? raw?.nis) ?? "",
+  nama_santri: toText(
+    raw?.nama_santri
+    ?? raw?.nama_lengkap_santri
+    ?? raw?.nama
+    ?? raw?.nama_lengkap
+    ?? raw?.santri_nama
+    ?? raw?.nama_siswa
+    ?? raw?.siswa_nama
+    ?? raw?.santri?.nama_lengkap_santri
+    ?? raw?.santri?.nama_lengkap
+    ?? raw?.santri?.nama
+    ?? raw?.data_santri?.nama_lengkap_santri
+    ?? raw?.data_santri?.nama_lengkap
+    ?? raw?.data_santri?.nama
+    ?? raw?.santri
+    ?? raw?.siswa
+  ),
   kode_kelas: toText(raw?.kode_kelas ?? raw?.kelas?.kode_kelas) ?? "",
   tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
   semester: toNumber(raw?.semester, 0),
