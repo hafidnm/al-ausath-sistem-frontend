@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalRegister } from '@/hooks/use-ppdb-portal';
+import { usePpdbPortalRegister } from '@/hooks/ppdb/santri/use-ppdb-portal';
 
 export default function PpdbRegisterPage() {
   const { toast } = useToast();

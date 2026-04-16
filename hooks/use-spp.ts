@@ -10,6 +10,7 @@ import {
   VerifySppPaymentRequest,
   sppService,
 } from '@/lib/services/spp.service';
+import { useAsyncMutation, useAsyncQuery } from '@/hooks/shared/use-async-request';
 
 export interface UseSppReturn {
   loading: boolean;
@@ -18,33 +19,29 @@ export interface UseSppReturn {
 }
 
 export function useSppPayments() {
-  const [data, setData] = useState<SppPayment[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useCallback(async () => {
+    const response = await sppService.getPayments();
+    return response.data;
+  }, []);
+
+  const { data, setData, loading, error, run } = useAsyncQuery(query, [] as SppPayment[], {
+    fallbackError: 'Failed to fetch SPP payments',
+    logLabel: 'Error fetching SPP payments:',
+  });
 
   const fetchPayments = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await sppService.getPayments();
-      setData(response.data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch SPP payments';
-      setError(message);
-      console.error('Error fetching SPP payments:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await run();
+  }, [run]);
 
   return { data, setData, loading, error, fetchPayments };
 }
 
 export function useSppPaymentDetail(id?: string) {
-  const [data, setData] = useState<SppPayment | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useCallback((targetId: string) => sppService.getPaymentDetail(targetId), []);
+  const { data, loading, error, setError, run } = useAsyncQuery(query, null as SppPayment | null, {
+    fallbackError: 'Failed to fetch payment detail',
+    logLabel: 'Error fetching payment detail:',
+  });
 
   const fetchPaymentDetail = useCallback(
     async (targetId?: string) => {
@@ -54,186 +51,113 @@ export function useSppPaymentDetail(id?: string) {
         return;
       }
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await sppService.getPaymentDetail(idToFetch);
-        setData(response);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch payment detail';
-        setError(message);
-        console.error('Error fetching payment detail:', err);
-      } finally {
-        setLoading(false);
-      }
+      await run(idToFetch);
     },
-    [id],
+    [id, run, setError],
   );
 
   return { data, loading, error, fetchPaymentDetail };
 }
 
 export function useCreateSppPayment() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { loading, error, success, mutate } = useAsyncMutation(
+    sppService.createPayment,
+    'Failed to create payment',
+    'Error creating payment:',
+  );
 
-  const createPayment = useCallback(async (payload: CreateSppPaymentRequest) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.createPayment(payload);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create payment';
-      setError(message);
-      console.error('Error creating payment:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const createPayment = useCallback(async (payload: CreateSppPaymentRequest) => mutate(payload), [mutate]);
 
   return { loading, error, success, createPayment };
 }
 
 export function useUpdateSppPayment() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const mutation = useCallback(
+    (id: string, payload: UpdateSppPaymentRequest) => sppService.updatePayment(id, payload),
+    [],
+  );
+  const { loading, error, success, mutate } = useAsyncMutation(
+    mutation,
+    'Failed to update payment',
+    'Error updating payment:',
+  );
 
-  const updatePayment = useCallback(async (id: string, payload: UpdateSppPaymentRequest) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.updatePayment(id, payload);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update payment';
-      setError(message);
-      console.error('Error updating payment:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const updatePayment = useCallback(
+    async (id: string, payload: UpdateSppPaymentRequest) => mutate(id, payload),
+    [mutate],
+  );
 
   return { loading, error, success, updatePayment };
 }
 
 export function useVerifySppPayment() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const mutation = useCallback(
+    (id: string, payload?: VerifySppPaymentRequest) => sppService.verifyPayment(id, payload),
+    [],
+  );
+  const { loading, error, success, mutate } = useAsyncMutation(
+    mutation,
+    'Failed to verify payment',
+    'Error verifying payment:',
+  );
 
-  const verifyPayment = useCallback(async (id: string, payload?: VerifySppPaymentRequest) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.verifyPayment(id, payload);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to verify payment';
-      setError(message);
-      console.error('Error verifying payment:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const verifyPayment = useCallback(async (id: string, payload?: VerifySppPaymentRequest) => mutate(id, payload), [mutate]);
 
   return { loading, error, success, verifyPayment };
 }
 
 export function useDeleteSppPayment() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { loading, error, success, mutate } = useAsyncMutation(
+    sppService.deletePayment,
+    'Failed to delete payment',
+    'Error deleting payment:',
+  );
 
-  const deletePayment = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.deletePayment(id);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete payment';
-      setError(message);
-      console.error('Error deleting payment:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const deletePayment = useCallback(async (id: string) => mutate(id), [mutate]);
 
   return { loading, error, success, deletePayment };
 }
 
 export function useSppTunggakanSummary() {
-  const [data, setData] = useState<SppTunggakanSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, run } = useAsyncQuery(
+    sppService.getTunggakanSummary,
+    null as SppTunggakanSummary | null,
+    {
+      fallbackError: 'Failed to fetch tunggakan summary',
+      logLabel: 'Error fetching tunggakan summary:',
+    },
+  );
 
   const fetchSummary = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await sppService.getTunggakanSummary();
-      setData(response);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch tunggakan summary';
-      setError(message);
-      console.error('Error fetching tunggakan summary:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await run();
+  }, [run]);
 
   return { data, loading, error, fetchSummary };
 }
 
 export function useSppSettings() {
-  const [data, setData] = useState<SppSetting[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useCallback(async () => {
+    const response = await sppService.getSettings();
+    return response.data;
+  }, []);
+  const { data, setData, loading, error, run } = useAsyncQuery(query, [] as SppSetting[], {
+    fallbackError: 'Failed to fetch SPP settings',
+    logLabel: 'Error fetching SPP settings:',
+  });
 
   const fetchSettings = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await sppService.getSettings();
-      setData(response.data);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to fetch SPP settings';
-      setError(message);
-      console.error('Error fetching SPP settings:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await run();
+  }, [run]);
 
   return { data, setData, loading, error, fetchSettings };
 }
 
 export function useSppSettingDetail(id?: string) {
-  const [data, setData] = useState<SppSetting | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const query = useCallback((targetId: string) => sppService.getSettingDetail(targetId), []);
+  const { data, loading, error, setError, run } = useAsyncQuery(query, null as SppSetting | null, {
+    fallbackError: 'Failed to fetch setting detail',
+    logLabel: 'Error fetching setting detail:',
+  });
 
   const fetchSettingDetail = useCallback(
     async (targetId?: string) => {
@@ -243,103 +167,53 @@ export function useSppSettingDetail(id?: string) {
         return;
       }
 
-      setLoading(true);
-      setError(null);
-
-      try {
-        const response = await sppService.getSettingDetail(idToFetch);
-        setData(response);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch setting detail';
-        setError(message);
-        console.error('Error fetching setting detail:', err);
-      } finally {
-        setLoading(false);
-      }
+      await run(idToFetch);
     },
-    [id],
+    [id, run, setError],
   );
 
   return { data, loading, error, fetchSettingDetail };
 }
 
 export function useCreateSppSetting() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { loading, error, success, mutate } = useAsyncMutation(
+    sppService.createSetting,
+    'Failed to create SPP setting',
+    'Error creating SPP setting:',
+  );
 
-  const createSetting = useCallback(async (payload: CreateSppSettingRequest) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.createSetting(payload);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create SPP setting';
-      setError(message);
-      console.error('Error creating SPP setting:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const createSetting = useCallback(async (payload: CreateSppSettingRequest) => mutate(payload), [mutate]);
 
   return { loading, error, success, createSetting };
 }
 
 export function useUpdateSppSetting() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const mutation = useCallback(
+    (id: string, payload: UpdateSppSettingRequest) => sppService.updateSetting(id, payload),
+    [],
+  );
+  const { loading, error, success, mutate } = useAsyncMutation(
+    mutation,
+    'Failed to update SPP setting',
+    'Error updating SPP setting:',
+  );
 
-  const updateSetting = useCallback(async (id: string, payload: UpdateSppSettingRequest) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.updateSetting(id, payload);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to update SPP setting';
-      setError(message);
-      console.error('Error updating SPP setting:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const updateSetting = useCallback(
+    async (id: string, payload: UpdateSppSettingRequest) => mutate(id, payload),
+    [mutate],
+  );
 
   return { loading, error, success, updateSetting };
 }
 
 export function useDeleteSppSetting() {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const { loading, error, success, mutate } = useAsyncMutation(
+    sppService.deleteSetting,
+    'Failed to delete SPP setting',
+    'Error deleting SPP setting:',
+  );
 
-  const deleteSetting = useCallback(async (id: string) => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-
-    try {
-      const response = await sppService.deleteSetting(id);
-      setSuccess(true);
-      return response;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to delete SPP setting';
-      setError(message);
-      console.error('Error deleting SPP setting:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const deleteSetting = useCallback(async (id: string) => mutate(id), [mutate]);
 
   return { loading, error, success, deleteSetting };
 }

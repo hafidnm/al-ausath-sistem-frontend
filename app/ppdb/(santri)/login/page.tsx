@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowLeft, Loader2, LogIn, UserRound } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,39 +9,49 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalLogin } from '@/hooks/use-ppdb-portal';
+import { usePpdbPortalLogin } from '@/hooks/ppdb/santri/use-ppdb-portal';
 import { ppdbPortalService } from '@/lib/services/ppdb-portal.service';
+import { useRouter } from 'next/navigation';
 
 const wait = (ms: number) => new Promise((resolve) => {
   setTimeout(resolve, ms);
 });
 
-const ensureDashboardReady = async (): Promise<void> => {
+const ensureDashboardReady = async (): Promise<Awaited<ReturnType<typeof ppdbPortalService.getDashboard>> | null> => {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      await ppdbPortalService.getDashboard();
-      return;
+      return await ppdbPortalService.getDashboard();
     } catch {
       await wait(300 * (attempt + 1));
     }
   }
+
+  return null;
 };
+
+// Komponen kecil yang hanya pakai useSearchParams — harus di-wrap Suspense
+function LoginParamSync({ onLoginParam }: { onLoginParam: (v: string) => void }) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const loginParam = searchParams.get('login');
+    if (!loginParam) return;
+    onLoginParam(loginParam);
+  }, [searchParams, onLoginParam]);
+
+  return null;
+}
 
 export default function PpdbLoginPage() {
   const { toast } = useToast();
+  const router = useRouter();
   const { login, loading } = usePpdbPortalLogin();
-  const searchParams = useSearchParams();
   const [form, setForm] = useState({
     login: '',
     password: '',
   });
 
-  useEffect(() => {
-    const loginParam = searchParams.get('login');
-    if (!loginParam) return;
-
-    setForm((prev) => ({ ...prev, login: loginParam }));
-  }, [searchParams]);
+  const handleLoginParam = (v: string) => setForm((prev) => ({ ...prev, login: v }));
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -61,7 +71,16 @@ export default function PpdbLoginPage() {
         password: form.password,
       });
 
-      await ensureDashboardReady();
+      const dashboard = await ensureDashboardReady();
+      const hasSubmittedTesAnswer = Boolean((dashboard?.soalJawab || '').trim());
+      const nextRoute =
+        dashboard?.step === 'tes' && !hasSubmittedTesAnswer
+          ? '/ppdb/tes'
+          : dashboard?.step === 'menunggu-pengumuman' ||
+            dashboard?.step === 'pengumuman' ||
+            dashboard?.formCompleted
+            ? '/ppdb/dashboard/pengumuman'
+            : '/ppdb/dashboard';
 
       toast({
         title: 'Login berhasil',
@@ -69,7 +88,7 @@ export default function PpdbLoginPage() {
       });
 
       setTimeout(() => {
-        window.location.href = '/ppdb/dashboard';
+        router.push(nextRoute);
       }, 400);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login PPDB gagal';
@@ -83,6 +102,10 @@ export default function PpdbLoginPage() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      {/* Suspense wrapper wajib untuk useSearchParams di Next.js App Router */}
+      <Suspense fallback={null}>
+        <LoginParamSync onLoginParam={handleLoginParam} />
+      </Suspense>
       <div className="w-full max-w-lg space-y-4">
         <Link
           href="/"
