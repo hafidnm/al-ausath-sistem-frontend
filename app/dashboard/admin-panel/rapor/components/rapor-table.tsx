@@ -41,7 +41,7 @@ export function RaporTable({
                 <TableHead>Kelas</TableHead>
                 <TableHead>Semester</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-center">Rata-rata</TableHead>
+                <TableHead className="text-center">Nilai Rata-rata Rapor</TableHead>
                 <TableHead className="text-center">Ranking</TableHead>
                 <TableHead className="text-right">Aksi</TableHead>
               </TableRow>
@@ -79,7 +79,9 @@ export function RaporTable({
                     <TableCell>{item.kode_kelas || "-"}</TableCell>
                     <TableCell>{item.semester} / {item.tahun_ajaran}</TableCell>
                     <TableCell><ReportStatusBadge status={item.status} /></TableCell>
-                    <TableCell className="text-center font-semibold text-primary">{item.nilai_rata ?? "-"}</TableCell>
+                    <TableCell className="text-center font-semibold text-primary">
+                      {item.nilai_rata != null ? item.nilai_rata.toFixed(2) : "-"}
+                    </TableCell>
                     <TableCell className="text-center">{item.ranking ? `#${item.ranking}` : "-"}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-2">

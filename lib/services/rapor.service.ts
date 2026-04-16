@@ -127,7 +127,18 @@ const normalizeRaporItem = (raw: any): RaporItem => ({
   tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
   semester: toNumber(raw?.semester, 0),
   status: toText(raw?.status) ?? "DRAFT",
-  nilai_rata: raw?.nilai_rata != null ? toNumber(raw?.nilai_rata, 0) : undefined,
+  nilai_rata:
+    raw?.nilai_rata != null
+      ? toNumber(raw?.nilai_rata, 0)
+      : raw?.rata_rata != null
+        ? toNumber(raw?.rata_rata, 0)
+        : raw?.nilai_rata_rata != null
+          ? toNumber(raw?.nilai_rata_rata, 0)
+          : raw?.average != null
+            ? toNumber(raw?.average, 0)
+            : raw?.avg != null
+              ? toNumber(raw?.avg, 0)
+              : undefined,
   ranking: raw?.ranking != null ? toNumber(raw?.ranking, 0) : undefined,
   catatan_wali: raw?.catatan_wali != null ? toText(raw?.catatan_wali) ?? null : undefined,
   id_wali_kelas: raw?.id_wali_kelas != null ? toNumber(raw?.id_wali_kelas, 0) : undefined,
