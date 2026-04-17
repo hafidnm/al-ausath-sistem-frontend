@@ -111,9 +111,6 @@ export default function PpdbDashboardPage() {
   useEffect(() => {
     if (!data) return;
 
-    const searchParams = new URLSearchParams(window.location.search);
-    const isManualDashboardVisit = searchParams.get('manual') === '1';
-
     setForm(mapDashboardToForm(data));
 
     // Auto-redirect ke halaman tes / pengumuman sesuai flow
@@ -133,10 +130,6 @@ export default function PpdbDashboardPage() {
     );
 
     if (shouldGoPengumuman) {
-      if (isManualDashboardVisit) {
-        return;
-      }
-
       router.replace('/ppdb/dashboard/pengumuman');
     }
   }, [data, router]);
