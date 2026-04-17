@@ -56,7 +56,7 @@ export default function PpdbPengumumanPage() {
     <div className="min-h-screen bg-background py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-4">
         <Link
-          href="/ppdb/dashboard?manual=1"
+          href="/ppdb/dashboard"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="w-4 h-4" />

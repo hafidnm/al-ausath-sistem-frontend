@@ -1,27 +1,6 @@
 import { PpdbPortalDashboard, PpdbPortalFormRequest } from '@/lib/services/ppdb-portal.service';
 import { PpdbDashboardFileState, PpdbDashboardFormState } from '@/types/ppdb/santri/dashboard';
 
-const toDateInputValue = (value: string): string => {
-  if (!value) return '';
-
-  const directIsoDate = value.match(/^(\d{4}-\d{2}-\d{2})/);
-  if (directIsoDate?.[1]) return directIsoDate[1];
-
-  const dmyDate = value.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
-  if (dmyDate) {
-    const [, dd, mm, yyyy] = dmyDate;
-    return `${yyyy}-${mm}-${dd}`;
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return '';
-
-  const year = parsed.getFullYear();
-  const month = String(parsed.getMonth() + 1).padStart(2, '0');
-  const day = String(parsed.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
 export const ppdbStatusBadgeClass: Record<string, string> = {
   Menunggu: 'bg-chart-3/20 text-chart-4 border-0',
   Terverifikasi: 'bg-accent/20 text-accent border-0',
@@ -65,21 +44,21 @@ export const wait = (ms: number) =>
   });
 
 export const mapDashboardToForm = (data: PpdbPortalDashboard): PpdbDashboardFormState => ({
-  program: data.program || data.jenjang,
+  program: data.program,
   namaLengkap: data.namaLengkap || data.namaCalon,
   jenisKelamin: data.jenisKelamin,
   tempatLahir: data.tempatLahir,
-  tanggalLahir: toDateInputValue(data.tanggalLahir),
+  tanggalLahir: data.tanggalLahir,
   nikCalonSantri: data.nikCalonSantri,
-  alamatLengkap: data.alamatLengkap || data.alamat,
+  alamatLengkap: data.alamatLengkap,
   riwayatPenyakit: data.riwayatPenyakit,
   namaAyah: data.namaAyah,
   penghasilanAyah: data.penghasilanAyah,
-  noHpAyah: data.noHpAyah || data.phone,
+  noHpAyah: data.noHpAyah,
   namaIbu: data.namaIbu,
   noHpIbu: data.noHpIbu,
   suratPernyataanText: data.suratPernyataanText,
-  asalSekolah: data.asalSekolah || data.asalKota,
+  asalSekolah: data.asalSekolah,
 });
 
 export const isPpdbFormIncomplete = (form: PpdbDashboardFormState): boolean => {

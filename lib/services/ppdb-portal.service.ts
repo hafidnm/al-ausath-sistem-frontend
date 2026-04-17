@@ -171,25 +171,6 @@ const toStringOrEmpty = (value: unknown): string => {
   return '';
 };
 
-const toFileReferenceString = (value: unknown): string => {
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'bigint') {
-    return String(value);
-  }
-
-  if (!value || typeof value !== 'object') return '';
-
-  const record = value as ApiRecord;
-  return toStringOrEmpty(
-    record.url ??
-      record.path ??
-      record.file ??
-      record.file_path ??
-      record.storage_path ??
-      record.original_url ??
-      record.download_url,
-  );
-};
-
 const toBoolean = (value: unknown): boolean => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value === 1;
@@ -232,29 +213,7 @@ const resolvePublicFileUrl = (value: unknown): string => {
   if (raw.startsWith('blob:') || raw.startsWith('data:')) return raw;
 
   const baseApiUrl = getPublicApiBaseUrl();
-  const slashNormalizedRaw = raw.replace(/\\/g, '/').trim();
-
-  let normalizedRaw = slashNormalizedRaw
-    .replace(/^\/?public\//i, '')
-    .replace(/^\/?app\/public\//i, 'storage/');
-
-  if (normalizedRaw.startsWith('/public/storage/')) {
-    normalizedRaw = normalizedRaw.replace('/public/storage/', '/storage/');
-  }
-
-  if (normalizedRaw.startsWith('public/storage/')) {
-    normalizedRaw = normalizedRaw.replace('public/storage/', 'storage/');
-  }
-
-  if (/^\/?storage\/app\/public\//i.test(normalizedRaw)) {
-    normalizedRaw = normalizedRaw.replace(/^\/?storage\/app\/public\//i, 'storage/');
-  }
-
-  const storageAppPublicMarker = '/storage/app/public/';
-  const storageAppPublicIdx = normalizedRaw.toLowerCase().indexOf(storageAppPublicMarker);
-  if (storageAppPublicIdx >= 0) {
-    normalizedRaw = `storage/${normalizedRaw.slice(storageAppPublicIdx + storageAppPublicMarker.length)}`;
-  }
+  const normalizedRaw = raw.replace(/^public\//i, '');
 
   if (normalizedRaw.startsWith('/storage/')) {
     return baseApiUrl ? `${baseApiUrl}${normalizedRaw}` : normalizedRaw;
@@ -685,53 +644,37 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     profile.asalSekolah ??
       profile.asal_sekolah ??
       profile.sekolah_asal ??
-      profile.asal ??
-      profile.asal_kota ??
       identity.asalSekolah ??
       identity.asal_sekolah ??
       identity.sekolah_asal ??
-      identity.asal ??
-      identity.asal_kota ??
       pendaftaran.asalSekolah ??
       pendaftaran.asal_sekolah ??
       pendaftaran.sekolah_asal ??
-      pendaftaran.asal ??
-      pendaftaran.asal_kota ??
       data.asalSekolah ??
       data.asal_sekolah ??
-      data.sekolah_asal ??
-      data.asal ??
-      data.asal_kota,
+      data.sekolah_asal,
   );
 
   const resolvedTempatLahir = toStringOrEmpty(
     profile.tempatLahir ??
       profile.tempat_lahir ??
-      profile.tempat_lahir_calon ??
       identity.tempatLahir ??
       identity.tempat_lahir ??
-      identity.tempat_lahir_calon ??
       pendaftaran.tempatLahir ??
       pendaftaran.tempat_lahir ??
-      pendaftaran.tempat_lahir_calon ??
       data.tempatLahir ??
-      data.tempat_lahir ??
-      data.tempat_lahir_calon,
+      data.tempat_lahir,
   );
 
   const resolvedTanggalLahir = toStringOrEmpty(
     profile.tanggalLahir ??
       profile.tanggal_lahir ??
-      profile.tanggal_lahir_calon ??
       identity.tanggalLahir ??
       identity.tanggal_lahir ??
-      identity.tanggal_lahir_calon ??
       pendaftaran.tanggalLahir ??
       pendaftaran.tanggal_lahir ??
-      pendaftaran.tanggal_lahir_calon ??
       data.tanggalLahir ??
-      data.tanggal_lahir ??
-      data.tanggal_lahir_calon,
+      data.tanggal_lahir,
   );
 
   const resolvedJenisKelamin = toStringOrEmpty(
@@ -748,23 +691,15 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   const resolvedAlamat = toStringOrEmpty(
     profile.alamatLengkap ??
       profile.alamat_lengkap ??
-      profile.alamat_lengkap_calon ??
-      profile.alamat_calon ??
       profile.alamat ??
       identity.alamatLengkap ??
       identity.alamat_lengkap ??
-      identity.alamat_lengkap_calon ??
-      identity.alamat_calon ??
       identity.alamat ??
       pendaftaran.alamatLengkap ??
       pendaftaran.alamat_lengkap ??
-      pendaftaran.alamat_lengkap_calon ??
-      pendaftaran.alamat_calon ??
       pendaftaran.alamat ??
       data.alamatLengkap ??
       data.alamat_lengkap ??
-      data.alamat_lengkap_calon ??
-      data.alamat_calon ??
       data.alamat,
   );
 
@@ -887,7 +822,7 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       pendaftaran.surat_pernyataan_text,
   );
 
-  const resolvedBerkasAktaPath = toFileReferenceString(
+  const resolvedBerkasAktaPath = toStringOrEmpty(
     profile.berkas_akta_url ??
       profile.akta_url ??
       profile.file_akta ??
@@ -895,13 +830,10 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       identity.berkas_akta_url ??
       identity.file_akta_path ??
       pendaftaran.berkas_akta_url ??
-      pendaftaran.file_akta_path ??
-      data.berkas_akta_url ??
-      data.file_akta ??
-      data.file_akta_path,
+      pendaftaran.file_akta_path,
   );
 
-  const resolvedBerkasKkPath = toFileReferenceString(
+  const resolvedBerkasKkPath = toStringOrEmpty(
     profile.berkas_kk_url ??
       profile.kk_url ??
       profile.file_kk ??
@@ -909,23 +841,18 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       identity.berkas_kk_url ??
       identity.file_kk_path ??
       pendaftaran.berkas_kk_url ??
-      pendaftaran.file_kk_path ??
-      data.berkas_kk_url ??
-      data.file_kk ??
-      data.file_kk_path,
+      pendaftaran.file_kk_path,
   );
 
-  const resolvedBerkasAktaKkPath = toFileReferenceString(
+  const resolvedBerkasAktaKkPath = toStringOrEmpty(
     profile.berkas_akta_kk_url ??
       profile.akta_kk_url ??
       profile.file_akta_kk ??
       identity.berkas_akta_kk_url ??
-      pendaftaran.berkas_akta_kk_url ??
-      data.berkas_akta_kk_url ??
-      data.file_akta_kk,
+      pendaftaran.berkas_akta_kk_url,
   );
 
-  const resolvedBerkasRekomendasiUstadzPath = toFileReferenceString(
+  const resolvedBerkasRekomendasiUstadzPath = toStringOrEmpty(
     profile.berkas_rekomendasi_ustadz_url ??
       profile.rekomendasi_ustadz_url ??
       profile.file_rekomendasi_ustadz ??
@@ -933,23 +860,17 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       identity.berkas_rekomendasi_ustadz_url ??
       identity.file_surat_rekomendasi_path ??
       pendaftaran.berkas_rekomendasi_ustadz_url ??
-      pendaftaran.file_surat_rekomendasi_path ??
-      data.berkas_rekomendasi_ustadz_url ??
-      data.file_rekomendasi_ustadz ??
-      data.file_surat_rekomendasi_path,
+      pendaftaran.file_surat_rekomendasi_path,
   );
 
-  const resolvedBerkasSuratPernyataanPath = toFileReferenceString(
+  const resolvedBerkasSuratPernyataanPath = toStringOrEmpty(
     profile.berkas_surat_pernyataan_url ??
       profile.file_surat_pernyataan ??
       profile.surat_pernyataan_file_path ??
       identity.berkas_surat_pernyataan_url ??
       identity.surat_pernyataan_file_path ??
       pendaftaran.berkas_surat_pernyataan_url ??
-      pendaftaran.surat_pernyataan_file_path ??
-      data.berkas_surat_pernyataan_url ??
-      data.file_surat_pernyataan ??
-      data.surat_pernyataan_file_path,
+      pendaftaran.surat_pernyataan_file_path,
   );
 
   const resolvedEmail = toStringOrEmpty(
@@ -1595,14 +1516,10 @@ export const ppdbPortalService = {
       jenjang: data.jenjang,
       jenis_kelamin: data.jenisKelamin,
       tempat_lahir: data.tempatLahir,
-      tempat_lahir_calon: data.tempatLahir,
       tanggal_lahir: data.tanggalLahir,
-      tanggal_lahir_calon: data.tanggalLahir,
       nik_calon_santri: data.nikCalonSantri,
       nik: data.nikCalonSantri,
       alamat_lengkap: data.alamatLengkap ?? data.alamat,
-      alamat_lengkap_calon: data.alamatLengkap ?? data.alamat,
-      alamat_calon: data.alamatLengkap ?? data.alamat,
       alamat: data.alamatLengkap ?? data.alamat,
       riwayat_penyakit: data.riwayatPenyakit,
       nama_ayah: data.namaAyah,
@@ -1617,7 +1534,6 @@ export const ppdbPortalService = {
       file_surat_rekomendasi_path: data.fileSuratRekomendasiPath,
       surat_pernyataan_setuju: data.suratPernyataanSetuju ?? 'accepted',
       surat_pernyataan_file_path: data.suratPernyataanFilePath,
-      file_surat_pernyataan_path: data.suratPernyataanFilePath,
       surat_pernyataan_text: data.suratPernyataanText,
       surat_pernyataan: data.suratPernyataanText,
       soal_jawab: data.soalJawab,
@@ -1626,7 +1542,6 @@ export const ppdbPortalService = {
       asal_kota: data.asalKota,
       asal: data.asalKota,
       asal_sekolah: data.asalSekolah,
-      sekolah_asal: data.asalSekolah,
       phone_ppdb: resolvedNoHpCalon,
       id_pendaftaran: data.idPendaftaran,
       email_ppdb: resolvedEmailPpdb,
@@ -1655,29 +1570,19 @@ export const ppdbPortalService = {
           if (data.dokumenAkta) {
             formData.append('akta', data.dokumenAkta);
             formData.append('berkas_akta', data.dokumenAkta);
-            formData.append('file_akta', data.dokumenAkta);
-            formData.append('dokumen_akta', data.dokumenAkta);
           }
           if (data.dokumenKk) {
             formData.append('kk', data.dokumenKk);
             formData.append('berkas_kk', data.dokumenKk);
-            formData.append('file_kk', data.dokumenKk);
-            formData.append('dokumen_kk', data.dokumenKk);
           }
           if (data.dokumenAktaKk) {
             formData.append('akta_kk', data.dokumenAktaKk);
-            formData.append('berkas_akta_kk', data.dokumenAktaKk);
           }
           if (data.dokumenRekomendasiUstadz) {
             formData.append('surat_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
-            formData.append('berkas_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
-            formData.append('file_surat_rekomendasi', data.dokumenRekomendasiUstadz);
-            formData.append('dokumen_rekomendasi_ustadz', data.dokumenRekomendasiUstadz);
           }
           if (data.dokumenSuratPernyataan) {
             formData.append('surat_pernyataan_file', data.dokumenSuratPernyataan);
-            formData.append('file_surat_pernyataan', data.dokumenSuratPernyataan);
-            formData.append('dokumen_surat_pernyataan', data.dokumenSuratPernyataan);
           }
 
           return formData;
@@ -1687,7 +1592,7 @@ export const ppdbPortalService = {
     const requestConfig = hasFilePayload
       ? {
           headers: {
-            Accept: 'application/json',
+            'Content-Type': 'multipart/form-data',
           },
         }
       : undefined;
