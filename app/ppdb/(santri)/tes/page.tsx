@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppdb/santri/use-ppdb-portal';
+import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppdb/santri';
 
 export default function PpdbTesPage() {
   const { toast } = useToast();

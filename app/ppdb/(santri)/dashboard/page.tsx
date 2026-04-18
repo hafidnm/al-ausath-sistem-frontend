@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ClipboardCheck,
@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import {
   usePpdbPortalDashboard,
   usePpdbPortalUpdateForm,
-} from '@/hooks/ppdb/santri/use-ppdb-portal';
+} from '@/hooks/ppdb/santri';
 import {
   buildPpdbUpdatePayload,
   formatAnnouncementDate,
@@ -45,7 +45,30 @@ import {
 import {
   initialPpdbDashboardFiles,
   initialPpdbDashboardForm,
+  type PpdbDashboardFileState,
+  type PpdbDashboardFormState,
 } from '@/types/ppdb/santri/dashboard';
+
+const AUTO_SAVE_DELAY_MS = 1500;
+
+type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+const fileSignature = (file: File | null): string =>
+  file ? `${file.name}:${file.size}:${file.lastModified}` : '';
+
+const buildAutosaveSignature = (
+  form: PpdbDashboardFormState,
+  files: PpdbDashboardFileState,
+): string =>
+  JSON.stringify({
+    ...form,
+    _files: {
+      dokumenAkta: fileSignature(files.dokumenAkta),
+      dokumenKk: fileSignature(files.dokumenKk),
+      dokumenRekomendasiUstadz: fileSignature(files.dokumenRekomendasiUstadz),
+      dokumenSuratPernyataan: fileSignature(files.dokumenSuratPernyataan),
+    },
+  });
 
 export default function PpdbDashboardPage() {
   const { toast } = useToast();
@@ -61,6 +84,13 @@ export default function PpdbDashboardPage() {
 
   const [files, setFiles] = useState(initialPpdbDashboardFiles);
 
+  const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
+  const [lastAutoSaveAt, setLastAutoSaveAt] = useState<Date | null>(null);
+
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasHydratedFromServerRef = useRef(false);
+  const lastSavedSignatureRef = useRef('');
+
   // Isu 8: Preview URL untuk file yang baru dipilih (belum upload)
   const [filePreviewUrls, setFilePreviewUrls] = useState<{
     akta?: string;
@@ -69,19 +99,58 @@ export default function PpdbDashboardPage() {
     suratPernyataan?: string;
   }>({});
 
+  const clearAutoSaveTimer = useCallback(() => {
+    if (!autoSaveTimerRef.current) return;
+    clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = null;
+  }, []);
+
+  const resetPendingFiles = useCallback(() => {
+    setFiles(initialPpdbDashboardFiles);
+    setFilePreviewUrls((prev) => {
+      Object.values(prev).forEach((url) => {
+        if (url?.startsWith('blob:')) {
+          URL.revokeObjectURL(url);
+        }
+      });
+
+      return {};
+    });
+  }, []);
+
   const handleFileChange = (
     key: keyof typeof initialPpdbDashboardFiles,
     previewKey: 'akta' | 'kk' | 'rekomendasi' | 'suratPernyataan',
     file: File | null,
   ) => {
     setFiles((prev) => ({ ...prev, [key]: file }));
-    if (file) {
-      const url = URL.createObjectURL(file);
-      setFilePreviewUrls((prev) => ({ ...prev, [previewKey]: url }));
-    } else {
-      setFilePreviewUrls((prev) => ({ ...prev, [previewKey]: undefined }));
-    }
+    setFilePreviewUrls((prev) => {
+      const currentUrl = prev[previewKey];
+      if (currentUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(currentUrl);
+      }
+
+      return {
+        ...prev,
+        [previewKey]: file ? URL.createObjectURL(file) : undefined,
+      };
+    });
   };
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => {
+    Object.values(filePreviewUrls).forEach((url) => {
+      if (url?.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+  }, [filePreviewUrls]);
 
 
 
@@ -111,11 +180,15 @@ export default function PpdbDashboardPage() {
   useEffect(() => {
     if (!data) return;
 
-    setForm(mapDashboardToForm(data));
+    const mappedForm = mapDashboardToForm(data);
+    setForm(mappedForm);
+    lastSavedSignatureRef.current = buildAutosaveSignature(mappedForm, initialPpdbDashboardFiles);
+    hasHydratedFromServerRef.current = true;
+    setAutoSaveStatus('idle');
 
     // Auto-redirect ke halaman tes / pengumuman sesuai flow
     const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
-    const shouldGoTes = data.formCompleted && data.step === 'tes' && !hasSubmittedTesAnswer;
+    const shouldGoTes = data.step === 'tes' && !hasSubmittedTesAnswer;
 
     if (shouldGoTes) {
       router.replace('/ppdb/tes');
@@ -123,16 +196,62 @@ export default function PpdbDashboardPage() {
     }
 
     const shouldGoPengumuman = Boolean(
-      data.step === 'menunggu-pengumuman'
-      || data.step === 'pengumuman'
-      || (data.formCompleted && hasSubmittedTesAnswer)
-      || (data.formCompleted && data.pendaftaranSelesai),
+      !shouldGoTes
+      && (
+        data.step === 'menunggu-pengumuman'
+        || data.step === 'pengumuman'
+        || data.formCompleted
+        || data.pendaftaranSelesai
+        || hasSubmittedTesAnswer
+      ),
     );
 
     if (shouldGoPengumuman) {
       router.replace('/ppdb/dashboard/pengumuman');
     }
   }, [data, router]);
+
+  useEffect(() => {
+    if (!data || !hasHydratedFromServerRef.current) return;
+
+    const currentSignature = buildAutosaveSignature(form, files);
+    if (currentSignature === lastSavedSignatureRef.current) {
+      return;
+    }
+
+    const hasPendingFiles = Boolean(
+      files.dokumenAkta
+      || files.dokumenKk
+      || files.dokumenRekomendasiUstadz
+      || files.dokumenSuratPernyataan,
+    );
+
+    clearAutoSaveTimer();
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      void (async () => {
+        setAutoSaveStatus('saving');
+
+        try {
+          await updateForm(buildPpdbUpdatePayload(form, files, data));
+          lastSavedSignatureRef.current = currentSignature;
+          setLastAutoSaveAt(new Date());
+          setAutoSaveStatus('saved');
+
+          if (hasPendingFiles) {
+            resetPendingFiles();
+            await fetchDashboard();
+          }
+        } catch {
+          setAutoSaveStatus('error');
+        }
+      })();
+    }, AUTO_SAVE_DELAY_MS);
+
+    return () => {
+      clearAutoSaveTimer();
+    };
+  }, [clearAutoSaveTimer, data, fetchDashboard, files, form, resetPendingFiles, updateForm]);
 
   const handleSaveForm = async () => {
     if (isPpdbFormIncomplete(form)) {
@@ -145,10 +264,32 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    const hasPendingFiles = Boolean(
+      files.dokumenAkta
+      || files.dokumenKk
+      || files.dokumenRekomendasiUstadz
+      || files.dokumenSuratPernyataan,
+    );
+
+    clearAutoSaveTimer();
+    setAutoSaveStatus('saving');
+
     try {
       await updateForm(buildPpdbUpdatePayload(form, files, data));
 
+      if (hasPendingFiles) {
+        resetPendingFiles();
+      }
+
       const refreshedDashboard = await fetchDashboard();
+      const refreshedForm = refreshedDashboard ? mapDashboardToForm(refreshedDashboard) : form;
+
+      lastSavedSignatureRef.current = buildAutosaveSignature(
+        refreshedForm,
+        initialPpdbDashboardFiles,
+      );
+      setLastAutoSaveAt(new Date());
+      setAutoSaveStatus('saved');
 
       toast({
         title: 'Form berhasil disimpan',
@@ -166,9 +307,14 @@ export default function PpdbDashboardPage() {
       }
 
       const shouldGoPengumuman = Boolean(
-        refreshedDashboard?.step === 'menunggu-pengumuman'
-        || refreshedDashboard?.step === 'pengumuman'
-        || refreshedDashboard?.formCompleted,
+        !shouldGoTes
+        && (
+          refreshedDashboard?.step === 'menunggu-pengumuman'
+          || refreshedDashboard?.step === 'pengumuman'
+          || refreshedDashboard?.pendaftaranSelesai
+          || refreshedDashboard?.formCompleted
+          || !isPpdbFormIncomplete(form)
+        ),
       );
 
       if (shouldGoPengumuman) {
@@ -176,6 +322,7 @@ export default function PpdbDashboardPage() {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan form PPDB';
+      setAutoSaveStatus('error');
       toast({
         title: 'Simpan form gagal',
         description: message,
@@ -183,6 +330,22 @@ export default function PpdbDashboardPage() {
       });
     }
   };
+
+  const autoSaveDescription = useMemo(() => {
+    if (autoSaveStatus === 'saving') {
+      return 'Menyimpan otomatis...';
+    }
+
+    if (autoSaveStatus === 'error') {
+      return 'Simpan otomatis gagal. Gunakan tombol Simpan Form PPDB.';
+    }
+
+    if (autoSaveStatus === 'saved' && lastAutoSaveAt) {
+      return `Tersimpan otomatis pada ${formatDateTime(lastAutoSaveAt.toISOString())}.`;
+    }
+
+    return 'Simpan otomatis aktif. Perubahan akan disimpan otomatis.';
+  }, [autoSaveStatus, lastAutoSaveAt]);
 
 
 
@@ -204,7 +367,9 @@ export default function PpdbDashboardPage() {
       && (
         data?.step === 'menunggu-pengumuman'
         || data?.step === 'pengumuman'
-        || (data?.formCompleted && hasSubmittedTesAnswer)
+        || data?.formCompleted
+        || data?.pendaftaranSelesai
+        || hasSubmittedTesAnswer
       ),
   );
 
@@ -594,10 +759,13 @@ export default function PpdbDashboardPage() {
               ) : null}
             </div>
 
-            <Button onClick={() => void handleSaveForm()} disabled={updateLoading}>
-              {updateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-              Simpan Form PPDB
-            </Button>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <Button onClick={() => void handleSaveForm()} disabled={updateLoading}>
+                {updateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                Simpan Form PPDB
+              </Button>
+              <p className="text-xs text-muted-foreground">{autoSaveDescription}</p>
+            </div>
           </CardContent>
         </Card>
 

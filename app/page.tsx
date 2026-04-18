@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
-import { usePpdbPortalRegister } from "@/hooks/ppdb/santri/use-ppdb-portal"
+import { usePpdbPortalRegister } from "@/hooks/ppdb/santri"
 import { BookOpen, Users, GraduationCap, Star, Moon, Menu, Calendar, Bell, MapPin, Phone, Mail, Clock, CheckCircle2, Building2, ChevronDown, LogIn, UserPlus, Loader2 } from "lucide-react"
 
 export default function LandingPage() {
@@ -566,9 +566,7 @@ function PpdbRegistrationForm() {
       })
       resetForm()
       setTimeout(() => {
-        const noPendaftaran = encodeURIComponent(result.noPendaftaran || "")
-        const idPendaftar = encodeURIComponent(result.idPendaftar || "")
-        window.location.href = `/ppdb/register/success?no=${noPendaftaran}&id=${idPendaftar}`
+        window.location.href = "/ppdb/login"
       }, 500)
     } catch (error) {
       const message = error instanceof Error ? error.message : "Terjadi kesalahan saat mengirim pendaftaran."

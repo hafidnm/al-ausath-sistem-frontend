@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalRegister } from '@/hooks/ppdb/santri/use-ppdb-portal';
+import { usePpdbPortalRegister } from '@/hooks/ppdb/santri';
 
 export default function PpdbRegisterPage() {
   const { toast } = useToast();
@@ -74,11 +74,7 @@ export default function PpdbRegisterPage() {
       });
 
       setTimeout(() => {
-        const noPendaftaran = encodeURIComponent(result.noPendaftaran || '');
-        const idPendaftar = encodeURIComponent(result.idPendaftar || '');
-        const loginHint = encodeURIComponent(result.noPendaftaran || form.email.trim());
-
-        window.location.href = `/ppdb/register/success?no=${noPendaftaran}&id=${idPendaftar}&login=${loginHint}`;
+        window.location.href = '/ppdb/login';
       }, 500);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Registrasi akun PPDB gagal';

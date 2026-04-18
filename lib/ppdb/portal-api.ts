@@ -1,0 +1,386 @@
+import api, { clearStoredPpdbToken, getCsrfToken, setPpdbAuthMarker, setStoredPpdbToken } from '@/lib/axios';
+import type {
+  PpdbPortalDashboard,
+  PpdbPortalFormRequest,
+  PpdbPortalLoginRequest,
+  PpdbPortalRegisterRequest,
+  PpdbPortalRegisterResponse,
+  PpdbPortalTesJawabRequest,
+  PpdbPortalTesStatus,
+  PpdbPortalStep,
+} from '@/types/ppdb/portal';
+
+const PPDB_PORTAL_BASE_PATH = '/ppdb';
+
+type Rec = Record<string, unknown>;
+
+const asRecord = (value: unknown): Rec =>
+  value && typeof value === 'object' ? (value as Rec) : {};
+
+const asString = (value: unknown): string => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'bigint') return String(value);
+  return '';
+};
+
+const asBool = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  const raw = asString(value).trim().toLowerCase();
+  return ['1', 'true', 'yes', 'y', 'aktif', 'open'].includes(raw);
+};
+
+const isFileValue = (value: unknown): value is File =>
+  typeof File !== 'undefined' && value instanceof File;
+
+const hasOwn = Object.prototype.hasOwnProperty;
+
+const resolveData = (payload: unknown): Rec => {
+  const root = asRecord(payload);
+  const data = root.data;
+  return data && typeof data === 'object' ? asRecord(data) : root;
+};
+
+const appendSource = (sources: Rec[], value: unknown) => {
+  if (!value || typeof value !== 'object') return;
+
+  const record = asRecord(value);
+  if (Object.keys(record).length === 0) return;
+  if (sources.includes(record)) return;
+
+  sources.push(record);
+};
+
+const resolveDashboardSources = (payload: unknown): Rec[] => {
+  const root = asRecord(payload);
+  const data = resolveData(payload);
+  const user = asRecord(data.user ?? data.akun);
+  const dataNested = asRecord(data.pendaftaran ?? data.pendaftar ?? data.identitas ?? data.biodata);
+  const dataFlow = asRecord(data.flow);
+  const dataTes = asRecord(data.tes);
+  const userNested = asRecord(user.pendaftaran ?? user.pendaftar ?? user.identitas ?? user.biodata);
+  const rootNested = asRecord(root.pendaftaran ?? root.pendaftar ?? root.identitas ?? root.biodata);
+  const rootFlow = asRecord(root.flow);
+
+  const sources: Rec[] = [];
+  appendSource(sources, data);
+  appendSource(sources, dataNested);
+  appendSource(sources, dataFlow);
+  appendSource(sources, dataTes);
+  appendSource(sources, user);
+  appendSource(sources, userNested);
+  appendSource(sources, rootNested);
+  appendSource(sources, rootFlow);
+  appendSource(sources, root.data);
+  appendSource(sources, root);
+
+  return sources;
+};
+
+const pickText = (sources: Rec[], keys: string[]): string => {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (!hasOwn.call(source, key)) continue;
+      const text = asString(source[key]).trim();
+      if (text.length > 0) return text;
+    }
+  }
+
+  return '';
+};
+
+const pickValue = (sources: Rec[], keys: string[]): unknown => {
+  for (const source of sources) {
+    for (const key of keys) {
+      if (!hasOwn.call(source, key)) continue;
+
+      const value = source[key];
+      if (value !== undefined && value !== null) {
+        return value;
+      }
+    }
+  }
+
+  return undefined;
+};
+
+const toMultipartFormData = (payload: PpdbPortalFormRequest): FormData => {
+  const formData = new FormData();
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (isFileValue(value)) {
+      formData.append(key, value);
+      return;
+    }
+
+    formData.append(key, String(value));
+  });
+
+  return formData;
+};
+
+const toJsonPayload = (payload: PpdbPortalFormRequest): Rec => {
+  const normalized: Rec = {};
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === undefined || value === null) return;
+    if (isFileValue(value)) return;
+
+    normalized[key] = value;
+  });
+
+  return normalized;
+};
+
+const hasFilePayload = (payload: PpdbPortalFormRequest): boolean =>
+  Object.values(payload).some((value) => isFileValue(value));
+
+const shouldFallbackToCreateIdentitas = (status?: number): boolean =>
+  status === 404 || status === 405 || status === 409;
+
+const normalizeStep = (value: unknown): PpdbPortalStep => {
+  const step = asString(value).trim().toLowerCase();
+  if (!step) return 'lengkapi-form';
+
+  if (step.includes('tes')) return 'tes';
+  if (step === 'pengumuman' || step === 'announcement') return 'pengumuman';
+  if (
+    step === 'menunggu-pengumuman'
+    || step === 'menunggu_pengumuman'
+    || step === 'menunggu pengumuman'
+    || step === 'waiting-announcement'
+    || step === 'waiting_announcement'
+    || step === 'menunggu'
+    || step === 'submitted'
+    || step === 'selesai'
+    || step === 'completed'
+    || step === 'done'
+  ) {
+    return 'menunggu-pengumuman';
+  }
+
+  return 'lengkapi-form';
+};
+
+const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
+  const sources = resolveDashboardSources(payload);
+  const status =
+    pickText(sources, ['status', 'status_verifikasi', 'hasil_verifikasi']) ||
+    'Menunggu';
+
+  const soalJawab = pickText(sources, ['soalJawab', 'soal_jawab']);
+  const showHalamanTes = asBool(pickValue(sources, ['showHalamanTes', 'show_halaman_tes']));
+  const formCompleted = asBool(pickValue(sources, ['formCompleted', 'form_completed', 'is_form_lengkap']));
+  const pendaftaranSelesai = asBool(pickValue(sources, ['pendaftaranSelesai', 'pendaftaran_selesai']));
+  const pengumumanOpen = asBool(pickValue(sources, ['pengumumanOpen', 'pengumuman_open', 'is_pengumuman_dibuka']));
+
+  const rawStep = pickValue(sources, ['step', 'tahap']);
+  const derivedStep = showHalamanTes
+    ? 'tes'
+    : formCompleted || pendaftaranSelesai || soalJawab.trim().length > 0
+      ? (pengumumanOpen ? 'pengumuman' : 'menunggu-pengumuman')
+      : 'lengkapi-form';
+  const step = normalizeStep(rawStep ?? derivedStep);
+
+  return {
+    idPendaftar: pickText(sources, ['idPendaftar', 'id_pendaftar', 'id_pendaftaran', 'pendaftaran_id', 'id']),
+    noPendaftaran: pickText(sources, ['noPendaftaran', 'no_pendaftaran', 'nomor_pendaftaran', 'registration_number']),
+    waktuPendaftaran: pickText(sources, [
+      'waktuPendaftaran',
+      'waktu_pendaftaran',
+      'waktuDaftar',
+      'waktu_daftar',
+      'tanggalDaftar',
+      'tanggal_daftar',
+      'created_at',
+      'createdAt',
+      'registered_at',
+      'registeredAt',
+    ]),
+    email: pickText(sources, ['email', 'email_ppdb']),
+    phone: pickText(sources, ['phone', 'phone_ppdb', 'no_hp_calon', 'noHpCalon']),
+    namaCalon: pickText(sources, ['namaCalon', 'nama_calon', 'nama_calon_santri', 'nama']),
+    namaLengkap: pickText(sources, ['namaLengkap', 'nama_lengkap', 'nama_calon', 'nama_calon_santri', 'nama']),
+    program: pickText(sources, ['program', 'program_pendaftaran', 'jenjang']),
+    jenjang: pickText(sources, ['jenjang', 'program_pendaftaran', 'program']),
+    nomorUmi: pickText(sources, ['nomorUmi', 'nomor_umi']),
+    asalKota: pickText(sources, ['asalKota', 'asal_kota', 'asalSekolah', 'asal_sekolah', 'sekolah_asal']),
+    asalSekolah: pickText(sources, ['asalSekolah', 'asal_sekolah', 'sekolah_asal', 'asalKota', 'asal_kota']),
+    tempatLahir: pickText(sources, ['tempatLahir', 'tempat_lahir']),
+    tanggalLahir: pickText(sources, ['tanggalLahir', 'tanggal_lahir']),
+    jenisKelamin: pickText(sources, ['jenisKelamin', 'jenis_kelamin']),
+    nikCalonSantri: pickText(sources, ['nikCalonSantri', 'nik_calon_santri', 'nik']),
+    alamatLengkap: pickText(sources, ['alamatLengkap', 'alamat_lengkap', 'alamat']),
+    riwayatPenyakit: pickText(sources, ['riwayatPenyakit', 'riwayat_penyakit']),
+    namaAyah: pickText(sources, ['namaAyah', 'nama_ayah']),
+    penghasilanAyah: pickText(sources, ['penghasilanAyah', 'penghasilan_ayah']),
+    noHpAyah: pickText(sources, ['noHpAyah', 'no_hp_ayah', 'no_hp_calon']),
+    namaIbu: pickText(sources, ['namaIbu', 'nama_ibu']),
+    noHpIbu: pickText(sources, ['noHpIbu', 'no_hp_ibu']),
+    soalJawab,
+    suratPernyataanText: pickText(sources, ['suratPernyataanText', 'surat_pernyataan_text']),
+    berkasAktaUrl: pickText(sources, ['berkasAktaUrl', 'berkas_akta_url', 'fileAktaPath', 'file_akta_path']),
+    berkasKkUrl: pickText(sources, ['berkasKkUrl', 'berkas_kk_url', 'fileKkPath', 'file_kk_path']),
+    berkasAktaKkUrl: pickText(sources, ['berkasAktaKkUrl', 'berkas_akta_kk_url', 'fileAktaKkPath', 'file_akta_kk_path']),
+    berkasRekomendasiUstadzUrl: pickText(sources, [
+      'berkasRekomendasiUstadzUrl',
+      'berkas_rekomendasi_ustadz_url',
+      'fileSuratRekomendasiPath',
+      'file_surat_rekomendasi_path',
+    ]),
+    berkasSuratPernyataanUrl: pickText(sources, [
+      'berkasSuratPernyataanUrl',
+      'berkas_surat_pernyataan_url',
+      'suratPernyataanFilePath',
+      'surat_pernyataan_file_path',
+    ]),
+    alamat: pickText(sources, ['alamat', 'alamat_lengkap']),
+    status: status as PpdbPortalDashboard['status'],
+    tesRequired: asBool(pickValue(sources, ['tesRequired', 'tes_required'])),
+    tesAvailable: asBool(pickValue(sources, ['tesAvailable', 'tes_available'])),
+    fiturSoalAktif: asBool(pickValue(sources, ['fiturSoalAktif', 'fitur_soal_aktif'])),
+    showHalamanTes,
+    pendaftaranSelesai,
+    soalTes: pickText(sources, ['soalTes', 'soal_tes']),
+    tesTitle: pickText(sources, ['tesTitle', 'tes_title']),
+    tesDescription: pickText(sources, ['tesDescription', 'tes_description']),
+    pengumumanDate: pickText(sources, ['pengumumanDate', 'pengumuman_date', 'tanggal_pengumuman']),
+    pengumumanOpen,
+    formCompleted,
+    step,
+  };
+};
+
+const normalizeTesStatus = (payload: unknown): PpdbPortalTesStatus => {
+  const row = resolveData(payload);
+  return {
+    canAccessTes: asBool(row.canAccessTes ?? row.can_access_tes),
+    showHalamanTes: asBool(row.showHalamanTes ?? row.show_halaman_tes),
+    pendaftaranSelesai: asBool(row.pendaftaranSelesai ?? row.pendaftaran_selesai),
+    fiturSoalAktif: asBool(row.fiturSoalAktif ?? row.fitur_soal_aktif),
+    soalTes: asString(row.soalTes ?? row.soal_tes),
+    formSchema: Array.isArray(row.formSchema)
+      ? (row.formSchema as PpdbPortalTesStatus['formSchema'])
+      : Array.isArray(row.form_schema)
+        ? (row.form_schema as PpdbPortalTesStatus['formSchema'])
+        : [],
+    tesRequired: asBool(row.tesRequired ?? row.tes_required),
+    tesAvailable: asBool(row.tesAvailable ?? row.tes_available),
+    tesFinished: asBool(row.tesFinished ?? row.tes_finished),
+    tesSubmitted: asBool(row.tesSubmitted ?? row.tes_submitted),
+    tesTitle: asString(row.tesTitle ?? row.tes_title),
+    tesDescription: asString(row.tesDescription ?? row.tes_description),
+    step: normalizeStep(row.step),
+    message: asString(row.message),
+  };
+};
+
+const resolveToken = (payload: unknown): string => {
+  const row = resolveData(payload);
+  return asString(
+    row.access_token || row.token || row.api_token || row.bearer_token || row.plain_text_token,
+  ).trim();
+};
+
+export const ppdbPortalApi = {
+  async register(data: PpdbPortalRegisterRequest): Promise<PpdbPortalRegisterResponse> {
+    await getCsrfToken();
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/register`, data);
+    const row = resolveData(response.data);
+
+    return {
+      idPendaftar: asString(row.idPendaftar ?? row.id_pendaftar ?? row.id_pendaftaran),
+      noPendaftaran: asString(row.noPendaftaran ?? row.no_pendaftaran ?? row.nomor_pendaftaran),
+      message: asString(row.message || asRecord(response.data).message || 'Registrasi berhasil'),
+    };
+  },
+
+  async login(data: PpdbPortalLoginRequest): Promise<unknown> {
+    await getCsrfToken();
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/login`, {
+      identifier: data.login,
+      password: data.password,
+    });
+
+    const token = resolveToken(response.data);
+    if (token) {
+      setStoredPpdbToken(token);
+    }
+    setPpdbAuthMarker();
+
+    return response.data;
+  },
+
+  async getDashboard(): Promise<PpdbPortalDashboard> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/dashboard`);
+    return normalizeDashboard(response.data);
+  },
+
+  async updateForm(payload: PpdbPortalFormRequest): Promise<unknown> {
+    const containsFile = hasFilePayload(payload);
+    const requestConfig = containsFile ? { headers: { Accept: 'application/json' } } : undefined;
+
+    const requestBody = containsFile
+      ? (() => {
+        const formData = toMultipartFormData(payload);
+        // Upload berkas perlu method spoof supaya PHP membaca file sebagai POST multipart.
+        formData.append('_method', 'PUT');
+        return formData;
+      })()
+      : toJsonPayload(payload);
+
+    try {
+      const formUpdateResponse = containsFile
+        ? await api.post(`${PPDB_PORTAL_BASE_PATH}/form`, requestBody, requestConfig)
+        : await api.put(`${PPDB_PORTAL_BASE_PATH}/form`, requestBody, requestConfig);
+
+      return formUpdateResponse.data;
+    } catch (error) {
+      const status =
+        (error as { response?: { status?: number } })?.response?.status;
+
+      if (!shouldFallbackToCreateIdentitas(status)) {
+        throw error;
+      }
+    }
+
+    const fallbackBody = containsFile ? toMultipartFormData(payload) : requestBody;
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/pendaftaran/create-identitas`, fallbackBody, requestConfig);
+
+    return response.data;
+  },
+
+  async previewNomor(): Promise<string> {
+    try {
+      const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/nomor/preview`);
+      const row = resolveData(response.data);
+      return asString(row.noPendaftaran ?? row.no_pendaftaran ?? row.nomor_pendaftaran);
+    } catch (error) {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status !== 404 && status !== 405) {
+        throw error;
+      }
+    }
+
+    const fallbackResponse = await api.get(`${PPDB_PORTAL_BASE_PATH}/preview-nomor`);
+    const fallbackRow = resolveData(fallbackResponse.data);
+    return asString(fallbackRow.noPendaftaran ?? fallbackRow.no_pendaftaran ?? fallbackRow.nomor_pendaftaran);
+  },
+
+  async getTesStatus(): Promise<PpdbPortalTesStatus> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/tes`);
+    return normalizeTesStatus(response.data);
+  },
+
+  async submitTesJawab(payload: PpdbPortalTesJawabRequest): Promise<unknown> {
+    const response = await api.put(`${PPDB_PORTAL_BASE_PATH}/form`, {
+      id_pendaftaran: payload.idPendaftaran,
+      soal_jawab: payload.soalJawab,
+    });
+    return response.data;
+  },
+
+  logout() {
+    clearStoredPpdbToken();
+  },
+};

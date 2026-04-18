@@ -38,7 +38,7 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react"
-import type { PpdbDetail } from "@/lib/services/ppdb.service"
+import type { PpdbDetail } from "@/types/ppdb/admin"
 
 interface PpdbTableProps {
   data: PpdbDetail[]

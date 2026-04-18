@@ -13,7 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { CheckCircle2, XCircle, Users } from "lucide-react"
-import type { PpdbDetail } from "@/lib/services/ppdb.service"
+import type { PpdbDetail } from "@/types/ppdb/admin"
 
 interface PpdbRekapCardProps {
   data: PpdbDetail[]

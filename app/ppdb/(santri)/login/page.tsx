@@ -9,18 +9,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalLogin } from '@/hooks/ppdb/santri/use-ppdb-portal';
-import { ppdbPortalService } from '@/lib/services/ppdb-portal.service';
+import { usePpdbPortalLogin } from '@/hooks/ppdb/santri';
+import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import { useRouter } from 'next/navigation';
+import type { PpdbPortalDashboard } from '@/types/ppdb/portal';
 
 const wait = (ms: number) => new Promise((resolve) => {
   setTimeout(resolve, ms);
 });
 
-const ensureDashboardReady = async (): Promise<Awaited<ReturnType<typeof ppdbPortalService.getDashboard>> | null> => {
+const ensureDashboardReady = async (): Promise<PpdbPortalDashboard | null> => {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await ppdbPortalService.getDashboard();
+      return await ppdbPortalApi.getDashboard();
     } catch {
       await wait(300 * (attempt + 1));
     }

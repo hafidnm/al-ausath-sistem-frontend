@@ -13,7 +13,7 @@ import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { Loader2 } from "lucide-react"
 import { PpdbFormFields, PpdbFormState } from "./ppdb-form-fields"
-import type { TesKonfigurasiJenjangKey } from "@/lib/services/ppdb.service"
+import type { TesKonfigurasiJenjangKey } from "@/types/ppdb/admin"
 
 interface TesConfigState {
   fiturSoalAktif: boolean
