@@ -45,6 +45,13 @@ const getFileExtension = (filename: string): string => filename.split(".").pop()
 const isSupportedImportExtension = (extension: string): boolean =>
   SUPPORTED_IMPORT_EXTENSIONS.includes(extension as (typeof SUPPORTED_IMPORT_EXTENSIONS)[number])
 
+const normalizeHeader = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\-/]+/g, "_")
+    .replace(/[^a-z0-9_]/g, "")
+
 const toText = (value: unknown): string => {
   if (value == null) return ""
   if (typeof value === "string") return value
@@ -78,7 +85,7 @@ const parseCsvText = (content: string): PreviewRow[] => {
 
   if (lines.length <= 1) return []
 
-  const headers = lines[0].split(",").map((cell) => cell.trim().toLowerCase())
+  const headers = lines[0].split(",").map((cell) => normalizeHeader(cell))
   const rows = lines.slice(1)
 
   return rows.map((line) => {
@@ -87,6 +94,45 @@ const parseCsvText = (content: string): PreviewRow[] => {
 
     headers.forEach((header, index) => {
       rowObj[header] = cells[index] ?? ""
+    })
+
+    return {
+      kode_unit: rowObj.kode_unit || "",
+      nama_unit: rowObj.nama_unit || "",
+      nomor_urut: rowObj.nomor_urut || "",
+      keterangan: rowObj.keterangan || "",
+      status: rowObj.status || "",
+      status_ppdb: rowObj.status_ppdb || "",
+      jumlah_kelas: "-",
+      jumlah_santri: "-",
+    }
+  })
+}
+
+const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
+  const XLSX = await import("xlsx")
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: "array" })
+  const firstSheetName = workbook.SheetNames[0]
+  if (!firstSheetName) return []
+
+  const worksheet = workbook.Sheets[firstSheetName]
+  const rows = XLSX.utils.sheet_to_json<Array<string | number | null>>(worksheet, {
+    header: 1,
+    blankrows: false,
+    defval: "",
+    raw: false,
+  })
+
+  if (rows.length <= 1) return []
+
+  const headers = (rows[0] || []).map((cell) => normalizeHeader(String(cell ?? "")))
+
+  return rows.slice(1).map((row) => {
+    const rowObj: Record<string, string> = {}
+
+    headers.forEach((header, index) => {
+      rowObj[header] = String(row[index] ?? "").trim()
     })
 
     return {
@@ -154,18 +200,27 @@ export default function UnitImportPage() {
 
     setFile(selectedFile)
 
-    // CSV bisa dipratinjau langsung di browser, file Excel tetap bisa diproses tapi tanpa preview lokal.
-    if (extension !== "csv" && extension !== "txt") {
+    try {
+      let rows: PreviewRow[] = []
+
+      if (extension === "csv" || extension === "txt") {
+        const text = await selectedFile.text()
+        rows = parseCsvText(text)
+      } else {
+        rows = await parseExcelRows(selectedFile)
+      }
+
+      setPreviewRows(rows)
+      setIsPreviewAvailable(true)
+    } catch {
       setPreviewRows([])
       setIsPreviewAvailable(false)
-      return
+      toast({
+        title: "Gagal Membaca Berkas",
+        description: "Pratinjau file tidak bisa dibaca, tapi Anda masih bisa coba proses impor.",
+        variant: "destructive",
+      })
     }
-
-    setIsPreviewAvailable(true)
-
-    const text = await selectedFile.text()
-    const rows = parseCsvText(text)
-    setPreviewRows(rows)
   }
 
   const handleProcessImport = () => {
@@ -243,7 +298,7 @@ export default function UnitImportPage() {
             </div>
             {!isPreviewAvailable && (
               <p className="text-sm text-muted-foreground">
-                Pratinjau hanya tersedia untuk CSV/TXT. File Excel tetap bisa langsung diproses impor.
+                Pratinjau tidak tersedia untuk file ini. Anda masih bisa lanjut proses impor.
               </p>
             )}
           </div>
@@ -278,7 +333,7 @@ export default function UnitImportPage() {
               {!isPreviewAvailable ? (
                 <TableRow>
                   <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
-                    Pratinjau tidak tersedia untuk file Excel. Klik Proses Impor Data untuk melanjutkan.
+                    Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (

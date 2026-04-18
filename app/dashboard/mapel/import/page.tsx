@@ -2,22 +2,28 @@
 
 import Link from "next/link"
 import { useMemo, useState } from "react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { DataKelasImportSummary, dataKelasService } from "@/lib/services/kelas.service"
+import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { ArrowLeft, CircleCheck, Download, Upload } from "lucide-react"
 
 type PreviewRow = {
+  kode_mapel: string
+  nama_mapel: string
   kode_unit: string
-  kode_kelas: string
-  nama_kelas: string
-  nama_jurusan: string
-  tahun_ajaran: string
+  kelompok_mapel: string
+  urutan: string
+  keterangan: string
   status: string
-  status_ppdb: string
+}
+
+type ErrorRow = {
+  line: number
+  errors: string[]
 }
 
 const SUPPORTED_IMPORT_EXTENSIONS = ["csv", "txt", "xlsx", "xls"] as const
@@ -54,13 +60,13 @@ const parseCsvText = (content: string): PreviewRow[] => {
     })
 
     return {
+      kode_mapel: rowObj.kode_mapel || "",
+      nama_mapel: rowObj.nama_mapel || "",
       kode_unit: rowObj.kode_unit || "",
-      kode_kelas: rowObj.kode_kelas || "",
-      nama_kelas: rowObj.nama_kelas || "",
-      nama_jurusan: rowObj.nama_jurusan || "",
-      tahun_ajaran: rowObj.tahun_ajaran || "",
+      kelompok_mapel: rowObj.kelompok_mapel || "",
+      urutan: rowObj.urutan || "",
+      keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
     }
   })
 }
@@ -92,13 +98,13 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
     })
 
     return {
+      kode_mapel: rowObj.kode_mapel || "",
+      nama_mapel: rowObj.nama_mapel || "",
       kode_unit: rowObj.kode_unit || "",
-      kode_kelas: rowObj.kode_kelas || "",
-      nama_kelas: rowObj.nama_kelas || "",
-      nama_jurusan: rowObj.nama_jurusan || "",
-      tahun_ajaran: rowObj.tahun_ajaran || "",
+      kelompok_mapel: rowObj.kelompok_mapel || "",
+      urutan: rowObj.urutan || "",
+      keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
     }
   })
 }
@@ -112,26 +118,50 @@ const downloadBlob = (blob: Blob, filename: string): void => {
   URL.revokeObjectURL(url)
 }
 
-export default function KelasImportPage() {
+const getErrorMessage = (error: unknown, fallback: string): string => {
+  if (!error || typeof error !== "object") return fallback
+
+  const err = error as {
+    response?: {
+      data?: {
+        message?: string
+        errors?: Record<string, string[]>
+      }
+    }
+    message?: string
+  }
+
+  const firstFieldError = err.response?.data?.errors
+    ? Object.values(err.response.data.errors).flat().find(Boolean)
+    : undefined
+
+  return firstFieldError || err.response?.data?.message || err.message || fallback
+}
+
+export default function MapelImportPage() {
   const { toast } = useToast()
   const [file, setFile] = useState<File | null>(null)
   const [previewRows, setPreviewRows] = useState<PreviewRow[]>([])
   const [isPreviewAvailable, setIsPreviewAvailable] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
-  const [importSummary, setImportSummary] = useState<DataKelasImportSummary | null>(null)
+  const [importSummary, setImportSummary] = useState<{
+    inserted: number
+    updated: number
+    failed: number
+    error_rows: ErrorRow[]
+  } | null>(null)
 
   const canProcess = useMemo(() => !!file && !isLoading, [file, isLoading])
 
   const handleDownloadTemplate = () => {
     const run = async () => {
       try {
-        const blob = await dataKelasService.downloadImportTemplate()
-        downloadBlob(blob, "template-import-kelas.csv")
+        const blob = await dataMataPelajaranService.downloadImportTemplate()
+        downloadBlob(blob, "template-import-mata-pelajaran.csv")
       } catch (error) {
-        const err = error as { response?: { data?: { message?: string } } }
         toast({
           title: "Gagal",
-          description: err.response?.data?.message || "Gagal mengunduh template impor kelas.",
+          description: getErrorMessage(error, "Gagal mengunduh template impor mata pelajaran."),
           variant: "destructive",
         })
       }
@@ -187,7 +217,7 @@ export default function KelasImportPage() {
       setIsPreviewAvailable(false)
       toast({
         title: "Gagal Membaca Berkas",
-        description: "Pratinjau file tidak bisa dibaca, tapi Anda masih bisa coba proses impor.",
+        description: "Pratinjau file tidak bisa dibaca, tapi Anda masih bisa lanjut proses impor.",
         variant: "destructive",
       })
     }
@@ -209,9 +239,15 @@ export default function KelasImportPage() {
 
       setIsLoading(true)
       try {
-        const result = await dataKelasService.importFile(file)
+        const result = await dataMataPelajaranService.importFile(file)
         const summary = result.data
-        setImportSummary(summary)
+
+        setImportSummary({
+          inserted: summary.inserted || 0,
+          updated: summary.updated || 0,
+          failed: summary.failed || 0,
+          error_rows: summary.error_rows || [],
+        })
 
         const hasFailures = (summary.failed ?? 0) > 0
 
@@ -221,10 +257,9 @@ export default function KelasImportPage() {
           variant: hasFailures ? "destructive" : "default",
         })
       } catch (error) {
-        const err = error as { response?: { data?: { message?: string } } }
         toast({
           title: "Gagal",
-          description: err.response?.data?.message || "Gagal memproses impor data kelas.",
+          description: getErrorMessage(error, "Gagal memproses impor data mata pelajaran."),
           variant: "destructive",
         })
       } finally {
@@ -238,8 +273,8 @@ export default function KelasImportPage() {
   return (
     <div className="space-y-6">
       <div className="space-y-3">
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">IMPOR DATA KELAS</h1>
-        <Link href="/dashboard/kelas">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">IMPOR DATA MATA PELAJARAN</h1>
+        <Link href="/dashboard/mapel">
           <Button className="h-11 w-14 p-0" variant="default">
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -249,7 +284,7 @@ export default function KelasImportPage() {
       <Card>
         <CardContent className="space-y-8 p-6">
           <div className="space-y-4">
-            <p className="text-2xl text-foreground">Silahkan unduh templat excel impor data kelas berikut:</p>
+            <p className="text-2xl text-foreground">Silahkan unduh templat impor data mata pelajaran berikut:</p>
             <Button className="h-11 gap-2 px-5" onClick={handleDownloadTemplate}>
               <Download className="h-5 w-5" />
               Unduh Templat
@@ -287,39 +322,45 @@ export default function KelasImportPage() {
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead>#</TableHead>
+                <TableHead>KODE MAPEL</TableHead>
+                <TableHead>NAMA MAPEL</TableHead>
                 <TableHead>KODE UNIT</TableHead>
-                <TableHead>KODE KELAS</TableHead>
-                <TableHead>NAMA KELAS</TableHead>
-                <TableHead>NAMA JURUSAN</TableHead>
-                <TableHead>TAHUN AJARAN</TableHead>
+                <TableHead>KELOMPOK MAPEL</TableHead>
+                <TableHead>URUTAN</TableHead>
+                <TableHead>KETERANGAN</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead>STATUS PPDB</TableHead>
+                <TableHead>AKSI IMPOR</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
               ) : (
                 previewRows.map((row, index) => (
-                  <TableRow key={`${row.kode_kelas}-${index}`}>
+                  <TableRow key={`${row.kode_mapel}-${index}`}>
                     <TableCell>{index + 1}</TableCell>
+                    <TableCell>{row.kode_mapel || "-"}</TableCell>
+                    <TableCell>{row.nama_mapel || "-"}</TableCell>
                     <TableCell>{row.kode_unit || "-"}</TableCell>
-                    <TableCell>{row.kode_kelas || "-"}</TableCell>
-                    <TableCell>{row.nama_kelas || "-"}</TableCell>
-                    <TableCell>{row.nama_jurusan || "-"}</TableCell>
-                    <TableCell>{row.tahun_ajaran || "-"}</TableCell>
+                    <TableCell>{row.kelompok_mapel || "-"}</TableCell>
+                    <TableCell>{row.urutan || "-"}</TableCell>
+                    <TableCell>{row.keterangan || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
-                    <TableCell>{row.status_ppdb || "-"}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="bg-primary/15 text-primary">
+                        Siap
+                      </Badge>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -337,19 +378,19 @@ export default function KelasImportPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="rounded-lg border bg-muted/20 p-4">
                 <p className="text-sm text-muted-foreground">Inserted</p>
-                <p className="text-2xl font-semibold">{importSummary.inserted ?? 0}</p>
+                <p className="text-2xl font-semibold">{importSummary.inserted}</p>
               </div>
               <div className="rounded-lg border bg-muted/20 p-4">
                 <p className="text-sm text-muted-foreground">Updated</p>
-                <p className="text-2xl font-semibold">{importSummary.updated ?? 0}</p>
+                <p className="text-2xl font-semibold">{importSummary.updated}</p>
               </div>
               <div className="rounded-lg border bg-muted/20 p-4">
                 <p className="text-sm text-muted-foreground">Failed</p>
-                <p className="text-2xl font-semibold text-destructive">{importSummary.failed ?? 0}</p>
+                <p className="text-2xl font-semibold text-destructive">{importSummary.failed}</p>
               </div>
             </div>
 
-            {(importSummary.error_rows?.length ?? 0) > 0 && (
+            {importSummary.error_rows.length > 0 && (
               <div className="space-y-3">
                 <p className="text-lg font-semibold text-foreground">Detail Error Baris</p>
                 <div className="overflow-hidden rounded-lg border">
@@ -361,7 +402,7 @@ export default function KelasImportPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {importSummary.error_rows?.map((row, index) => (
+                      {importSummary.error_rows.map((row, index) => (
                         <TableRow key={`${row.line}-${index}`}>
                           <TableCell className="font-medium">{row.line}</TableCell>
                           <TableCell>
