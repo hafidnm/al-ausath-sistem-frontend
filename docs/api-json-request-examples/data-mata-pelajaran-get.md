@@ -1,4 +1,4 @@
-# GET /api/administrasi/mata-pelajaran
+# GET /api/akademik/mata-pelajaran
 
 Auth: `sanctum`
 

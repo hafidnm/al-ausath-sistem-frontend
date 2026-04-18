@@ -1,4 +1,4 @@
-# POST /api/administrasi/mata-pelajaran
+# POST /api/akademik/mata-pelajaran
 
 Auth: `sanctum`
 

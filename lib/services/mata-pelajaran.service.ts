@@ -20,11 +20,11 @@ export interface GetMataPelajaranParams {
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "")
 const MAPEL_ENDPOINT = API_BASE_URL.endsWith("/api")
-  ? "/administrasi/mata-pelajaran"
-  : "/api/administrasi/mata-pelajaran"
-const MAPEL_FALLBACK_ENDPOINT = MAPEL_ENDPOINT === "/administrasi/mata-pelajaran"
-  ? "/api/administrasi/mata-pelajaran"
-  : "/administrasi/mata-pelajaran"
+  ? "/akademik/mata-pelajaran"
+  : "/api/akademik/mata-pelajaran"
+const MAPEL_FALLBACK_ENDPOINT = MAPEL_ENDPOINT === "/akademik/mata-pelajaran"
+  ? "/api/akademik/mata-pelajaran"
+  : "/akademik/mata-pelajaran"
 
 const toNumber = (value: unknown, fallback = 0): number => {
   const num = Number(value)

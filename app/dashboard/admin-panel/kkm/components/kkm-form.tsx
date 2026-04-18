@@ -128,7 +128,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
         setIsLoadingMapel(true)
         setMapelError("")
 
-        const response = await api.get("/administrasi/mata-pelajaran", {
+        const response = await api.get("/akademik/mata-pelajaran", {
           params: {
             per_page: 200,
           },

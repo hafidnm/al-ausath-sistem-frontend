@@ -1,4 +1,4 @@
-# GET /api/administrasi/mata-pelajaran/import-template
+# GET /api/akademik/mata-pelajaran/import-template
 
 Auth: `sanctum`
 
