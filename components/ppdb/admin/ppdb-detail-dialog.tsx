@@ -7,13 +7,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Loader2, FileDown, ExternalLink } from "lucide-react"
-import type { PpdbDetail } from "@/lib/services/ppdb.service"
-import type { TesKonfigurasiJenjangKey } from "@/lib/services/ppdb.service"
+import type { PpdbDetail } from "@/types/ppdb/admin"
+import type { TesKonfigurasiJenjangKey, UpdateTestResultRequest } from "@/types/ppdb/admin"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 interface TesConfigState {
   fiturSoalAktif: boolean
@@ -27,11 +35,8 @@ interface PpdbDetailDialogProps {
   isLoading: boolean
   selectedPendaftarJenjang: TesKonfigurasiJenjangKey | null
   tesConfig: TesConfigState | null
-  isTesConfigLoading: boolean
-  isTesConfigSaving: boolean
-  onTesToggle: (jenjang: TesKonfigurasiJenjangKey, checked: boolean) => void
-  onTesSoalChange: (jenjang: TesKonfigurasiJenjangKey, soal: string) => void
-  onTesConfigSave: (jenjang: TesKonfigurasiJenjangKey) => void
+  isTesResultSaving: boolean
+  onTesResultSave: (payload: UpdateTestResultRequest) => void | Promise<void>
 }
 
 const formatDateTime = (value: string) => {
@@ -124,12 +129,51 @@ export function PpdbDetailDialog({
   isLoading,
   selectedPendaftarJenjang,
   tesConfig,
-  isTesConfigLoading,
-  isTesConfigSaving,
-  onTesToggle,
-  onTesSoalChange,
-  onTesConfigSave,
+  isTesResultSaving,
+  onTesResultSave,
 }: PpdbDetailDialogProps) {
+  const [nilaiTesInput, setNilaiTesInput] = useState("")
+  const [statusTesInput, setStatusTesInput] = useState("")
+  const [catatanTesInput, setCatatanTesInput] = useState("")
+
+  useEffect(() => {
+    if (!pendaftar) {
+      setNilaiTesInput("")
+      setStatusTesInput("")
+      setCatatanTesInput("")
+      return
+    }
+
+    setNilaiTesInput(
+      pendaftar.nilaiTes !== undefined && pendaftar.nilaiTes !== null
+        ? String(pendaftar.nilaiTes)
+        : "",
+    )
+    setStatusTesInput(pendaftar.statusTes || "")
+    setCatatanTesInput(pendaftar.catatanTes || "")
+  }, [pendaftar])
+
+  const handleSaveKoreksiTes = () => {
+    const trimmedNilai = nilaiTesInput.trim()
+    const normalizedNilai =
+      trimmedNilai.length === 0 ? undefined : Number(trimmedNilai.replace(',', '.'))
+
+    if (normalizedNilai !== undefined && Number.isNaN(normalizedNilai)) {
+      alert("Nilai tes harus berupa angka yang valid")
+      return
+    }
+
+    onTesResultSave({
+      nilai: normalizedNilai,
+      statusTes: statusTesInput || undefined,
+      catatan: catatanTesInput.trim() || undefined,
+      metodeTes: 'manual',
+      soalTes: tesConfig?.soalTes || undefined,
+    })
+  }
+
+  const shouldShowTesCorrection = Boolean(tesConfig?.fiturSoalAktif)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
@@ -194,64 +238,89 @@ export function PpdbDetailDialog({
                 </div>
               </div>
 
-              {/* Konfigurasi Tes */}
-              <div className="sm:col-span-2 rounded-lg border border-border/70 p-4 space-y-3 bg-muted/20">
-                <div className="flex items-center justify-between gap-3">
+              {shouldShowTesCorrection ? (
+                <div className="sm:col-span-2 rounded-lg border border-border/70 p-4 space-y-4 bg-muted/20">
                   <div>
-                    <p className="text-sm font-medium text-foreground">Konfigurasi Tes</p>
+                    <p className="text-sm font-medium text-foreground">Koreksi Jawaban Tes</p>
                     <p className="text-xs text-muted-foreground">
-                      Aktifkan fitur soal tes berdasarkan jenjang peserta ({selectedPendaftarJenjang || "-"}).
+                      Jawaban santri jenjang {selectedPendaftarJenjang || "-"} ditampilkan karena Konfigurasi Soal sedang ON.
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={tesConfig?.fiturSoalAktif ?? false}
-                      onCheckedChange={(checked) => {
-                        if (!selectedPendaftarJenjang) return
-                        onTesToggle(selectedPendaftarJenjang, checked)
-                      }}
-                      disabled={!selectedPendaftarJenjang || isTesConfigLoading || isTesConfigSaving}
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Soal Tes</p>
+                    <Textarea value={tesConfig?.soalTes || "-"} readOnly className="min-h-[80px] bg-background" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Jawaban Santri</p>
+                    <Textarea
+                      value={pendaftar.soalJawab || "Belum ada jawaban dari santri."}
+                      readOnly
+                      className="min-h-[120px] bg-background"
                     />
-                    <span className="text-sm text-muted-foreground">
-                      {tesConfig?.fiturSoalAktif ? "On" : "Off"}
-                    </span>
+                  </div>
+
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Nilai Tes</p>
+                      <Input
+                        value={nilaiTesInput}
+                        onChange={(e) => setNilaiTesInput(e.target.value)}
+                        placeholder="Contoh: 80"
+                        inputMode="decimal"
+                        disabled={isTesResultSaving}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Status Tes</p>
+                      <Select
+                        value={statusTesInput || "pending"}
+                        onValueChange={(value) => setStatusTesInput(value === "pending" ? "" : value)}
+                        disabled={isTesResultSaving}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih status tes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Belum ditentukan</SelectItem>
+                          <SelectItem value="lulus">Lulus</SelectItem>
+                          <SelectItem value="tidak_lulus">Tidak Lulus</SelectItem>
+                          <SelectItem value="cadangan">Cadangan</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">Catatan Koreksi</p>
+                    <Textarea
+                      value={catatanTesInput}
+                      onChange={(e) => setCatatanTesInput(e.target.value)}
+                      placeholder="Tambahkan catatan koreksi untuk panitia"
+                      disabled={isTesResultSaving}
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSaveKoreksiTes}
+                      disabled={isTesResultSaving}
+                    >
+                      {isTesResultSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Menyimpan...
+                        </>
+                      ) : (
+                        "Simpan Koreksi Tes"
+                      )}
+                    </Button>
                   </div>
                 </div>
-
-                {tesConfig?.fiturSoalAktif ? (
-                  <Textarea
-                    value={tesConfig.soalTes}
-                    onChange={(e) => {
-                      if (!selectedPendaftarJenjang) return
-                      onTesSoalChange(selectedPendaftarJenjang, e.target.value)
-                    }}
-                    placeholder="Tulis pertanyaan tes di sini"
-                    disabled={!selectedPendaftarJenjang || isTesConfigLoading || isTesConfigSaving}
-                  />
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Saat off, pendaftar akan diarahkan ke halaman menunggu pengumuman.
-                  </p>
-                )}
-
-                <div className="flex justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => selectedPendaftarJenjang && onTesConfigSave(selectedPendaftarJenjang)}
-                    disabled={!selectedPendaftarJenjang || isTesConfigLoading || isTesConfigSaving}
-                  >
-                    {isTesConfigSaving ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Menyimpan...
-                      </>
-                    ) : (
-                      "Simpan Konfigurasi Tes"
-                    )}
-                  </Button>
-                </div>
-              </div>
+              ) : null}
             </div>
           </div>
         ) : (

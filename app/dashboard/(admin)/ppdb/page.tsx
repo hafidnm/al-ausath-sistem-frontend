@@ -18,10 +18,11 @@ import {
   usePpdbList,
   useCreatePpdb,
   useDeletePpdb,
+  useUpdatePpdbTestResult,
   useUpdatePpdbVerification,
-} from "@/hooks/ppdb/admin/use-ppdb"
-import { ppdbService } from "@/lib/services/ppdb.service"
-import type { PpdbDetail, TesKonfigurasiJenjangKey, TestQuestion } from "@/lib/services/ppdb.service"
+} from "@/hooks/ppdb/admin"
+import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
+import type { PpdbDetail, TesKonfigurasiJenjangKey, TestQuestion, UpdateTestResultRequest } from "@/types/ppdb/admin"
 
 import { PpdbStatsCards } from "@/components/ppdb/admin/ppdb-stats-cards"
 import { PpdbTesKonfigurasiCard } from "@/components/ppdb/admin/ppdb-tes-konfigurasi-card"
@@ -87,6 +88,7 @@ export default function PpdbPage() {
   const { data: ppdbData, loading, error, fetchList, updateStatusByIds } = usePpdbList()
   const { create: createPendaftar, loading: createLoading } = useCreatePpdb()
   const { deleteItem: deletePendaftar, loading: deleteLoading } = useDeletePpdb()
+  const { updateTestResult, loading: testResultLoading } = useUpdatePpdbTestResult()
   const { updateVerification, loading: verificationLoading } = useUpdatePpdbVerification()
 
   // Derived
@@ -108,7 +110,7 @@ export default function PpdbPage() {
   const loadTesKonfigurasi = useCallback(async () => {
     setIsTesConfigLoading(true)
     try {
-      const configs = await ppdbService.getTesKonfigurasiPerJenjang()
+      const configs = await ppdbAdminApi.getTesKonfigurasiPerJenjang()
       setTesConfigByJenjang((prev) => {
         const next = { ...prev }
         configs.forEach((cfg) => {
@@ -189,9 +191,37 @@ export default function PpdbPage() {
   ) => {
     const ids = getIdCandidates(p)
     if (!ids.length) throw new Error("ID pendaftar tidak ditemukan")
+
+    const shouldRetryWithNextId = (error: unknown) => {
+      if (!error || typeof error !== "object") return false
+
+      const errObj = error as {
+        response?: { status?: number; data?: { message?: string } }
+        message?: string
+      }
+
+      const status = errObj.response?.status
+      if (status === 404 || status === 405) return true
+
+      const message = (errObj.response?.data?.message || errObj.message || "").toLowerCase()
+      return (
+        message.includes("must be of type int")
+        || message.includes("no query results")
+        || message.includes("not found")
+      )
+    }
+
     let lastErr: unknown
     for (const id of ids) {
-      try { return await action(id) } catch (e) { lastErr = e }
+      try {
+        return await action(id)
+      } catch (e) {
+        lastErr = e
+
+        if (!shouldRetryWithNextId(e)) {
+          throw e
+        }
+      }
     }
     throw lastErr
   }
@@ -214,7 +244,7 @@ export default function PpdbPage() {
     setIsDetailOpen(true)
     setIsDetailLoading(true)
     try {
-      const res = await runActionWithIdFallback(p, (id) => ppdbService.getDetail(id))
+      const res = await runActionWithIdFallback(p, (id) => ppdbAdminApi.getDetail(id))
       if (res) {
         const detail = res as PpdbDetail
         setSelectedPendaftar(detail)
@@ -281,13 +311,14 @@ export default function PpdbPage() {
   const handleExport = async () => {
     setIsExportLoading(true)
     try {
-      const blob = await ppdbService.exportPendaftar({
+      const blob = await ppdbAdminApi.exportPendaftar({
         jenjang: selectedProgram === "all" ? undefined : selectedProgram,
+        status_verifikasi: "diterima",
       })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `ppdb-pendaftar-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `ppdb-diterima-${new Date().toISOString().slice(0, 10)}.csv`
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
@@ -297,19 +328,43 @@ export default function PpdbPage() {
 
   const handleUpdateTesConfig = async (jenjang: TesKonfigurasiJenjangKey) => {
     const draft = tesConfigByJenjang[jenjang]
+    const normalizedFormSchema = Array.isArray(draft.formSchema)
+      ? draft.formSchema.filter((question) => (question.question || '').trim().length > 0)
+      : []
+
     setIsTesConfigSaving(true)
     try {
-      const updated = await ppdbService.updateTesKonfigurasiPerJenjang(jenjang, {
+      const updated = await ppdbAdminApi.updateTesKonfigurasiPerJenjang(jenjang, {
         fiturSoalAktif: draft.fiturSoalAktif,
         soalTes: draft.soalTes.trim(),
+        formSchema: normalizedFormSchema,
       })
       updateTesConfigDraft(jenjang, {
         fiturSoalAktif: Boolean(updated.fiturSoalAktif),
         soalTes: updated.soalTes || "",
+        formSchema: updated.formSchema || normalizedFormSchema,
       })
       alert(`Konfigurasi tes jenjang ${jenjang} berhasil diperbarui`)
     } catch (err) { alert(getErrorMessage(err, "Gagal memperbarui konfigurasi tes")) }
     finally { setIsTesConfigSaving(false) }
+  }
+
+  const handleSaveTesResult = async (payload: UpdateTestResultRequest) => {
+    if (!selectedPendaftar) return
+
+    try {
+      await runActionWithIdFallback(selectedPendaftar, (id) => updateTestResult(id, payload))
+      const refreshed = await runActionWithIdFallback(selectedPendaftar, (id) => ppdbAdminApi.getDetail(id))
+
+      if (refreshed) {
+        setSelectedPendaftar(refreshed as PpdbDetail)
+      }
+
+      void fetchList()
+      alert("Koreksi tes berhasil disimpan")
+    } catch (err) {
+      alert(getErrorMessage(err, "Gagal menyimpan koreksi tes"))
+    }
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
@@ -338,7 +393,7 @@ export default function PpdbPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={isExportLoading}>
             {isExportLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            {isExportLoading ? "Exporting..." : "Export"}
+            {isExportLoading ? "Exporting..." : "Export Diterima"}
           </Button>
           <PpdbAddDialog
             open={isAddOpen}
@@ -402,11 +457,8 @@ export default function PpdbPage() {
         isLoading={isDetailLoading}
         selectedPendaftarJenjang={selectedPendaftarJenjang}
         tesConfig={selectedPendaftarTesConfig}
-        isTesConfigLoading={isTesConfigLoading}
-        isTesConfigSaving={isTesConfigSaving}
-        onTesToggle={(j, checked) => updateTesConfigDraft(j, { fiturSoalAktif: checked })}
-        onTesSoalChange={(j, soal) => updateTesConfigDraft(j, { soalTes: soal })}
-        onTesConfigSave={handleUpdateTesConfig}
+        isTesResultSaving={testResultLoading}
+        onTesResultSave={handleSaveTesResult}
       />
 
 

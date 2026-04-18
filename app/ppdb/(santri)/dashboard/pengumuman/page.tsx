@@ -7,7 +7,7 @@ import { ArrowLeft, Info, Loader2, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri/use-ppdb-portal';
+import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { formatAnnouncementDate } from '@/lib/ppdb/santri/dashboard';
 
 export default function PpdbPengumumanPage() {
@@ -34,10 +34,6 @@ export default function PpdbPengumumanPage() {
     if (data.step === 'tes' && !hasSubmittedTesAnswer) {
       router.replace('/ppdb/tes');
       return;
-    }
-
-    if (!data.formCompleted && data.step === 'lengkapi-form') {
-      router.replace('/ppdb/dashboard');
     }
   }, [data, router]);
 

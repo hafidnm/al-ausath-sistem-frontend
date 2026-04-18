@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { Loader2, Plus, Trash2, GripVertical } from "lucide-react"
-import type { TesKonfigurasiJenjangKey, TestQuestion, TestQuestionType } from "@/lib/services/ppdb.service"
+import type { TesKonfigurasiJenjangKey, TestQuestion, TestQuestionType } from "@/types/ppdb/admin"
 
 const tesJenjangOptions: Array<{ value: TesKonfigurasiJenjangKey; label: string }> = [
   { value: "MI", label: "MI" },

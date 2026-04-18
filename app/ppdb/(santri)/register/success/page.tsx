@@ -12,10 +12,6 @@ function RegisterSuccessContent() {
 
   const idPendaftar = useMemo(() => searchParams.get('id') || '', [searchParams]);
   const noPendaftaran = useMemo(() => searchParams.get('no') || '', [searchParams]);
-  const loginHint = useMemo(
-    () => searchParams.get('login') || noPendaftaran || idPendaftar,
-    [idPendaftar, noPendaftaran, searchParams],
-  );
 
   return (
     <div className="w-full max-w-xl space-y-4">
@@ -51,7 +47,7 @@ function RegisterSuccessContent() {
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3">
-            <Link href={`/ppdb/login?login=${encodeURIComponent(loginHint)}`} className="w-full">
+            <Link href="/ppdb/login" className="w-full">
               <Button className="w-full">
                 <LogIn className="w-4 h-4 mr-2" />
                 Login Akun PPDB
