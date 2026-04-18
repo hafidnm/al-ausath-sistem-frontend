@@ -1,4 +1,6 @@
 import api from "../axios"
+import { mataPelajaranService } from "./mata-pelajaran.service"
+import { santriService } from "./santri.service"
 
 export interface NilaiMapelTugasItem {
   nilai: number
@@ -136,6 +138,47 @@ const extractList = (payload: any): any[] => {
   return []
 }
 
+const sanitizeKey = (value: unknown): string => toText(value)?.trim().toLowerCase() ?? ""
+
+const santriNameCache = new Map<string, string>()
+const mapelNameCache = new Map<string, string>()
+
+const resolveSantriName = async (nomorInduk: string): Promise<string | undefined> => {
+  const key = sanitizeKey(nomorInduk)
+  if (!key) return undefined
+
+  const cached = santriNameCache.get(key)
+  if (cached) return cached
+
+  const results = await santriService.search(nomorInduk, 10)
+  const exact = results.find((item) => sanitizeKey(item.nomor_induk) === key)
+  const name = exact?.nama_lengkap ?? results[0]?.nama_lengkap
+
+  if (name) {
+    santriNameCache.set(key, name)
+  }
+
+  return name
+}
+
+const resolveMapelName = async (kodeMapel: string): Promise<string | undefined> => {
+  const key = sanitizeKey(kodeMapel)
+  if (!key) return undefined
+
+  const cached = mapelNameCache.get(key)
+  if (cached) return cached
+
+  const results = await mataPelajaranService.search(kodeMapel, 10)
+  const exact = results.find((item) => sanitizeKey(item.kode_mapel) === key)
+  const name = exact?.nama_mapel ?? results[0]?.nama_mapel
+
+  if (name) {
+    mapelNameCache.set(key, name)
+  }
+
+  return name
+}
+
 const normalizeTugasItem = (raw: any): NilaiMapelTugasItem => ({
   nilai: toNumber(raw?.nilai, 0),
   jenis: (toText(raw?.jenis) as NilaiMapelTugasItem["jenis"]) || "PR",
@@ -165,7 +208,7 @@ const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
     semester: toNumber(raw?.semester, 0),
     tugas: tugasRaw.map(normalizeTugasItem),
     ulangan: ulanganRaw.map(normalizeUlanganItem),
-    ujian_akhir: toNumber(raw?.ujian_akhir, 0),
+    ujian_akhir: toNumber(raw?.ujian_akhir ?? raw?.nilai_uas ?? raw?.nilai_ujian_akhir, 0),
     nilai_rapor_tampil: raw?.nilai_rapor_tampil != null ? toNumber(raw?.nilai_rapor_tampil, 0) : undefined,
     flag_warna_rapor: raporFlag.isRed,
     flag_warna_rapor_raw: raporFlag.raw,
@@ -177,16 +220,30 @@ const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
   }
 }
 
+const enrichNilaiMapelItem = async (item: NilaiMapelItem): Promise<NilaiMapelItem> => {
+  const [namaSantri, namaMapel] = await Promise.all([
+    item.nama_santri ? Promise.resolve(item.nama_santri) : resolveSantriName(item.nomor_induk),
+    item.mapel ? Promise.resolve(item.mapel) : resolveMapelName(item.kode_mapel),
+  ])
+
+  return {
+    ...item,
+    nama_santri: namaSantri ?? item.nama_santri,
+    mapel: namaMapel ?? item.mapel,
+  }
+}
+
 export const nilaiMapelService = {
   async getAll(params: GetNilaiMapelParams): Promise<NilaiMapelItem[]> {
     const response = await api.get("/akademik/nilai-mapel", { params })
-    return extractList(response.data).map(normalizeNilaiMapelItem)
+    const items = extractList(response.data).map(normalizeNilaiMapelItem)
+    return Promise.all(items.map(enrichNilaiMapelItem))
   },
 
   async getByKodeMapel(kodeMapel: string, params: ShowNilaiMapelParams): Promise<NilaiMapelItem> {
     const response = await api.get(`/akademik/nilai-mapel/${encodeURIComponent(kodeMapel)}`, { params })
     const raw = response.data?.data ?? response.data
-    return normalizeNilaiMapelItem(raw)
+    return enrichNilaiMapelItem(normalizeNilaiMapelItem(raw))
   },
 
   async upsert(payload: UpsertNilaiMapelPayload): Promise<NilaiMapelItem> {
@@ -196,7 +253,7 @@ export const nilaiMapelService = {
       ...(rawData && typeof rawData === "object" ? rawData : {}),
       perhitungan: response.data?.perhitungan ?? rawData?.perhitungan,
     }
-    return normalizeNilaiMapelItem(raw)
+    return enrichNilaiMapelItem(normalizeNilaiMapelItem(raw))
   },
 
   async remove(id: number): Promise<void> {
