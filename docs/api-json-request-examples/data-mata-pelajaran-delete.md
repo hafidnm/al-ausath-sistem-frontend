@@ -1,4 +1,4 @@
-# DELETE /api/administrasi/mata-pelajaran/{id}
+# DELETE /api/akademik/mata-pelajaran/{id}
 
 Auth: `sanctum`
 

@@ -1,4 +1,4 @@
-# PUT /api/administrasi/mata-pelajaran/{id}
+# PUT /api/akademik/mata-pelajaran/{id}
 
 Auth: `sanctum`
 
