@@ -92,13 +92,15 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
   const [openSantriPopover, setOpenSantriPopover] = useState(false)
   const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
-  const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka ?? 80)
+  const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka != null ? String(initialData.nilai_angka) : "")
   const [aspek, setAspek] = useState(initialData?.aspek ?? "AKHLAK")
   const [deskripsi, setDeskripsi] = useState(initialData?.deskripsi ?? "")
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
   const [isUserReady, setIsUserReady] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const parsedNilaiAngka = Number(nilaiAngka)
 
   const applySelectedSantri = (santri: SantriItem) => {
     setNomorInduk(santri.nomor_induk)
@@ -129,7 +131,7 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
     setSearchInput("")
     setTahunAjaran(initialData.tahun_ajaran ?? "")
     setSemester(String(initialData.semester ?? ""))
-    setNilaiAngka(initialData.nilai_angka ?? 80)
+    setNilaiAngka(initialData.nilai_angka != null ? String(initialData.nilai_angka) : "")
     setAspek(initialData.aspek ?? "AKHLAK")
     setDeskripsi(initialData.deskripsi ?? "")
   }, [initialData])
@@ -189,7 +191,7 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
       return
     }
 
-    if (nilaiAngka < 0 || nilaiAngka > 100) {
+    if (!Number.isFinite(parsedNilaiAngka) || parsedNilaiAngka < 0 || parsedNilaiAngka > 100) {
       setError("Nilai angka harus di antara 0 sampai 100")
       return
     }
@@ -212,7 +214,7 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
         nomor_induk: nomorInduk.trim(),
         tahun_ajaran: tahunAjaran,
         semester: Number(semester),
-        nilai_angka: nilaiAngka,
+        nilai_angka: parsedNilaiAngka,
         aspek: aspek || "AKHLAK",
         deskripsi: deskripsi.trim() || undefined,
         id_petugas_input: petugasInputId,
@@ -349,9 +351,10 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
                 type="number"
                 min={0}
                 max={100}
+                placeholder="0"
                 value={nilaiAngka}
                 onChange={(e) => {
-                  setNilaiAngka(Number(e.target.value))
+                  setNilaiAngka(e.target.value)
                   setError("")
                 }}
               />

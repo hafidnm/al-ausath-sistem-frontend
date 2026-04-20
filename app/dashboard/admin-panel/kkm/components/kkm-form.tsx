@@ -69,7 +69,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
   const [kodeMapel, setKodeMapel] = useState(initialData?.kode_mapel ?? "")
   const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
-  const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm ?? 75)
+  const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
   const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit?.toUpperCase() ?? "")
   const [keterangan, setKeterangan] = useState(initialData?.keterangan ?? "")
   const [mapelOptions, setMapelOptions] = useState<MapelOption[]>([])
@@ -109,7 +109,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
     setKodeMapel(initialData.kode_mapel)
     setTahunAjaran(initialData.tahun_ajaran)
     setSemester(String(initialData.semester))
-    setNilaiKkm(initialData.nilai_kkm)
+    setNilaiKkm(initialData.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
     setKodeUnit(initialData.kode_unit?.toUpperCase() ?? "")
     setKeterangan(initialData.keterangan ?? "")
   }, [initialData])
@@ -121,6 +121,8 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
       setKodeUnit(selectedMapel.kode_unit)
     }
   }, [selectedMapel])
+
+  const parsedNilaiKkm = useMemo(() => Number(nilaiKkm), [nilaiKkm])
 
   useEffect(() => {
     const fetchMapelOptions = async () => {
@@ -162,7 +164,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
       return
     }
 
-    if (!isValidKkm(nilaiKkm)) {
+    if (!isValidKkm(parsedNilaiKkm)) {
       setError("Nilai KKM harus di antara 0 sampai 100")
       return
     }
@@ -175,7 +177,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
         kode_mapel: normalizedKodeMapel,
         tahun_ajaran: tahunAjaran,
         semester: Number(semester),
-        nilai_kkm: nilaiKkm,
+        nilai_kkm: parsedNilaiKkm,
         kode_unit: normalizedUnit || undefined,
         keterangan,
       })
@@ -264,8 +266,9 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
                 type="number"
                 min={0}
                 max={100}
+                placeholder="0"
                 value={nilaiKkm}
-                onChange={(e) => { setNilaiKkm(Number(e.target.value)); setError("") }}
+                onChange={(e) => { setNilaiKkm(e.target.value); setError("") }}
               />
             </div>
 
