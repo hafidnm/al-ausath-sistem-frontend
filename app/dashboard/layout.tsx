@@ -55,6 +55,7 @@ const menuItems = [
   { icon: Building2, label: "Data Unit", href: "/dashboard/unit" },
   { icon: BookOpen, label: "Data Kelas Mapel", href: "/dashboard/kelas-mapel" },
   { icon: BookOpen, label: "Data Mata Pelajaran", href: "/dashboard/mapel" },
+  { icon: Calendar, label: "Data Jadwal Pembelajaran", href: "/dashboard/jadwal-pembelajaran" },
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
   { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
   { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },

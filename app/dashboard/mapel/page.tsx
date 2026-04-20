@@ -653,13 +653,13 @@ export default function MapelPage() {
           <Link href="/dashboard/mapel/import">
             <Button className="h-10 gap-2 px-4" variant="default">
               <Upload className="h-4 w-4" />
-              Impor CSV
+              Impor
             </Button>
           </Link>
 
           <Button className="h-10 gap-2 px-4" variant="default" onClick={handleExport}>
             <Download className="h-4 w-4" />
-            Ekspor CSV
+            Ekspor 
           </Button>
 
         </div>
