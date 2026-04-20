@@ -34,6 +34,9 @@ interface NilaiMapelFormProps {
   onCancel?: () => void
 }
 
+type TugasFormItem = Omit<NilaiMapelTugasItem, "nilai"> & { nilai: string }
+type UlanganFormItem = Omit<NilaiMapelUlanganItem, "nilai"> & { nilai: string }
+
 const extractPetugasInputId = (me: any): number | undefined => {
   const candidates = [
     me?.user?.id_petugas,
@@ -58,17 +61,23 @@ const extractPetugasInputId = (me: any): number | undefined => {
   return undefined
 }
 
-const defaultTugas: NilaiMapelTugasItem[] = [
-  { nilai: 0, jenis: "PR" },
-  { nilai: 0, jenis: "TUGAS_PENGGANTI" },
-  { nilai: 0, jenis: "MODUL_KOMPETENSI" },
+const defaultTugas: TugasFormItem[] = [
+  { nilai: "", jenis: "PR" },
+  { nilai: "", jenis: "TUGAS_PENGGANTI" },
+  { nilai: "", jenis: "MODUL_KOMPETENSI" },
 ]
 
-const defaultUlangan: NilaiMapelUlanganItem[] = [
-  { nilai: 0, soal_disusun_pengajar: true, diawasi_pengajar: true },
-  { nilai: 0, soal_disusun_pengajar: true, diawasi_pengajar: true },
-  { nilai: 0, soal_disusun_pengajar: true, diawasi_pengajar: true },
+const defaultUlangan: UlanganFormItem[] = [
+  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
+  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
+  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
 ]
+
+const normalizeNilaiInput = (value: string): number => {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return 0
+  return Math.max(0, Math.min(100, parsed))
+}
 
 const toErrorMessage = (error: any): string => {
   const message = error?.response?.data?.message
@@ -115,9 +124,9 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const [tahunAjaran, setTahunAjaran] = useState("")
   const [semester, setSemester] = useState("")
   const [keterangan, setKeterangan] = useState("")
-  const [ujianAkhir, setUjianAkhir] = useState(0)
-  const [tugas, setTugas] = useState<NilaiMapelTugasItem[]>(defaultTugas)
-  const [ulangan, setUlangan] = useState<NilaiMapelUlanganItem[]>(defaultUlangan)
+  const [ujianAkhir, setUjianAkhir] = useState("")
+  const [tugas, setTugas] = useState<TugasFormItem[]>(defaultTugas)
+  const [ulangan, setUlangan] = useState<UlanganFormItem[]>(defaultUlangan)
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
   const [nilaiKkm, setNilaiKkm] = useState<number | undefined>(undefined)
   const [isLoadingKkm, setIsLoadingKkm] = useState(false)
@@ -319,7 +328,16 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   }, [kodeMapel, tahunAjaran, semester])
 
   const preview = useMemo(() => {
-    const raw = calculateRaporRaw(tugas, ulangan, ujianAkhir)
+    const tugasForCalc: NilaiMapelTugasItem[] = tugas.map((item) => ({
+      ...item,
+      nilai: normalizeNilaiInput(item.nilai),
+    }))
+    const ulanganForCalc: NilaiMapelUlanganItem[] = ulangan.map((item) => ({
+      ...item,
+      nilai: normalizeNilaiInput(item.nilai),
+    }))
+
+    const raw = calculateRaporRaw(tugasForCalc, ulanganForCalc, normalizeNilaiInput(ujianAkhir))
     const normalized = normalizeRaporDisplay(raw)
     const status = statusKkm(normalized.nilai, nilaiKkm ?? 75)
 
@@ -331,11 +349,11 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
     }
   }, [nilaiKkm, tugas, ulangan, ujianAkhir])
 
-  const updateTugas = (index: number, patch: Partial<NilaiMapelTugasItem>) => {
+  const updateTugas = (index: number, patch: Partial<TugasFormItem>) => {
     setTugas((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
   }
 
-  const updateUlangan = (index: number, patch: Partial<NilaiMapelUlanganItem>) => {
+  const updateUlangan = (index: number, patch: Partial<UlanganFormItem>) => {
     setUlangan((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
   }
 
@@ -381,6 +399,15 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       setIsSubmitting(true)
       setError("")
 
+      const tugasPayload: NilaiMapelTugasItem[] = tugas.map((item) => ({
+        ...item,
+        nilai: normalizeNilaiInput(item.nilai),
+      }))
+      const ulanganPayload: NilaiMapelUlanganItem[] = ulangan.map((item) => ({
+        ...item,
+        nilai: normalizeNilaiInput(item.nilai),
+      }))
+
       await onSubmit?.({
         nomor_induk: selectedNomorInduk.trim(),
         kode_mapel: kodeMapel.trim(),
@@ -389,9 +416,9 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
         semester: Number(semester),
         id_petugas_input: petugasInputId,
         keterangan: keterangan.trim() || undefined,
-        tugas,
-        ulangan,
-        ujian_akhir: ujianAkhir,
+        tugas: tugasPayload,
+        ulangan: ulanganPayload,
+        ujian_akhir: normalizeNilaiInput(ujianAkhir),
       })
     } catch (err) {
       setError(toErrorMessage(err))
@@ -632,7 +659,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             </div>
             <div className="space-y-2">
               <Label>Ujian Akhir</Label>
-              <Input type="number" min={0} max={100} value={ujianAkhir} onChange={(e) => setUjianAkhir(Number(e.target.value))} />
+              <Input type="number" min={0} max={100} placeholder="0" value={ujianAkhir} onChange={(e) => setUjianAkhir(e.target.value)} />
             </div>
           </div>
 
@@ -644,7 +671,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                 size="sm"
                 variant="outline"
                 className="bg-transparent"
-                onClick={() => setTugas((prev) => [...prev, { nilai: 0, jenis: "PR" }])}
+                onClick={() => setTugas((prev) => [...prev, { nilai: "", jenis: "PR" }])}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Tambah Tugas
@@ -663,7 +690,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                       ))}
                     </SelectContent>
                   </Select>
-                  <Input type="number" min={0} max={100} value={item.nilai} onChange={(e) => updateTugas(index, { nilai: Number(e.target.value) })} />
+                  <Input type="number" min={0} max={100} placeholder="0" value={item.nilai} onChange={(e) => updateTugas(index, { nilai: e.target.value })} />
                   <div className="flex justify-end">
                     <Button
                       type="button"
@@ -688,7 +715,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                 size="sm"
                 variant="outline"
                 className="bg-transparent"
-                onClick={() => setUlangan((prev) => [...prev, { nilai: 0, soal_disusun_pengajar: true, diawasi_pengajar: true }])}
+                onClick={() => setUlangan((prev) => [...prev, { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true }])}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Tambah Ulangan
@@ -697,7 +724,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             <div className="space-y-2">
               {ulangan.map((item, index) => (
                 <div key={`ulangan-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border border-border/50">
-                  <Input type="number" min={0} max={100} value={item.nilai} onChange={(e) => updateUlangan(index, { nilai: Number(e.target.value) })} />
+                  <Input type="number" min={0} max={100} placeholder="0" value={item.nilai} onChange={(e) => updateUlangan(index, { nilai: e.target.value })} />
                   <Label className="flex items-center gap-2 text-sm">
                     <Checkbox checked={item.soal_disusun_pengajar} onCheckedChange={(checked) => updateUlangan(index, { soal_disusun_pengajar: Boolean(checked) })} />
                     Soal disusun pengajar
