@@ -35,6 +35,7 @@ import {
   DataKelasMapelApiItem,
 } from "@/lib/services/kelas-mapel.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
+import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
@@ -84,6 +85,12 @@ interface UnitOption {
 interface PetugasOption {
   value: string
   label: string
+}
+
+interface MapelOption {
+  value: string
+  label: string
+  kodeUnit: string
 }
 
 const defaultFormState: KelasMapelFormData = {
@@ -173,6 +180,7 @@ export default function MapelPage() {
   const [editingFormData, setEditingFormData] = useState<KelasMapelFormData>(defaultFormState)
 
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
+  const [mapelOptions, setMapelOptions] = useState<MapelOption[]>([])
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
@@ -194,19 +202,6 @@ export default function MapelPage() {
 
   const rowsLimit = Number(rowsPerPage)
 
-  const mapelOptions = useMemo(() => {
-    const seen = new Set<string>()
-    const options: Array<{ value: string; label: string }> = []
-
-    for (const row of rows) {
-      if (!row.kodeMapel || seen.has(row.kodeMapel)) continue
-      seen.add(row.kodeMapel)
-      options.push({ value: row.kodeMapel, label: row.namaMapel || row.kodeMapel })
-    }
-
-    return options
-  }, [rows])
-
   const kelasByUnit = useMemo(() => {
     if (unitFilter === "all") return kelasOptions
     return kelasOptions.filter((option) => option.kodeUnit === unitFilter)
@@ -217,10 +212,20 @@ export default function MapelPage() {
     return kelasOptions.filter((option) => option.kodeUnit === formUnitFilter)
   }, [kelasOptions, formUnitFilter])
 
+  const formMapelByUnit = useMemo(() => {
+    if (formUnitFilter === "all") return mapelOptions
+    return mapelOptions.filter((option) => option.kodeUnit === formUnitFilter)
+  }, [mapelOptions, formUnitFilter])
+
   const editKelasByUnit = useMemo(() => {
     if (editUnitFilter === "all") return kelasOptions
     return kelasOptions.filter((option) => option.kodeUnit === editUnitFilter)
   }, [kelasOptions, editUnitFilter])
+
+  const editMapelByUnit = useMemo(() => {
+    if (editUnitFilter === "all") return mapelOptions
+    return mapelOptions.filter((option) => option.kodeUnit === editUnitFilter)
+  }, [mapelOptions, editUnitFilter])
 
   const kelasUnitMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -294,8 +299,9 @@ export default function MapelPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [kelasResult, tahunResult, petugasResult] = await Promise.all([
+        const [kelasResult, mapelResult, tahunResult, petugasResult] = await Promise.all([
           dataKelasService.getAll({ page: 1, per_page: 500 }),
+          dataMataPelajaranService.getAll({ page: 1, per_page: 500 }),
           tahunAjaranService.getAll({ page: 1, per_page: 200 }),
           dataPetugasService.getAll({ page: 1, per_page: 200 }),
         ])
@@ -325,6 +331,17 @@ export default function MapelPage() {
           years.push({ value: kode, label: toText(item.nama_tahun).trim() || kode })
         }
 
+        const mapel: MapelOption[] = []
+        for (const item of mapelResult.data) {
+          const kode = toText(item.kode_mapel).trim().toUpperCase()
+          if (!kode) continue
+          mapel.push({
+            value: kode,
+            label: toText(item.nama_mapel).trim() || kode,
+            kodeUnit: toText(item.kode_unit).trim().toUpperCase(),
+          })
+        }
+
         const petugas: PetugasOption[] = []
         for (const item of petugasResult.data) {
           const idPetugas = toNumber(item.id_petugas ?? item.id, 0)
@@ -336,11 +353,13 @@ export default function MapelPage() {
         }
 
         setKelasOptions(kelas)
+        setMapelOptions(mapel)
         setUnitOptions(units)
         setTahunOptions(years)
         setPetugasOptions(petugas)
       } catch {
         setKelasOptions([])
+        setMapelOptions([])
         setUnitOptions([])
         setTahunOptions([])
         setPetugasOptions([])
@@ -368,11 +387,25 @@ export default function MapelPage() {
   }, [formData.kodeKelas, formKelasByUnit])
 
   useEffect(() => {
+    if (!formData.kodeMapel) return
+    if (!formMapelByUnit.some((option) => option.value === formData.kodeMapel)) {
+      setFormData((prev) => ({ ...prev, kodeMapel: "" }))
+    }
+  }, [formData.kodeMapel, formMapelByUnit])
+
+  useEffect(() => {
     if (!editingFormData.kodeKelas) return
     if (!editKelasByUnit.some((option) => option.value === editingFormData.kodeKelas)) {
       setEditingFormData((prev) => ({ ...prev, kodeKelas: "" }))
     }
   }, [editingFormData.kodeKelas, editKelasByUnit])
+
+  useEffect(() => {
+    if (!editingFormData.kodeMapel) return
+    if (!editMapelByUnit.some((option) => option.value === editingFormData.kodeMapel)) {
+      setEditingFormData((prev) => ({ ...prev, kodeMapel: "" }))
+    }
+  }, [editingFormData.kodeMapel, editMapelByUnit])
 
   const resetFilter = () => {
     setKeyword("")
@@ -680,13 +713,19 @@ export default function MapelPage() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="create-kode-mapel">Kode Mapel</Label>
-                    <Input
-                      id="create-kode-mapel"
-                      value={formData.kodeMapel}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, kodeMapel: event.target.value }))}
-                      placeholder="Contoh: MATH-01"
-                    />
+                    <Label>Kode Mapel</Label>
+                    <Select value={formData.kodeMapel} onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeMapel: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih kode mapel" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {formMapelByUnit.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.value} - {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -787,13 +826,13 @@ export default function MapelPage() {
           <Link href="/dashboard/kelas-mapel/import">
             <Button className="h-10 gap-2 px-4" variant="default">
               <Upload className="h-4 w-4" />
-              Impor CSV
+              Impor
             </Button>
           </Link>
 
           <Button className="h-10 gap-2 px-4" variant="default" onClick={handleExport}>
             <Download className="h-4 w-4" />
-            Ekspor CSV
+            Ekspor
           </Button>
 
         </div>
@@ -1184,12 +1223,22 @@ export default function MapelPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-kode-mapel">Kode Mapel</Label>
-                <Input
-                  id="edit-kode-mapel"
+                <Label>Kode Mapel</Label>
+                <Select
                   value={editingFormData.kodeMapel}
-                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, kodeMapel: event.target.value }))}
-                />
+                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, kodeMapel: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kode mapel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {editMapelByUnit.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.value} - {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
