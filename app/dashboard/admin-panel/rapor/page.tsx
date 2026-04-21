@@ -299,6 +299,12 @@ export default function AdminPanelRaporPage() {
       setSuccess("")
 
       const generated = await raporService.generate(selectedParams)
+      await raporService.generateRanking({
+        kode_kelas: generated.kode_kelas,
+        tahun_ajaran: generated.tahun_ajaran,
+        semester: generated.semester,
+      })
+
       const [reportDetail, catatan] = await Promise.all([
         raporService.getShow({
           nomor_induk: generated.nomor_induk,
@@ -315,7 +321,7 @@ export default function AdminPanelRaporPage() {
       setSelected(generated)
       setDetail(reportDetail)
       hydrateCatatanForm(reportDetail, catatan)
-      setSuccess("Rapor berhasil di-generate")
+      setSuccess("Rapor dan ranking kelas berhasil di-generate")
       await fetchReports()
     } catch (err: any) {
       setError(err?.response?.data?.message || "Gagal generate rapor")
