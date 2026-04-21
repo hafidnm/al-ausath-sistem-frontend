@@ -60,6 +60,12 @@ export interface GetRaporCatatanParams {
 
 export interface GenerateRaporPayload extends GetRaporCatatanParams {}
 
+export interface GenerateRaporRankingPayload {
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+}
+
 export interface UpsertCatatanWaliPayload extends GetRaporCatatanParams {
   kode_kelas: string
   catatan_wali: string
@@ -221,6 +227,10 @@ export const raporService = {
   async generate(payload: GenerateRaporPayload): Promise<RaporItem> {
     const response = await api.post("/akademik/raport/generate", payload)
     return normalizeRaporItem(response.data?.data ?? response.data)
+  },
+
+  async generateRanking(payload: GenerateRaporRankingPayload): Promise<void> {
+    await api.post("/akademik/raport/rank", payload)
   },
 
   async upsertCatatanWali(payload: UpsertCatatanWaliPayload): Promise<RaporDetail> {
