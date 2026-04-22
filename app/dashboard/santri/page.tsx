@@ -105,6 +105,12 @@ interface SantriFormData {
   alamat_email: string
 }
 
+interface SantriAccountFormData {
+  nama_akun: string
+  password: string
+  status: "AKTIF" | "NONAKTIF"
+}
+
 const defaultForm: SantriFormData = {
   nomor_induk: "",
   nama_lengkap_santri: "",
@@ -114,6 +120,12 @@ const defaultForm: SantriFormData = {
   nama_wali: "",
   nomor_telepon: "",
   alamat_email: "",
+}
+
+const defaultAccountForm: SantriAccountFormData = {
+  nama_akun: "",
+  password: "",
+  status: "AKTIF",
 }
 
 const toText = (value: unknown): string => {
@@ -242,6 +254,9 @@ export default function SantriPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState<SantriFormData>(defaultForm)
   const [editingFormData, setEditingFormData] = useState<SantriFormData>(defaultForm)
+  const [isCreateAccountEnabled, setIsCreateAccountEnabled] = useState(false)
+  const [accountFormData, setAccountFormData] = useState<SantriAccountFormData>(defaultAccountForm)
+  const [isSavingAddForm, setIsSavingAddForm] = useState(false)
 
   const rowsLimit = Number(rowsPerPage)
 
@@ -422,6 +437,8 @@ export default function SantriPage() {
 
   const resetAddForm = () => {
     setFormData(defaultForm)
+    setIsCreateAccountEnabled(false)
+    setAccountFormData(defaultAccountForm)
   }
 
   const handleCreate = async () => {
@@ -434,21 +451,65 @@ export default function SantriPage() {
       return
     }
 
-    try {
-      await dataSantriService.create(toPayload(formData))
+    if (isCreateAccountEnabled && accountFormData.password.trim().length < 6) {
       toast({
-        title: "Berhasil",
-        description: "Data santri berhasil ditambahkan.",
+        title: "Password Tidak Valid",
+        description: "Password akun minimal 6 karakter.",
+        variant: "destructive",
       })
+      return
+    }
+
+    setIsSavingAddForm(true)
+    try {
+      const createdSantri = await dataSantriService.create(toPayload(formData))
+      let accountCreationError: string | null = null
+
+      if (isCreateAccountEnabled) {
+        const createdId = Number(createdSantri.id_santri ?? createdSantri.id)
+
+        if (!Number.isFinite(createdId) || createdId <= 0) {
+          accountCreationError = "ID santri baru tidak ditemukan untuk membuat akun."
+        } else {
+          try {
+            await dataSantriService.createAccount(createdId, {
+              nama_akun: accountFormData.nama_akun.trim() || undefined,
+              password: accountFormData.password,
+              status: accountFormData.status,
+            })
+          } catch (accountError) {
+            accountCreationError = getErrorMessage(accountError, "Akun santri gagal dibuat.")
+          }
+        }
+      }
+
       setIsAddDialogOpen(false)
       resetAddForm()
       void fetchRows()
+
+      if (accountCreationError) {
+        toast({
+          title: "Data Santri Tersimpan",
+          description: `${accountCreationError} Data santri sudah berhasil disimpan.`,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Berhasil",
+        description: isCreateAccountEnabled
+          ? "Data santri dan akun berhasil ditambahkan."
+          : "Data santri berhasil ditambahkan.",
+      })
     } catch (error) {
       toast({
         title: "Gagal Menyimpan",
         description: getErrorMessage(error, "Data santri gagal ditambahkan."),
         variant: "destructive",
       })
+    } finally {
+      setIsSavingAddForm(false)
     }
   }
 
@@ -604,6 +665,12 @@ export default function SantriPage() {
   const formFields = (
     data: SantriFormData,
     setData: Dispatch<SetStateAction<SantriFormData>>,
+    accountSection?: {
+      enabled: boolean
+      onToggle: (value: boolean) => void
+      accountData: SantriAccountFormData
+      setAccountData: Dispatch<SetStateAction<SantriAccountFormData>>
+    },
   ) => (
     <div className="grid gap-4 py-4">
       <div className="grid grid-cols-2 gap-4">
@@ -635,6 +702,77 @@ export default function SantriPage() {
           </Select>
         </div>
       </div>
+
+      {accountSection ? (
+        <div className="rounded-lg border border-dashed border-border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">Akun Santri</p>
+              <p className="text-xs text-muted-foreground">Buat akun langsung setelah data santri tersimpan.</p>
+            </div>
+            <Button
+              type="button"
+              variant={accountSection.enabled ? "default" : "outline"}
+              size="sm"
+              onClick={() => accountSection.onToggle(!accountSection.enabled)}
+            >
+              {accountSection.enabled ? "Akun Aktif" : "Sekalian Buat Akun"}
+            </Button>
+          </div>
+
+          {accountSection.enabled ? (
+            <div className="mt-4 grid gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="nama_akun">Username / Nama Akun</Label>
+                <Input
+                  id="nama_akun"
+                  placeholder="Kosongkan untuk memakai nomor induk"
+                  value={accountSection.accountData.nama_akun}
+                  onChange={(event) =>
+                    accountSection.setAccountData((prev) => ({ ...prev, nama_akun: event.target.value }))
+                  }
+                />
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="password">Kata Sandi</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="Minimal 6 karakter"
+                    value={accountSection.accountData.password}
+                    onChange={(event) =>
+                      accountSection.setAccountData((prev) => ({ ...prev, password: event.target.value }))
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status_akun">Status Akun</Label>
+                  <Select
+                    value={accountSection.accountData.status}
+                    onValueChange={(value) =>
+                      accountSection.setAccountData((prev) => ({
+                        ...prev,
+                        status: value === "NONAKTIF" ? "NONAKTIF" : "AKTIF",
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="status_akun">
+                      <SelectValue placeholder="Pilih status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AKTIF">Aktif</SelectItem>
+                      <SelectItem value="NONAKTIF">Nonaktif</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="nama_lengkap_santri">Nama Lengkap</Label>
@@ -737,13 +875,18 @@ export default function SantriPage() {
                 <DialogTitle>Tambah Santri Baru</DialogTitle>
                 <DialogDescription>Isi data santri baru dengan lengkap</DialogDescription>
               </DialogHeader>
-              {formFields(formData, setFormData)}
+              {formFields(formData, setFormData, {
+                enabled: isCreateAccountEnabled,
+                onToggle: setIsCreateAccountEnabled,
+                accountData: accountFormData,
+                setAccountData: setAccountFormData,
+              })}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
                   Batal
                 </Button>
-                <Button className="bg-primary text-primary-foreground" onClick={handleCreate}>
-                  Simpan
+                <Button className="bg-primary text-primary-foreground" onClick={handleCreate} disabled={isSavingAddForm}>
+                  {isSavingAddForm ? "Menyimpan..." : "Simpan"}
                 </Button>
               </DialogFooter>
             </DialogContent>
