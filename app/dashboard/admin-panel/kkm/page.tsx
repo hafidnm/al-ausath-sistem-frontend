@@ -23,15 +23,47 @@ export default function KkmPage() {
       setIsLoading(true)
       setError("")
 
-      const data = await kkmService.getAll({
-        q: query || undefined,
+      const queryTrimmed = query.trim()
+      const sharedParams = {
         tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
         semester: semester === "all" ? undefined : semester,
         kode_unit: kodeUnit === "all" ? undefined : kodeUnit,
         per_page: perPage,
+      }
+
+      if (!queryTrimmed) {
+        const data = await kkmService.getAll(sharedParams)
+        setItems(data)
+        return
+      }
+
+      const normalizedQuery = queryTrimmed.toLowerCase()
+
+      // 1) Coba backend yang mendukung q (search umum)
+      let data = await kkmService.getAll({
+        ...sharedParams,
+        q: queryTrimmed,
       })
 
-      setItems(data)
+      // 2) Fallback backend yang hanya mendukung kode_mapel
+      if (data.length === 0) {
+        data = await kkmService.getAll({
+          ...sharedParams,
+          kode_mapel: queryTrimmed,
+        })
+      }
+
+      // 3) Fallback terakhir: ambil dataset filter lain lalu cari di frontend
+      if (data.length === 0) {
+        data = await kkmService.getAll(sharedParams)
+      }
+
+      const filtered = data.filter((item) => (
+        item.kode_mapel.toLowerCase().includes(normalizedQuery)
+        || (item.mapel ?? "").toLowerCase().includes(normalizedQuery)
+      ))
+
+      setItems(filtered)
     } catch (err: any) {
       setError(err?.response?.data?.message || "Gagal memuat data KKM")
     } finally {

@@ -10,7 +10,9 @@ import {
   ArrowUpDown,
   HeartHandshake,
   BookMarked,
+  FileText,
   ArrowRight,
+  Trophy,
 } from "lucide-react"
 
 interface ModuleCard {
@@ -64,6 +66,20 @@ export function AdminPanelHome() {
       icon: <BookMarked className="w-6 h-6" />,
       href: "/dashboard/admin-panel/nilai-mapel",
       color: "bg-sky-500/15 text-sky-600",
+    },
+    {
+      title: "Rapor Operasional",
+      description: "Generate rapor, preview PDF, dan kelola catatan wali dalam satu halaman",
+      icon: <FileText className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/rapor",
+      color: "bg-violet-500/15 text-violet-600",
+    },
+    {
+      title: "Rangking",
+      description: "Lihat peringkat santri berdasarkan nilai sebagai preview frontend dummy",
+      icon: <Trophy className="w-6 h-6" />,
+      href: "/dashboard/admin-panel/rangking",
+      color: "bg-amber-500/15 text-amber-600",
     },
   ]
 

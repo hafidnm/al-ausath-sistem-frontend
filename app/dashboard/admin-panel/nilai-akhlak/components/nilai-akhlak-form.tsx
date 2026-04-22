@@ -14,7 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Check } from "lucide-react"
+import { santriService, type SantriItem } from "@/lib/services/santri.service"
+import { authService } from "@/lib/services/auth.service"
 import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 
 interface NilaiAkhlakFormPayload {
@@ -24,6 +26,7 @@ interface NilaiAkhlakFormPayload {
   nilai_angka: number
   aspek?: string
   deskripsi?: string
+  id_petugas_input?: number
 }
 
 interface NilaiAkhlakFormProps {
@@ -54,26 +57,131 @@ const toErrorMessage = (error: any): string => {
   return "Gagal menyimpan nilai akhlak"
 }
 
+const extractPetugasInputId = (me: any): number | undefined => {
+  const candidates = [
+    me?.user?.id_petugas,
+    me?.user?.petugas_id,
+    me?.user?.idDataPetugas,
+    me?.user?.data_petugas?.id,
+    me?.id_petugas,
+    me?.petugas_id,
+    me?.idDataPetugas,
+    me?.data_petugas?.id,
+    me?.user?.id,
+    me?.id,
+  ]
+
+  for (const candidate of candidates) {
+    const id = Number(candidate)
+    if (Number.isFinite(id) && id > 0) {
+      return id
+    }
+  }
+
+  return undefined
+}
+
 export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlakFormProps) {
   const [nomorInduk, setNomorInduk] = useState(initialData?.nomor_induk ?? "")
+  const [selectedNama, setSelectedNama] = useState("")
+  const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
+  const [searchInput, setSearchInput] = useState("")
+  const [santriResults, setSantriResults] = useState<SantriItem[]>([])
+  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
+  const [santriSearchError, setSantriSearchError] = useState("")
+  const [openSantriPopover, setOpenSantriPopover] = useState(false)
   const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
-  const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka ?? 80)
+  const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka != null ? String(initialData.nilai_angka) : "")
   const [aspek, setAspek] = useState(initialData?.aspek ?? "AKHLAK")
   const [deskripsi, setDeskripsi] = useState(initialData?.deskripsi ?? "")
+  const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
+  const [isUserReady, setIsUserReady] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const parsedNilaiAngka = Number(nilaiAngka)
+
+  const applySelectedSantri = (santri: SantriItem) => {
+    setNomorInduk(santri.nomor_induk)
+    setSelectedNama(santri.nama_lengkap ?? "")
+    setSelectedSantriId(santri.id)
+    setSearchInput("")
+    setOpenSantriPopover(false)
+    setError("")
+  }
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const me = await authService.me()
+      const id = extractPetugasInputId(me)
+      setPetugasInputId(id)
+      setIsUserReady(true)
+    }
+
+    loadUser()
+  }, [])
 
   useEffect(() => {
     if (!initialData) return
 
     setNomorInduk(initialData.nomor_induk ?? "")
+    setSelectedNama("")
+    setSelectedSantriId(null)
+    setSearchInput("")
     setTahunAjaran(initialData.tahun_ajaran ?? "")
     setSemester(String(initialData.semester ?? ""))
-    setNilaiAngka(initialData.nilai_angka ?? 80)
+    setNilaiAngka(initialData.nilai_angka != null ? String(initialData.nilai_angka) : "")
     setAspek(initialData.aspek ?? "AKHLAK")
     setDeskripsi(initialData.deskripsi ?? "")
   }, [initialData])
+
+  useEffect(() => {
+    if (!searchInput.trim()) {
+      setSantriResults([])
+      setSantriSearchError("")
+      return
+    }
+
+    let cancelled = false
+
+    const searchSantri = async () => {
+      try {
+        setIsLoadingSantri(true)
+        setSantriSearchError("")
+        const results = await santriService.search(searchInput.trim())
+
+        if (!cancelled) {
+          setSantriResults(results)
+        }
+      } catch {
+        if (!cancelled) {
+          setSantriResults([])
+          setSantriSearchError("Gagal mengambil data santri dari server")
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingSantri(false)
+        }
+      }
+    }
+
+    const timer = setTimeout(searchSantri, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [searchInput])
+
+  useEffect(() => {
+    const query = searchInput.trim().toLowerCase()
+    if (!query || selectedSantriId) return
+
+    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
+    if (exact) {
+      applySelectedSantri(exact)
+    }
+  }, [santriResults, searchInput, selectedSantriId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,8 +191,18 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
       return
     }
 
-    if (nilaiAngka < 0 || nilaiAngka > 100) {
+    if (!Number.isFinite(parsedNilaiAngka) || parsedNilaiAngka < 0 || parsedNilaiAngka > 100) {
       setError("Nilai angka harus di antara 0 sampai 100")
+      return
+    }
+
+    if (!isUserReady) {
+      setError("Data user belum siap, tunggu sebentar lalu coba simpan lagi")
+      return
+    }
+
+    if (!petugasInputId) {
+      setError("ID petugas input tidak ditemukan dari akun login. Silakan refresh halaman atau cek data akun petugas")
       return
     }
 
@@ -96,9 +214,10 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
         nomor_induk: nomorInduk.trim(),
         tahun_ajaran: tahunAjaran,
         semester: Number(semester),
-        nilai_angka: nilaiAngka,
+        nilai_angka: parsedNilaiAngka,
         aspek: aspek || "AKHLAK",
         deskripsi: deskripsi.trim() || undefined,
+        id_petugas_input: petugasInputId,
       })
     } catch (err) {
       setError(toErrorMessage(err))
@@ -125,14 +244,77 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Nomor Induk</Label>
-              <Input
-                value={nomorInduk}
-                onChange={(e) => {
-                  setNomorInduk(e.target.value)
-                  setError("")
-                }}
-                placeholder="Contoh: 2024001"
-              />
+              <div className="relative">
+                <Input
+                  value={nomorInduk && !searchInput ? `${nomorInduk}${selectedNama ? " - " + selectedNama : ""}` : searchInput}
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return
+                    e.preventDefault()
+
+                    const query = searchInput.trim().toLowerCase()
+                    if (!query || santriResults.length === 0) return
+
+                    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
+                    applySelectedSantri(exact ?? santriResults[0])
+                  }}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    setSearchInput(value)
+                    setNomorInduk("")
+                    setSelectedNama("")
+                    setSelectedSantriId(null)
+                    setOpenSantriPopover(true)
+                    setError("")
+                  }}
+                  onFocus={() => setOpenSantriPopover(true)}
+                  onBlur={() => {
+                    setTimeout(() => setOpenSantriPopover(false), 120)
+                  }}
+                  placeholder="Cari berdasarkan nomor induk atau nama..."
+                />
+
+                {openSantriPopover && (searchInput.trim() || isLoadingSantri || santriResults.length > 0) && (
+                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
+                    {isLoadingSantri && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari santri...</div>
+                    )}
+
+                    {!isLoadingSantri && santriSearchError && (
+                      <div className="px-2 py-4 text-center text-sm text-destructive">{santriSearchError}</div>
+                    )}
+
+                    {!isLoadingSantri && !santriSearchError && santriResults.length === 0 && searchInput.trim() && (
+                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada santri ditemukan</div>
+                    )}
+
+                    {!isLoadingSantri && santriResults.length > 0 && (
+                      <div className="max-h-60 overflow-auto">
+                        {santriResults.map((santri) => (
+                          <button
+                            key={santri.id}
+                            type="button"
+                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => applySelectedSantri(santri)}
+                          >
+                            <Check
+                              className={`mt-0.5 h-4 w-4 ${
+                                nomorInduk === santri.nomor_induk ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{santri.nomor_induk} - {santri.nama_lengkap}</div>
+                              {(santri.kode_kelas ?? santri.kelas) && (
+                                <div className="text-xs text-muted-foreground">{santri.kode_kelas ?? santri.kelas}</div>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -169,9 +351,10 @@ export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlak
                 type="number"
                 min={0}
                 max={100}
+                placeholder="0"
                 value={nilaiAngka}
                 onChange={(e) => {
-                  setNilaiAngka(Number(e.target.value))
+                  setNilaiAngka(e.target.value)
                   setError("")
                 }}
               />

@@ -17,6 +17,7 @@ export default function NilaiAkhlakNewPage() {
     nilai_angka: number
     aspek?: string
     deskripsi?: string
+    id_petugas_input?: number
   }) => {
     await nilaiAkhlakService.upsert(data)
     router.push("/dashboard/admin-panel/nilai-akhlak")
