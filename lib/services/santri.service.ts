@@ -1,4 +1,4 @@
-import api, { getCsrfToken } from "../axios"
+﻿import api, { getCsrfToken } from "../axios"
 
 export type BackendSantriStatus = "AKTIF" | "CUTI" | "LULUS" | "KELUAR"
 
@@ -69,6 +69,7 @@ export interface SantriItem {
   nama_lengkap?: string
   kelas?: string
   kode_kelas?: string
+  kode_unit?: string
   jenjang?: string
   updatedAt?: string
 }
@@ -449,6 +450,7 @@ const normalizeSantriItem = (raw: any): SantriItem => ({
   nama_lengkap: toText(raw?.nama_lengkap_santri ?? raw?.nama_lengkap ?? raw?.nama),
   kelas: toText(raw?.kelas?.kode_kelas ?? raw?.kelas ?? raw?.kode_kelas),
   kode_kelas: toText(raw?.kode_kelas ?? raw?.kelas?.kode_kelas ?? raw?.kelas),
+  kode_unit: toText(raw?.kode_unit ?? raw?.kelas?.kode_unit ?? raw?.unit?.kode_unit),
   jenjang: toText(raw?.jenjang),
   updatedAt: toText(raw?.updated_at ?? raw?.updatedAt),
 })

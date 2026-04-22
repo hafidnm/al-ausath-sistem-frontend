@@ -109,6 +109,44 @@ const extractList = (payload: any): any[] => {
   return []
 }
 
+const normalizeRaporStatus = (raw: any): string => {
+  const statusCandidate = toText(
+    raw?.status
+    ?? raw?.status_raport
+    ?? raw?.status_rapor
+    ?? raw?.status_publish
+    ?? raw?.publish_status,
+  )
+
+  if (statusCandidate) {
+    const normalized = statusCandidate.trim().toUpperCase()
+    if (["TERBIT", "PUBLISHED", "PUBLISH", "PUBLISHING", "AKTIF", "ACTIVE"].includes(normalized)) {
+      return "TERBIT"
+    }
+
+    if (["DRAFT", "DRAF", "UNPUBLISHED", "NONAKTIF", "INACTIVE"].includes(normalized)) {
+      return "DRAFT"
+    }
+  }
+
+  const publishedFlag = raw?.is_published ?? raw?.published ?? raw?.is_terbit
+  if (publishedFlag != null) {
+    const truthy =
+      publishedFlag === true
+      || publishedFlag === 1
+      || String(publishedFlag).trim().toLowerCase() === "true"
+      || String(publishedFlag).trim() === "1"
+
+    return truthy ? "TERBIT" : "DRAFT"
+  }
+
+  if (raw?.tanggal_terbit || raw?.published_at || raw?.terbit_at) {
+    return "TERBIT"
+  }
+
+  return "DRAFT"
+}
+
 const normalizeRaporItem = (raw: any): RaporItem => ({
   id: toNumber(raw?.id ?? raw?.id_rapor ?? raw?.rapor_id, -1),
   nomor_induk: toText(raw?.nomor_induk ?? raw?.santri?.nomor_induk ?? raw?.data_santri?.nomor_induk ?? raw?.nis) ?? "",
@@ -132,7 +170,7 @@ const normalizeRaporItem = (raw: any): RaporItem => ({
   kode_kelas: toText(raw?.kode_kelas ?? raw?.kelas?.kode_kelas) ?? "",
   tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
   semester: toNumber(raw?.semester, 0),
-  status: toText(raw?.status) ?? "DRAFT",
+  status: normalizeRaporStatus(raw),
   nilai_rata:
     raw?.nilai_rata != null
       ? toNumber(raw?.nilai_rata, 0)
