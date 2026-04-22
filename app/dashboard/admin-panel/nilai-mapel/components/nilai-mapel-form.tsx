@@ -101,10 +101,14 @@ const toErrorMessage = (error: any): string => {
   return "Gagal menyimpan nilai mapel"
 }
 
+const normalizeUnitCode = (value?: string | null): string => (value ?? "").trim().toUpperCase()
+
 export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: NilaiMapelFormProps) {
   const [selectedNomorInduk, setSelectedNomorInduk] = useState(initialNomorInduk)
   const [selectedNama, setSelectedNama] = useState("")
   const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
+  const [selectedSantriKodeUnit, setSelectedSantriKodeUnit] = useState("")
+  const [isHydratingSantriUnit, setIsHydratingSantriUnit] = useState(false)
   const [searchInput, setSearchInput] = useState("")
   const [santriResults, setSantriResults] = useState<SantriItem[]>([])
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
@@ -137,9 +141,19 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const normalizeCode = (value: string): string => value.trim().toUpperCase()
 
   const applySelectedSantri = (santri: SantriItem) => {
+    const normalizedSantriId = Number.isFinite(santri.id) && santri.id > 0 ? santri.id : null
+
     setSelectedNomorInduk(santri.nomor_induk)
     setSelectedNama(santri.nama_lengkap ?? "")
-    setSelectedSantriId(santri.id)
+    setSelectedSantriId(normalizedSantriId)
+    setSelectedSantriKodeUnit(normalizeUnitCode(santri.kode_unit))
+
+    // Reset mapel when santri changes to avoid cross-unit selection.
+    setKodeMapel("")
+    setSelectedNamaMapel("")
+    setSelectedMapelId(null)
+    setMapelSearchInput("")
+    setMapelResults([])
 
     const kodeKelasSantri = santri.kode_kelas ?? santri.kelas
 
@@ -234,9 +248,74 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   }, [mapelResults, mapelSearchInput, selectedMapelId])
 
   useEffect(() => {
+    if (!selectedNomorInduk.trim() || selectedSantriKodeUnit) return
+
+    let cancelled = false
+
+    const hydrateSelectedSantriUnit = async () => {
+      try {
+        setIsHydratingSantriUnit(true)
+
+        const nomorInduk = selectedNomorInduk.trim()
+        const rows = await santriService.getAll({
+          q: nomorInduk,
+          per_page: "10",
+        })
+
+        const matched = rows.find((row) => row.nomor_induk.trim() === nomorInduk)
+        const kodeUnitFromList = normalizeUnitCode(matched?.kode_unit)
+
+        if (!cancelled && kodeUnitFromList) {
+          setSelectedSantriKodeUnit(kodeUnitFromList)
+          return
+        }
+
+        if (selectedSantriId && selectedSantriId > 0) {
+          const detail = await santriService.getById(selectedSantriId)
+          const kodeUnit = normalizeUnitCode(detail.kode_unit)
+
+          if (!cancelled && kodeUnit) {
+            setSelectedSantriKodeUnit(kodeUnit)
+          }
+        }
+      } catch {
+        // Keep graceful fallback to existing validation message.
+      } finally {
+        if (!cancelled) {
+          setIsHydratingSantriUnit(false)
+        }
+      }
+    }
+
+    hydrateSelectedSantriUnit()
+
+    return () => {
+      cancelled = true
+    }
+  }, [selectedNomorInduk, selectedSantriId, selectedSantriKodeUnit])
+
+  useEffect(() => {
     if (!mapelSearchInput.trim()) {
       setMapelResults([])
       setMapelSearchError("")
+      return
+    }
+
+    if (!selectedNomorInduk.trim()) {
+      setMapelResults([])
+      setMapelSearchError("Pilih santri terlebih dahulu agar mapel terfilter sesuai unit")
+      return
+    }
+
+    if (isHydratingSantriUnit) {
+      setMapelResults([])
+      setMapelSearchError("Memuat unit santri...")
+      return
+    }
+
+    if (!selectedSantriKodeUnit) {
+      setMapelResults([])
+      setMapelSearchError("Unit santri belum ditemukan, silakan pilih ulang data santri")
       return
     }
 
@@ -246,9 +325,19 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       try {
         setIsLoadingMapel(true)
         setMapelSearchError("")
-        const results = await mataPelajaranService.search(mapelSearchInput.trim())
+        const results = await mataPelajaranService.search(mapelSearchInput.trim(), 20, {
+          kode_unit: selectedSantriKodeUnit,
+        })
         if (!cancelled) {
-          setMapelResults(results)
+          const filtered = results.filter((item) => {
+            const mapelKodeUnit = (item.kode_unit ?? "").trim().toUpperCase()
+            return mapelKodeUnit === selectedSantriKodeUnit
+          })
+          setMapelResults(filtered)
+
+          if (filtered.length === 0) {
+            setMapelSearchError("Tidak ada mapel aktif untuk unit santri yang dipilih")
+          }
         }
       } catch {
         if (!cancelled) {
@@ -267,7 +356,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       cancelled = true
       clearTimeout(timer)
     }
-  }, [mapelSearchInput])
+  }, [isHydratingSantriUnit, mapelSearchInput, selectedNomorInduk, selectedSantriKodeUnit])
 
   useEffect(() => {
     const kodeMapelTrimmed = kodeMapel.trim()
@@ -465,7 +554,14 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
                     setSelectedNomorInduk("")
                     setSelectedNama("")
                     setSelectedSantriId(null)
+                      setSelectedSantriKodeUnit("")
                     setIsKodeKelasManual(true)
+                      setKodeMapel("")
+                      setSelectedNamaMapel("")
+                      setSelectedMapelId(null)
+                      setMapelSearchInput("")
+                      setMapelResults([])
+                      setMapelSearchError("")
                     setOpenSantriPopover(true)
                   }}
                   onFocus={() => setOpenSantriPopover(true)}

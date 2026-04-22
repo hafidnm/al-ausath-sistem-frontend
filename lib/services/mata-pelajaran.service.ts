@@ -274,13 +274,20 @@ export const mataPelajaranService = {
     }
   },
 
-  async search(query: string, limit: number = 20): Promise<MataPelajaranItem[]> {
+  async search(
+    query: string,
+    limit: number = 20,
+    options?: {
+      kode_unit?: string
+    },
+  ): Promise<MataPelajaranItem[]> {
     try {
       const response = await api.get(MAPEL_ENDPOINT, {
         params: {
           q: query,
           per_page: String(limit),
           status: "AKTIF",
+          kode_unit: options?.kode_unit || undefined,
         },
       })
       return extractMapelList(response.data).map(normalizeMapelItem)
@@ -295,6 +302,7 @@ export const mataPelajaranService = {
           q: query,
           per_page: String(limit),
           status: "AKTIF",
+          kode_unit: options?.kode_unit || undefined,
         },
       })
       return extractMapelList(response.data).map(normalizeMapelItem)
