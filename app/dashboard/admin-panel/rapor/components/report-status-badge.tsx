@@ -8,8 +8,9 @@ interface ReportStatusBadgeProps {
 
 export function ReportStatusBadge({ status }: ReportStatusBadgeProps) {
   const normalized = (status || "DRAFT").toUpperCase()
+  const isTerbit = ["TERBIT", "PUBLISHED", "PUBLISH", "AKTIF", "ACTIVE", "1", "TRUE"].includes(normalized)
 
-  if (normalized === "TERBIT") {
+  if (isTerbit) {
     return <Badge className="bg-primary/10 text-primary border-0">TERBIT</Badge>
   }
 

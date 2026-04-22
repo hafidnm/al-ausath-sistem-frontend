@@ -34,6 +34,7 @@ interface RaporGenerateCardProps {
   onSantriOptionPick: (option: SantriOption) => void
   isGenerating: boolean
   isReportReady: boolean
+  isPublishedReport: boolean
   onGenerate: () => void
   onPreviewPdf: () => void
   onDownloadPdf: () => void
@@ -48,6 +49,7 @@ export function RaporGenerateCard({
   onSantriOptionPick,
   isGenerating,
   isReportReady,
+  isPublishedReport,
   onGenerate,
   onPreviewPdf,
   onDownloadPdf,
@@ -120,9 +122,9 @@ export function RaporGenerateCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onGenerate} disabled={isGenerating}>
+          <Button onClick={onGenerate} disabled={isGenerating || isPublishedReport}>
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            Generate Rapor
+            {isPublishedReport ? "Rapor Sudah Terbit" : "Generate Rapor"}
           </Button>
           <Button variant="outline" className="bg-transparent" onClick={onPreviewPdf} disabled={!isReportReady}>
             <Eye className="mr-2 h-4 w-4" />
@@ -136,6 +138,7 @@ export function RaporGenerateCard({
 
         <p className="text-sm text-muted-foreground">
           Catatan wali baru bisa diisi setelah rapor berhasil di-generate.
+          {isPublishedReport ? " Rapor berstatus TERBIT tidak bisa di-generate ulang." : ""}
         </p>
       </CardContent>
     </Card>

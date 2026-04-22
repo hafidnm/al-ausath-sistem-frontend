@@ -58,6 +58,11 @@ const getRaporIdentity = (item: RaporItem) => {
   ].join("|")
 }
 
+const isTerbitStatus = (status?: string) => {
+  const normalized = (status || "").trim().toUpperCase()
+  return ["TERBIT", "PUBLISHED", "PUBLISH", "AKTIF", "ACTIVE", "1", "TRUE"].includes(normalized)
+}
+
 export default function AdminPanelRaporPage() {
   const router = useRouter()
   const [query, setQuery] = useState("")
@@ -96,6 +101,7 @@ export default function AdminPanelRaporPage() {
   }, [catatanForm.kode_kelas, catatanForm.nomor_induk, catatanForm.semester, catatanForm.tahun_ajaran, selected])
 
   const isReportReady = Boolean(detail || selected)
+  const isPublishedReport = isTerbitStatus(selected?.status) || isTerbitStatus(detail?.status)
 
   const hydrateCatatanForm = useCallback((source: RaporDetail, catatan: Awaited<ReturnType<typeof raporService.getCatatanWali>>) => {
     setCatatanForm((current) => ({
@@ -293,10 +299,26 @@ export default function AdminPanelRaporPage() {
       return
     }
 
+    if (isPublishedReport) {
+      setError("Rapor sudah berstatus TERBIT dan tidak dapat di-generate ulang")
+      return
+    }
+
     try {
       setIsGenerating(true)
       setError("")
       setSuccess("")
+
+      // Guard tambahan saat input manual: jika data yang sama ternyata sudah TERBIT, batalkan generate.
+      try {
+        const existing = await raporService.getShow(selectedParams)
+        if (isTerbitStatus(existing.status)) {
+          setError("Rapor sudah berstatus TERBIT dan tidak dapat di-generate ulang")
+          return
+        }
+      } catch {
+        // Abaikan jika data belum ada atau endpoint show gagal, generate tetap dilanjutkan.
+      }
 
       const generated = await raporService.generate(selectedParams)
       await raporService.generateRanking({
@@ -333,6 +355,11 @@ export default function AdminPanelRaporPage() {
   const handleSaveCatatan = async () => {
     if (!isReportReady) {
       setError("Generate rapor dulu sebelum mengisi catatan wali")
+      return
+    }
+
+    if (isPublishedReport) {
+      setError("Rapor sudah berstatus TERBIT, catatan wali tidak dapat diubah")
       return
     }
 
@@ -476,6 +503,7 @@ export default function AdminPanelRaporPage() {
             }}
             isGenerating={isGenerating}
             isReportReady={isReportReady}
+            isPublishedReport={isPublishedReport}
             onGenerate={handleGenerate}
             onPreviewPdf={openPdfPreview}
             onDownloadPdf={downloadPdf}
@@ -486,6 +514,7 @@ export default function AdminPanelRaporPage() {
             selected={selected}
             catatanForm={catatanForm}
             isReportReady={isReportReady}
+            isPublishedReport={isPublishedReport}
             isSaving={isSaving}
             isSelecting={isSelecting}
             onCatatanFormChange={setCatatanForm}
