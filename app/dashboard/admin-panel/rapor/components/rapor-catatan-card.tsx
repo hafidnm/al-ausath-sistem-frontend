@@ -28,6 +28,7 @@ interface RaporCatatanCardProps {
   selected: RaporItem | null
   catatanForm: CatatanFormState
   isReportReady: boolean
+  isPublishedReport: boolean
   isSaving: boolean
   isSelecting: boolean
   onCatatanFormChange: (updater: (current: CatatanFormState) => CatatanFormState) => void
@@ -40,6 +41,7 @@ export function RaporCatatanCard({
   selected,
   catatanForm,
   isReportReady,
+  isPublishedReport,
   isSaving,
   isSelecting,
   onCatatanFormChange,
@@ -74,7 +76,7 @@ export function RaporCatatanCard({
               className="mt-2 min-h-30"
               value={catatanForm.catatan_wali}
               onChange={(event) => onCatatanFormChange((current) => ({ ...current, catatan_wali: event.target.value }))}
-              disabled={!isReportReady}
+              disabled={!isReportReady || isPublishedReport}
               placeholder={isReportReady ? "Tulis catatan pengembangan diri, akhlak, akademis, dan pesan wali kelas" : "Generate rapor dulu untuk mengisi catatan wali"}
             />
           </div>
@@ -82,22 +84,22 @@ export function RaporCatatanCard({
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <Label>Kebersihan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kebersihan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_kebersihan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
             <div>
               <Label>Kerapian</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kerapian} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_kerapian} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
             <div>
               <Label>Keterampilan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_keterampilan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_keterampilan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>ID wali kelas</Label>
-              <Input className="mt-2" value={catatanForm.id_wali_kelas} onChange={(event) => onCatatanFormChange((current) => ({ ...current, id_wali_kelas: event.target.value }))} disabled={!isReportReady} placeholder="Opsional" />
+              <Input className="mt-2" value={catatanForm.id_wali_kelas} onChange={(event) => onCatatanFormChange((current) => ({ ...current, id_wali_kelas: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="Opsional" />
             </div>
             <div>
               <Label>Semester aktif</Label>
@@ -107,7 +109,7 @@ export function RaporCatatanCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onSaveCatatan} disabled={!isReportReady || isSaving}>
+          <Button onClick={onSaveCatatan} disabled={!isReportReady || isSaving || isPublishedReport}>
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Simpan Catatan
           </Button>
@@ -120,6 +122,12 @@ export function RaporCatatanCard({
         {!isReportReady && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700">
             Generate rapor dulu sebelum catatan wali bisa diinput.
+          </div>
+        )}
+
+        {isReportReady && isPublishedReport && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm text-primary">
+            Rapor sudah TERBIT. Catatan wali dan nilai keseharian dikunci dan tidak dapat diubah.
           </div>
         )}
 
