@@ -186,7 +186,7 @@ export default function PpdbDashboardPage() {
     hasHydratedFromServerRef.current = true;
     setAutoSaveStatus('idle');
 
-    // Auto-redirect ke halaman tes / pengumuman sesuai flow
+    // Auto-redirect ke halaman tes sesuai flow
     const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
     const shouldGoTes = data.step === 'tes' && !hasSubmittedTesAnswer;
 
@@ -195,19 +195,33 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    // Redirect ke pengumuman HANYA jika sudah benar-benar selesai:
+    // - step menunggu-pengumuman/pengumuman, ATAU
+    // - formCompleted DAN semua dokumen wajib sudah ada
+    const allDocsUploaded = Boolean(
+      data.berkasAktaUrl &&
+      data.berkasKkUrl &&
+      data.berkasRekomendasiUstadzUrl &&
+      data.berkasSuratPernyataanUrl
+    );
+
     const shouldGoPengumuman = Boolean(
       !shouldGoTes
       && (
         data.step === 'menunggu-pengumuman'
-        || data.step === 'pengumuman'
-        || data.formCompleted
-        || data.pendaftaranSelesai
-        || hasSubmittedTesAnswer
+        || (data.step === 'pengumuman' && data.statusVerifikasi !== 'diterima' && data.statusVerifikasi !== 'lulus' && data.statusVerifikasi !== 'accepted')
+        || (data.formCompleted && allDocsUploaded && data.step === 'menunggu-pengumuman')
       ),
     );
 
     if (shouldGoPengumuman) {
       router.replace('/ppdb/dashboard/pengumuman');
+      return;
+    }
+
+    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/pembayaran');
+      return;
     }
   }, [data, router]);
 
@@ -306,14 +320,21 @@ export default function PpdbDashboardPage() {
         return;
       }
 
+      // Cek semua dokumen wajib sudah terupload
+      const allDocsUploaded = Boolean(
+        refreshedDashboard?.berkasAktaUrl &&
+        refreshedDashboard?.berkasKkUrl &&
+        refreshedDashboard?.berkasRekomendasiUstadzUrl &&
+        refreshedDashboard?.berkasSuratPernyataanUrl
+      );
+
       const shouldGoPengumuman = Boolean(
         !shouldGoTes
         && (
           refreshedDashboard?.step === 'menunggu-pengumuman'
           || refreshedDashboard?.step === 'pengumuman'
           || refreshedDashboard?.pendaftaranSelesai
-          || refreshedDashboard?.formCompleted
-          || !isPpdbFormIncomplete(form)
+          || (refreshedDashboard?.formCompleted && allDocsUploaded)
         ),
       );
 
@@ -366,11 +387,12 @@ export default function PpdbDashboardPage() {
     !shouldShowTesSection
       && (
         data?.step === 'menunggu-pengumuman'
-        || data?.step === 'pengumuman'
+        || (data?.step === 'pengumuman' && data?.statusVerifikasi !== 'diterima' && data?.statusVerifikasi !== 'lulus' && data?.statusVerifikasi !== 'accepted')
         || data?.formCompleted
-        || data?.pendaftaranSelesai
         || hasSubmittedTesAnswer
-      ),
+      )
+      && data?.step !== 'pembayaran-ppdb'
+      && data?.step !== 'siap-menjadi-santri'
   );
 
   return (

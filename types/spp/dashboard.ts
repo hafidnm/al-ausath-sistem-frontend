@@ -1,27 +1,29 @@
-import { SppStatus } from '@/lib/services/spp.service';
+import type { SppStatus } from '@/lib/services/spp.service';
 
+/**
+ * Form state untuk dialog Tambah/Edit Pembayaran.
+ * Field disesuaikan dengan POST /api/administrasi/spp/pembayaran
+ */
 export type PaymentFormState = {
-  noTagihan: string;
-  nis: string;
-  nama: string;
-  kelas: string;
-  bulan: string;
-  jatuhTempo: string;
-  nominal: string;
-  terbayar: string;
-  status: SppStatus;
+  idSantri: string;      // id_santri (FK ke data_santri)
+  idSetting: string;     // id_setting (FK ke spp_setting)
+  nominalBayar: string;  // nominal_bayar
+  tanggalBayar: string;  // tanggal_bayar (datetime)
+  metodeBayar: string;   // metode_bayar: 'cash' | 'transfer' | dll
 };
 
+/**
+ * Form state untuk dialog Tambah/Edit Setting SPP.
+ * Field disesuaikan dengan POST /api/administrasi/spp/setting
+ */
 export type SettingFormState = {
-  nama: string;
-  jenjang: string;
-  kelas: string;
-  tahunAjaran: string;
-  nominal: string;
-  jatuhTempoHari: string;
-  aktif: 'true' | 'false';
-  keterangan: string;
+  kodeKelas: string;     // kode_kelas
+  idGolonganSpp: string; // id_golongan_spp
+  nominal: string;       // nominal (dalam IDR)
 };
+
+export const metodeBayarOptions = ['transfer', 'cash', 'qris', 'lainnya'] as const;
+export type MetodeBayar = (typeof metodeBayarOptions)[number];
 
 export const paymentStatusOptions: SppStatus[] = [
   'Menunggu Verifikasi',
@@ -30,27 +32,20 @@ export const paymentStatusOptions: SppStatus[] = [
   'Cicilan',
   'Belum Bayar',
   'Terlambat',
+  'Tagihan Dibuat',
+  'Ditolak',
 ];
 
 export const emptyPaymentForm: PaymentFormState = {
-  noTagihan: '',
-  nis: '',
-  nama: '',
-  kelas: '',
-  bulan: '',
-  jatuhTempo: '',
-  nominal: '',
-  terbayar: '0',
-  status: 'Belum Bayar',
+  idSantri: '',
+  idSetting: '',
+  nominalBayar: '',
+  tanggalBayar: '',
+  metodeBayar: 'transfer',
 };
 
 export const emptySettingForm: SettingFormState = {
-  nama: '',
-  jenjang: '',
-  kelas: '',
-  tahunAjaran: '',
+  kodeKelas: '',
+  idGolonganSpp: '',
   nominal: '',
-  jatuhTempoHari: '',
-  aktif: 'true',
-  keterangan: '',
 };

@@ -5,1339 +5,349 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
-Table,
-TableBody,
-TableCell,
-TableHead,
-TableHeader,
-TableRow,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 import {
-Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select"
 import {
-DropdownMenu,
-DropdownMenuContent,
-DropdownMenuItem,
-DropdownMenuLabel,
-DropdownMenuSeparator,
-DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-Dialog,
-DialogContent,
-DialogDescription,
-DialogFooter,
-DialogHeader,
-DialogTitle,
-DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { SppStatusBadge } from "@/components/spp/spp-status-badge"
-import {
-Search,
-Plus,
-Filter,
-Download,
-RefreshCw,
-MoreHorizontal,
-Eye,
-Edit,
-Trash2,
-Wallet,
-CheckCircle2,
-Clock3,
-AlertTriangle,
-Receipt,
-Settings,
-Loader2,
-BadgeCheck,
+  RefreshCw,
+  Search,
+  Receipt,
+  CheckCircle2,
+  AlertTriangle,
+  Clock3,
+  Loader2,
+  Filter,
 } from "lucide-react"
-import {
-useCreateSppPayment,
-useCreateSppSetting,
-useDeleteSppPayment,
-useDeleteSppSetting,
-useSppPaymentDetail,
-useSppPayments,
-useSppSettingDetail,
-useSppSettings,
-useSppTunggakanSummary,
-useUpdateSppPayment,
-useUpdateSppSetting,
-useVerifySppPayment,
-} from "@/hooks/use-spp"
-import {
-SppPayment,
-SppSetting,
-} from "@/lib/services/spp.service"
-import {
-	formatCurrency,
-	formatDate,
-	getErrorMessage,
-	mapPaymentToForm,
-	mapSettingToForm,
-	mergeSummary,
-	parseNumberInput,
-	summarizeFromPayments,
-} from "@/lib/spp/dashboard"
-import {
-	emptyPaymentForm,
-	emptySettingForm,
-	paymentStatusOptions,
-	PaymentFormState,
-	SettingFormState,
-} from "@/types/spp/dashboard"
+import { useTagihan, useRingkasanPembayaran } from "@/hooks/use-pembayaran"
+import type { TagihanRow, StatusPembayaran } from "@/hooks/use-pembayaran"
 
-export default function SppPage() {
-const [searchQuery, setSearchQuery] = useState("")
-const [selectedKelas, setSelectedKelas] = useState("all")
-const [selectedStatus, setSelectedStatus] = useState("all")
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
-const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
-const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-const [isAddSettingDialogOpen, setIsAddSettingDialogOpen] = useState(false)
-const [isEditSettingDialogOpen, setIsEditSettingDialogOpen] = useState(false)
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value)
 
-const [selectedPayment, setSelectedPayment] = useState<SppPayment | null>(null)
-const [selectedSetting, setSelectedSetting] = useState<SppSetting | null>(null)
-
-const [newPaymentForm, setNewPaymentForm] = useState<PaymentFormState>(emptyPaymentForm)
-const [editPaymentForm, setEditPaymentForm] = useState<PaymentFormState>(emptyPaymentForm)
-const [newSettingForm, setNewSettingForm] = useState<SettingFormState>(emptySettingForm)
-const [editSettingForm, setEditSettingForm] = useState<SettingFormState>(emptySettingForm)
-
-const {
-data: paymentData,
-loading: paymentLoading,
-error: paymentError,
-fetchPayments,
-} = useSppPayments()
-
-const {
-data: tunggakanSummary,
-loading: summaryLoading,
-error: summaryError,
-fetchSummary,
-} = useSppTunggakanSummary()
-
-const {
-data: paymentDetail,
-loading: paymentDetailLoading,
-fetchPaymentDetail,
-} = useSppPaymentDetail()
-
-const {
-data: settingData,
-loading: settingLoading,
-error: settingError,
-fetchSettings,
-} = useSppSettings()
-
-const {
-data: settingDetail,
-loading: settingDetailLoading,
-fetchSettingDetail,
-} = useSppSettingDetail()
-
-const { createPayment, loading: createPaymentLoading } = useCreateSppPayment()
-const { updatePayment, loading: updatePaymentLoading } = useUpdateSppPayment()
-const { verifyPayment, loading: verifyPaymentLoading } = useVerifySppPayment()
-const { deletePayment, loading: deletePaymentLoading } = useDeleteSppPayment()
-
-const { createSetting, loading: createSettingLoading } = useCreateSppSetting()
-const { updateSetting, loading: updateSettingLoading } = useUpdateSppSetting()
-const { deleteSetting, loading: deleteSettingLoading } = useDeleteSppSetting()
-
-useEffect(() => {
-void fetchPayments()
-void fetchSummary()
-void fetchSettings()
-}, [fetchPayments, fetchSettings, fetchSummary])
-
-useEffect(() => {
-if (!isEditDialogOpen || !paymentDetail) return
-setEditPaymentForm(mapPaymentToForm(paymentDetail))
-}, [isEditDialogOpen, paymentDetail])
-
-useEffect(() => {
-if (!isEditSettingDialogOpen || !settingDetail) return
-setEditSettingForm(mapSettingToForm(settingDetail))
-}, [isEditSettingDialogOpen, settingDetail])
-
-const filteredData = useMemo(() => {
-return paymentData.filter((item) => {
-const keyword = searchQuery.toLowerCase()
-const matchesSearch =
-item.nama.toLowerCase().includes(keyword) ||
-item.nis.toLowerCase().includes(keyword) ||
-item.noTagihan.toLowerCase().includes(keyword)
-const matchesKelas = selectedKelas === "all" || item.kelas === selectedKelas
-const matchesStatus = selectedStatus === "all" || item.status === selectedStatus
-
-return matchesSearch && matchesKelas && matchesStatus
-})
-}, [paymentData, searchQuery, selectedKelas, selectedStatus])
-
-const kelasOptions = useMemo(() => {
-const classes = paymentData
-.map((item) => item.kelas.trim())
-.filter((item) => item.length > 0)
-return Array.from(new Set(classes)).sort((a, b) => a.localeCompare(b))
-}, [paymentData])
-
-const fallbackSummary = useMemo(() => summarizeFromPayments(paymentData), [paymentData])
-const summary = useMemo(
-() => mergeSummary(fallbackSummary, tunggakanSummary),
-[fallbackSummary, tunggakanSummary],
-)
-
-const currentDetail = useMemo(() => {
-if (!selectedPayment) return null
-if (paymentDetail && paymentDetail.id === selectedPayment.id) return paymentDetail
-return selectedPayment
-}, [paymentDetail, selectedPayment])
-
-const totalTagihan = summary.totalTagihan
-const totalLunas = summary.totalLunas
-const totalCicilan = summary.totalCicilan
-const totalBelumBayar = summary.totalBelumBayar
-const totalTerlambat = summary.totalTerlambat
-const totalNominal = summary.totalNominal
-const totalTerbayar = summary.totalTerbayar
-const totalSisa = summary.totalSisa
-
-const isProcessing =
-createPaymentLoading ||
-updatePaymentLoading ||
-verifyPaymentLoading ||
-deletePaymentLoading ||
-createSettingLoading ||
-updateSettingLoading ||
-deleteSettingLoading
-
-const refreshAll = async () => {
-await Promise.all([fetchPayments(), fetchSummary(), fetchSettings()])
+/** Status badge sesuai FE Guide §9 */
+const StatusBadge = ({ status }: { status: StatusPembayaran }) => {
+  switch (status) {
+    case "lunas":
+      return <Badge className="bg-emerald-500/15 text-emerald-600 border-0 font-medium">Lunas</Badge>
+    case "menunggu_konfirmasi":
+      return <Badge className="bg-blue-500/15 text-blue-600 border-0 font-medium">Menunggu Konfirmasi</Badge>
+    case "dibatalkan":
+      return <Badge className="bg-slate-500/15 text-slate-600 border-0 font-medium">Dibatalkan</Badge>
+    case "menunggu_pembayaran":
+    default:
+      return <Badge className="bg-red-500/15 text-red-600 border-0 font-medium">Menunggu Pembayaran</Badge>
+  }
 }
 
-const handleAddPayment = async () => {
-if (!newPaymentForm.nis || !newPaymentForm.nama || !newPaymentForm.nominal) {
-alert("NIS, nama, dan nominal wajib diisi")
-return
-}
+const statusOptions: Array<{ value: string; label: string }> = [
+  { value: "all", label: "Semua Status" },
+  { value: "menunggu_pembayaran", label: "Menunggu Pembayaran" },
+  { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
+  { value: "lunas", label: "Lunas" },
+  { value: "dibatalkan", label: "Dibatalkan" },
+]
 
-try {
-await createPayment({
-noTagihan: newPaymentForm.noTagihan || undefined,
-nis: newPaymentForm.nis,
-nama: newPaymentForm.nama,
-kelas: newPaymentForm.kelas,
-bulan: newPaymentForm.bulan,
-jatuhTempo: newPaymentForm.jatuhTempo,
-nominal: parseNumberInput(newPaymentForm.nominal),
-terbayar: parseNumberInput(newPaymentForm.terbayar),
-status: newPaymentForm.status,
-})
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
-setIsAddDialogOpen(false)
-setNewPaymentForm(emptyPaymentForm)
-await refreshAll()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal menambah tagihan SPP"))
-}
-}
+export default function TagihanPage() {
+  const { data: tagihanData, loading, error, fetchTagihan } = useTagihan()
+  const { data: ringkasan, loading: ringkasanLoading, fetchRingkasan } = useRingkasanPembayaran()
 
-const handleOpenDetail = async (item: SppPayment) => {
-setSelectedPayment(item)
-setIsDetailDialogOpen(true)
-await fetchPaymentDetail(item.id)
-}
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedSumber, setSelectedSumber] = useState("all")
 
-const handleOpenEdit = async (item: SppPayment) => {
-setSelectedPayment(item)
-setEditPaymentForm(mapPaymentToForm(item))
-setIsEditDialogOpen(true)
-await fetchPaymentDetail(item.id)
-}
+  useEffect(() => {
+    void fetchTagihan()
+    void fetchRingkasan()
+  }, [fetchTagihan, fetchRingkasan])
 
-const handleUpdatePayment = async () => {
-if (!selectedPayment) return
+  const refreshAll = async () => {
+    await Promise.all([fetchTagihan(), fetchRingkasan()])
+  }
 
-try {
-await updatePayment(selectedPayment.id, {
-noTagihan: editPaymentForm.noTagihan,
-nis: editPaymentForm.nis,
-nama: editPaymentForm.nama,
-kelas: editPaymentForm.kelas,
-bulan: editPaymentForm.bulan,
-jatuhTempo: editPaymentForm.jatuhTempo,
-nominal: parseNumberInput(editPaymentForm.nominal),
-terbayar: parseNumberInput(editPaymentForm.terbayar),
-status: editPaymentForm.status,
-})
+  // ── Derived stats ─────────────────────────────────────────────────────────
+  const stats = useMemo(() => {
+    if (ringkasan) return ringkasan
+    return {
+      totalTagihan: tagihanData.length,
+      totalDibayar: tagihanData.filter((r) => r.status === "lunas").length,
+      totalTunggakan: tagihanData.reduce((s, r) => s + r.totalTunggakan, 0),
+      menungguKonfirmasi: tagihanData.filter((r) => r.status === "menunggu_konfirmasi").length,
+      lunas: tagihanData.filter((r) => r.status === "lunas").length,
+      dibatalkan: tagihanData.filter((r) => r.status === "dibatalkan").length,
+    }
+  }, [ringkasan, tagihanData])
 
-setIsEditDialogOpen(false)
-await refreshAll()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal memperbarui pembayaran"))
-}
-}
+  // ── Unit options from data ─────────────────────────────────────────────────
+  const sumberOptions = useMemo(() => {
+    const set = new Set(tagihanData.map((r) => r.sumber))
+    return Array.from(set)
+  }, [tagihanData])
 
-const handleDeletePayment = async (item: SppPayment) => {
-if (!confirm(`Hapus tagihan ${item.noTagihan}?`)) return
+  // ── Filter ─────────────────────────────────────────────────────────────────
+  const filteredData = useMemo(() => {
+    const keyword = searchQuery.toLowerCase().trim()
+    return tagihanData.filter((row) => {
+      const matchesSearch =
+        keyword.length === 0 ||
+        row.namaLengkap.toLowerCase().includes(keyword) ||
+        row.nomorInduk.toLowerCase().includes(keyword) ||
+        row.namaUnit.toLowerCase().includes(keyword)
+      const matchesStatus = selectedStatus === "all" || row.status === selectedStatus
+      const matchesSumber = selectedSumber === "all" || row.sumber === selectedSumber
+      return matchesSearch && matchesStatus && matchesSumber
+    })
+  }, [tagihanData, searchQuery, selectedStatus, selectedSumber])
 
-try {
-await deletePayment(item.id)
-await refreshAll()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal menghapus tagihan"))
-}
-}
+  const totalTunggakanFiltered = filteredData.reduce((s, r) => s + r.totalTunggakan, 0)
 
-const handleVerifyPayment = async (item: SppPayment) => {
-if (!confirm(`Verifikasi pembayaran ${item.noTagihan}? Kwitansi akan aktif setelah verifikasi.`)) return
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-bold text-foreground">Tagihan SPP</h1>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          Gagal memuat data tagihan: {error}
+        </div>
+      </div>
+    )
+  }
 
-try {
-await verifyPayment(item.id, {
-status: "verified",
-verified: true,
-})
-await refreshAll()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal memverifikasi pembayaran"))
-}
-}
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Tagihan</h1>
+          <p className="text-sm text-muted-foreground">
+            Daftar tagihan seluruh santri (termasuk calon santri PPDB). Tagihan tampil di website,
+            pembayaran via WhatsApp, admin verifikasi lalu kwitansi otomatis tersedia.
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => void refreshAll()}
+          disabled={loading || ringkasanLoading}
+          id="btn-refresh-tagihan"
+        >
+          <RefreshCw className="w-4 h-4 mr-2" />
+          Refresh
+        </Button>
+      </div>
 
-const handleAddSetting = async () => {
-if (!newSettingForm.nama || !newSettingForm.nominal) {
-alert("Nama setting dan nominal wajib diisi")
-return
-}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Receipt className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Tagihan</p>
+                <p className="text-xl font-bold text-foreground">{stats.totalTagihan}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-try {
-await createSetting({
-nama: newSettingForm.nama,
-jenjang: newSettingForm.jenjang || undefined,
-kelas: newSettingForm.kelas || undefined,
-tahunAjaran: newSettingForm.tahunAjaran || undefined,
-nominal: parseNumberInput(newSettingForm.nominal),
-jatuhTempoHari: newSettingForm.jatuhTempoHari
-? parseNumberInput(newSettingForm.jatuhTempoHari)
-: null,
-aktif: newSettingForm.aktif === "true",
-keterangan: newSettingForm.keterangan || undefined,
-})
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Lunas</p>
+                <p className="text-xl font-bold text-foreground">{stats.lunas}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-setIsAddSettingDialogOpen(false)
-setNewSettingForm(emptySettingForm)
-await fetchSettings()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal menambah setting SPP"))
-}
-}
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                <Clock3 className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Menunggu Konfirmasi</p>
+                <p className="text-xl font-bold text-foreground">{stats.menungguKonfirmasi}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-const handleOpenEditSetting = async (item: SppSetting) => {
-setSelectedSetting(item)
-setEditSettingForm(mapSettingToForm(item))
-setIsEditSettingDialogOpen(true)
-await fetchSettingDetail(item.id)
-}
+        <Card className="border-border/50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Total Tunggakan</p>
+                <p className="text-lg font-bold text-foreground">
+                  {formatCurrency(
+                    typeof stats.totalTunggakan === "number"
+                      ? stats.totalTunggakan
+                      : totalTunggakanFiltered,
+                  )}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-const handleUpdateSetting = async () => {
-if (!selectedSetting) return
-
-try {
-await updateSetting(selectedSetting.id, {
-nama: editSettingForm.nama,
-jenjang: editSettingForm.jenjang || undefined,
-kelas: editSettingForm.kelas || undefined,
-tahunAjaran: editSettingForm.tahunAjaran || undefined,
-nominal: parseNumberInput(editSettingForm.nominal),
-jatuhTempoHari: editSettingForm.jatuhTempoHari
-? parseNumberInput(editSettingForm.jatuhTempoHari)
-: null,
-aktif: editSettingForm.aktif === "true",
-keterangan: editSettingForm.keterangan || undefined,
-})
-
-setIsEditSettingDialogOpen(false)
-await fetchSettings()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal memperbarui setting SPP"))
-}
-}
-
-const handleDeleteSetting = async (item: SppSetting) => {
-if (!confirm(`Hapus setting ${item.nama}?`)) return
-
-try {
-await deleteSetting(item.id)
-await fetchSettings()
-} catch (error) {
-alert(getErrorMessage(error, "Gagal menghapus setting SPP"))
-}
-}
-
-return (
-<div className="space-y-6">
-<div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-<div>
-<h1 className="text-2xl font-bold text-foreground">SPP - Pembayaran SPP</h1>
-<p className="text-muted-foreground">Tagihan tampil di website, pembayaran via WA, admin verifikasi lalu kwitansi otomatis tersedia.</p>
-</div>
-<div className="flex items-center gap-2">
-<Button variant="outline" size="sm" onClick={() => void refreshAll()} disabled={isProcessing}>
-<RefreshCw className="w-4 h-4 mr-2" />
-Refresh
-</Button>
-<Button variant="outline" size="sm">
-<Download className="w-4 h-4 mr-2" />
-Export
-</Button>
-<Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-<DialogTrigger asChild>
-<Button size="sm" className="bg-primary text-primary-foreground">
-<Plus className="w-4 h-4 mr-2" />
-Tambah Tagihan
-</Button>
-</DialogTrigger>
-<DialogContent className="sm:max-w-[640px]">
-<DialogHeader>
-<DialogTitle>Tambah Tagihan SPP</DialogTitle>
-<DialogDescription>
-Buat data pembayaran SPP baru untuk santri
-</DialogDescription>
-</DialogHeader>
-<div className="grid gap-4 py-2">
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label htmlFor="no-tagihan">No Tagihan</Label>
-<Input
-id="no-tagihan"
-placeholder="Contoh: INV-SPP-2026-001"
-value={newPaymentForm.noTagihan}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, noTagihan: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="nis">NIS</Label>
-<Input
-id="nis"
-placeholder="Nomor induk santri"
-value={newPaymentForm.nis}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, nis: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label htmlFor="nama">Nama Santri</Label>
-<Input
-id="nama"
-placeholder="Nama santri"
-value={newPaymentForm.nama}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, nama: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="kelas">Kelas</Label>
-<Input
-id="kelas"
-placeholder="Contoh: 11 IPA"
-value={newPaymentForm.kelas}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, kelas: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label htmlFor="bulan">Bulan Tagihan</Label>
-<Input
-id="bulan"
-placeholder="Contoh: April 2026"
-value={newPaymentForm.bulan}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, bulan: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="jatuh-tempo">Jatuh Tempo</Label>
-<Input
-id="jatuh-tempo"
-type="date"
-value={newPaymentForm.jatuhTempo}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, jatuhTempo: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-3 gap-4">
-<div className="space-y-2">
-<Label htmlFor="nominal">Nominal</Label>
-<Input
-id="nominal"
-placeholder="450000"
-value={newPaymentForm.nominal}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, nominal: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="terbayar">Terbayar</Label>
-<Input
-id="terbayar"
-placeholder="0"
-value={newPaymentForm.terbayar}
-onChange={(e) =>
-setNewPaymentForm((prev) => ({ ...prev, terbayar: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Status</Label>
-<Select
-value={newPaymentForm.status}
-onValueChange={(value) =>
-setNewPaymentForm((prev) => ({ ...prev, status: value as any }))
-}
->
-<SelectTrigger>
-<SelectValue placeholder="Pilih status" />
-</SelectTrigger>
-<SelectContent>
-{paymentStatusOptions.map((status) => (
-<SelectItem key={status} value={status}>
-{status}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-</div>
-</div>
-<DialogFooter>
-<Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>
-Batal
-</Button>
-<Button className="bg-primary text-primary-foreground" onClick={() => void handleAddPayment()}>
-{createPaymentLoading ? (
-<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-) : null}
-Simpan
-</Button>
-</DialogFooter>
-</DialogContent>
-</Dialog>
-</div>
-</div>
-
-{paymentError ? (
-<p className="text-sm text-destructive">Gagal memuat pembayaran: {paymentError}</p>
-) : null}
-{summaryError ? (
-<p className="text-sm text-destructive">Ringkasan tunggakan tidak tersedia: {summaryError}</p>
-) : null}
-{settingError ? (
-<p className="text-sm text-destructive">Gagal memuat setting SPP: {settingError}</p>
-) : null}
-
-<div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-<Card className="border-border/50">
-<CardContent className="p-4">
-<div className="flex items-center gap-3">
-<div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-<Receipt className="w-5 h-5 text-primary" />
-</div>
-<div>
-<p className="text-xs text-muted-foreground">Total Tagihan</p>
-<p className="text-xl font-bold text-foreground">{totalTagihan}</p>
-</div>
-</div>
-</CardContent>
-</Card>
-
-<Card className="border-border/50">
-<CardContent className="p-4">
-<div className="flex items-center gap-3">
-<div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-<CheckCircle2 className="w-5 h-5 text-primary" />
-</div>
-<div>
-<p className="text-xs text-muted-foreground">Lunas</p>
-<p className="text-xl font-bold text-foreground">{totalLunas}</p>
-</div>
-</div>
-</CardContent>
-</Card>
-
-<Card className="border-border/50">
-<CardContent className="p-4">
-<div className="flex items-center gap-3">
-<div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-<Wallet className="w-5 h-5 text-accent" />
-</div>
-<div>
-<p className="text-xs text-muted-foreground">Cicilan</p>
-<p className="text-xl font-bold text-foreground">{totalCicilan}</p>
-</div>
-</div>
-</CardContent>
-</Card>
-
-<Card className="border-border/50">
-<CardContent className="p-4">
-<div className="flex items-center gap-3">
-<div className="w-10 h-10 rounded-lg bg-chart-3/20 flex items-center justify-center">
-<Clock3 className="w-5 h-5 text-chart-4" />
-</div>
-<div>
-<p className="text-xs text-muted-foreground">Belum Bayar</p>
-<p className="text-xl font-bold text-foreground">{totalBelumBayar}</p>
-</div>
-</div>
-</CardContent>
-</Card>
-
-<Card className="border-border/50">
-<CardContent className="p-4">
-<div className="flex items-center gap-3">
-<div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-<AlertTriangle className="w-5 h-5 text-destructive" />
-</div>
-<div>
-<p className="text-xs text-muted-foreground">Terlambat</p>
-<p className="text-xl font-bold text-foreground">{totalTerlambat}</p>
-</div>
-</div>
-</CardContent>
-</Card>
-</div>
-
-<Card className="border-border/50">
-<CardHeader>
-<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-<div>
-<CardTitle>Daftar Pembayaran SPP</CardTitle>
-<CardDescription>
-Periode {summary.periode || "-"} | Total {formatCurrency(totalNominal)} | Terbayar {formatCurrency(totalTerbayar)} | Sisa {formatCurrency(totalSisa)}
-</CardDescription>
-</div>
-<div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
-<div className="relative w-full sm:w-64">
-<Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-<Input
-placeholder="Cari nama, NIS, atau no tagihan..."
-value={searchQuery}
-onChange={(e) => setSearchQuery(e.target.value)}
-className="pl-9"
-/>
-</div>
-<Select value={selectedKelas} onValueChange={setSelectedKelas}>
-<SelectTrigger className="w-full sm:w-[170px]">
-<Filter className="w-4 h-4 mr-2" />
-<SelectValue placeholder="Kelas" />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="all">Semua Kelas</SelectItem>
-{kelasOptions.map((kelas) => (
-<SelectItem key={kelas} value={kelas}>
-{kelas}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-<Select value={selectedStatus} onValueChange={setSelectedStatus}>
-<SelectTrigger className="w-full sm:w-[170px]">
-<SelectValue placeholder="Status" />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="all">Semua Status</SelectItem>
-{paymentStatusOptions.map((status) => (
-<SelectItem key={status} value={status}>
-{status}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-</div>
-</CardHeader>
-<CardContent>
-<div className="rounded-lg border border-border overflow-x-auto">
-<Table>
-<TableHeader>
-<TableRow>
-<TableHead>No Tagihan</TableHead>
-<TableHead>Santri</TableHead>
-<TableHead>Kelas</TableHead>
-<TableHead>Bulan</TableHead>
-<TableHead>Jatuh Tempo</TableHead>
-<TableHead>Nominal</TableHead>
-<TableHead>Terbayar</TableHead>
-<TableHead>Sisa</TableHead>
-<TableHead>Status</TableHead>
-<TableHead className="text-right">Aksi</TableHead>
-</TableRow>
-</TableHeader>
-<TableBody>
-{paymentLoading || summaryLoading ? (
-<TableRow>
-<TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
-<span className="inline-flex items-center gap-2">
-<Loader2 className="w-4 h-4 animate-spin" />
-Memuat data pembayaran...
-</span>
-</TableCell>
-</TableRow>
-) : null}
-
-{!paymentLoading &&
-filteredData.map((item) => {
-const sisa = Math.max(item.nominal - item.terbayar, 0)
-return (
-<TableRow key={item.id}>
-<TableCell className="font-medium">{item.noTagihan}</TableCell>
-<TableCell>
-<div className="flex items-center gap-3">
-<Avatar className="w-8 h-8">
-<AvatarFallback className="bg-primary/10 text-primary text-xs">
-{item.nama
-.split(" ")
-.map((part) => part[0])
-.join("")
-.slice(0, 2)}
-</AvatarFallback>
-</Avatar>
-<div>
-<p className="font-medium text-foreground">{item.nama}</p>
-<p className="text-xs text-muted-foreground">NIS {item.nis || "-"}</p>
-</div>
-</div>
-</TableCell>
-<TableCell>{item.kelas || "-"}</TableCell>
-<TableCell>{item.bulan || "-"}</TableCell>
-<TableCell>{formatDate(item.jatuhTempo)}</TableCell>
-<TableCell>{formatCurrency(item.nominal)}</TableCell>
-<TableCell>{formatCurrency(item.terbayar)}</TableCell>
-<TableCell className={sisa > 0 ? "text-destructive font-medium" : "text-primary font-medium"}>
-{formatCurrency(sisa)}
-</TableCell>
-<TableCell><SppStatusBadge status={item.status} /></TableCell>
-<TableCell className="text-right">
-<DropdownMenu>
-<DropdownMenuTrigger asChild>
-<Button variant="ghost" size="icon" className="h-8 w-8">
-<MoreHorizontal className="w-4 h-4" />
-</Button>
-</DropdownMenuTrigger>
-<DropdownMenuContent align="end">
-<DropdownMenuLabel>Aksi</DropdownMenuLabel>
-<DropdownMenuSeparator />
-<DropdownMenuItem onClick={() => void handleOpenDetail(item)}>
-<Eye className="w-4 h-4 mr-2" />
-Lihat Detail
-</DropdownMenuItem>
-<DropdownMenuItem onClick={() => void handleOpenEdit(item)}>
-<Edit className="w-4 h-4 mr-2" />
-Catat Pembayaran
-</DropdownMenuItem>
-<DropdownMenuItem onClick={() => void handleVerifyPayment(item)}>
-<BadgeCheck className="w-4 h-4 mr-2" />
-Verifikasi Pembayaran
-</DropdownMenuItem>
-<DropdownMenuItem
-className="text-destructive focus:text-destructive"
-onClick={() => void handleDeletePayment(item)}
->
-<Trash2 className="w-4 h-4 mr-2" />
-Hapus Tagihan
-</DropdownMenuItem>
-</DropdownMenuContent>
-</DropdownMenu>
-</TableCell>
-</TableRow>
-)
-})}
-
-{!paymentLoading && filteredData.length === 0 ? (
-<TableRow>
-<TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-Data pembayaran SPP tidak ditemukan.
-</TableCell>
-</TableRow>
-) : null}
-</TableBody>
-</Table>
-</div>
-</CardContent>
-</Card>
-
-<Card className="border-border/50">
-<CardHeader>
-<div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-<div>
-<CardTitle className="flex items-center gap-2">
-<Settings className="w-5 h-5 text-primary" />
-Pengaturan SPP
-</CardTitle>
-<CardDescription>Kelola nominal dan aturan jatuh tempo SPP per jenjang/kelas</CardDescription>
-</div>
-<Dialog open={isAddSettingDialogOpen} onOpenChange={setIsAddSettingDialogOpen}>
-<DialogTrigger asChild>
-<Button size="sm" className="bg-primary text-primary-foreground">
-<Plus className="w-4 h-4 mr-2" />
-Tambah Setting
-</Button>
-</DialogTrigger>
-<DialogContent className="sm:max-w-[640px]">
-<DialogHeader>
-<DialogTitle>Tambah Setting SPP</DialogTitle>
-<DialogDescription>
-Atur nominal SPP sesuai jenjang dan tahun ajaran
-</DialogDescription>
-</DialogHeader>
-<div className="grid gap-4 py-2">
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label htmlFor="setting-nama">Nama Setting</Label>
-<Input
-id="setting-nama"
-placeholder="Contoh: SPP SMA 2026"
-value={newSettingForm.nama}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, nama: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="setting-tahun">Tahun Ajaran</Label>
-<Input
-id="setting-tahun"
-placeholder="Contoh: 2026/2027"
-value={newSettingForm.tahunAjaran}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, tahunAjaran: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label htmlFor="setting-jenjang">Jenjang</Label>
-<Input
-id="setting-jenjang"
-placeholder="Contoh: SMA"
-value={newSettingForm.jenjang}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, jenjang: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="setting-kelas">Kelas</Label>
-<Input
-id="setting-kelas"
-placeholder="Contoh: 12 IPA"
-value={newSettingForm.kelas}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, kelas: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-3 gap-4">
-<div className="space-y-2">
-<Label htmlFor="setting-nominal">Nominal SPP</Label>
-<Input
-id="setting-nominal"
-placeholder="450000"
-value={newSettingForm.nominal}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, nominal: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label htmlFor="setting-jatuh-tempo">Tanggal Jatuh Tempo</Label>
-<Input
-id="setting-jatuh-tempo"
-placeholder="10"
-value={newSettingForm.jatuhTempoHari}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, jatuhTempoHari: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Status</Label>
-<Select
-value={newSettingForm.aktif}
-onValueChange={(value) =>
-setNewSettingForm((prev) => ({ ...prev, aktif: value as "true" | "false" }))
-}
->
-<SelectTrigger>
-<SelectValue placeholder="Pilih status" />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="true">Aktif</SelectItem>
-<SelectItem value="false">Nonaktif</SelectItem>
-</SelectContent>
-</Select>
-</div>
-</div>
-<div className="space-y-2">
-<Label htmlFor="setting-keterangan">Keterangan</Label>
-<Textarea
-id="setting-keterangan"
-placeholder="Opsional"
-value={newSettingForm.keterangan}
-onChange={(e) =>
-setNewSettingForm((prev) => ({ ...prev, keterangan: e.target.value }))
-}
-/>
-</div>
-</div>
-<DialogFooter>
-<Button variant="outline" onClick={() => setIsAddSettingDialogOpen(false)}>
-Batal
-</Button>
-<Button className="bg-primary text-primary-foreground" onClick={() => void handleAddSetting()}>
-{createSettingLoading ? (
-<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-) : null}
-Simpan
-</Button>
-</DialogFooter>
-</DialogContent>
-</Dialog>
-</div>
-</CardHeader>
-<CardContent>
-<div className="rounded-lg border border-border overflow-x-auto">
-<Table>
-<TableHeader>
-<TableRow>
-<TableHead>Nama Setting</TableHead>
-<TableHead>Jenjang/Kelas</TableHead>
-<TableHead>Tahun Ajaran</TableHead>
-<TableHead>Nominal</TableHead>
-<TableHead>Jatuh Tempo</TableHead>
-<TableHead>Status</TableHead>
-<TableHead className="text-right">Aksi</TableHead>
-</TableRow>
-</TableHeader>
-<TableBody>
-{settingLoading ? (
-<TableRow>
-<TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-<span className="inline-flex items-center gap-2">
-<Loader2 className="w-4 h-4 animate-spin" />
-Memuat setting SPP...
-</span>
-</TableCell>
-</TableRow>
-) : null}
-
-{!settingLoading &&
-settingData.map((item) => (
-<TableRow key={item.id}>
-<TableCell className="font-medium">{item.nama}</TableCell>
-<TableCell>
-{[item.jenjang, item.kelas].filter(Boolean).join(" / ") || "-"}
-</TableCell>
-<TableCell>{item.tahunAjaran || "-"}</TableCell>
-<TableCell>{formatCurrency(item.nominal)}</TableCell>
-<TableCell>
-{item.jatuhTempoHari ? `Tanggal ${item.jatuhTempoHari}` : "-"}
-</TableCell>
-<TableCell>
-{item.aktif ? (
-<Badge className="bg-primary/10 text-primary border-0">Aktif</Badge>
-) : (
-<Badge variant="outline">Nonaktif</Badge>
-)}
-</TableCell>
-<TableCell className="text-right">
-<DropdownMenu>
-<DropdownMenuTrigger asChild>
-<Button variant="ghost" size="icon" className="h-8 w-8">
-<MoreHorizontal className="w-4 h-4" />
-</Button>
-</DropdownMenuTrigger>
-<DropdownMenuContent align="end">
-<DropdownMenuItem onClick={() => void handleOpenEditSetting(item)}>
-<Edit className="w-4 h-4 mr-2" />
-Edit Setting
-</DropdownMenuItem>
-<DropdownMenuItem
-className="text-destructive focus:text-destructive"
-onClick={() => void handleDeleteSetting(item)}
->
-<Trash2 className="w-4 h-4 mr-2" />
-Hapus Setting
-</DropdownMenuItem>
-</DropdownMenuContent>
-</DropdownMenu>
-</TableCell>
-</TableRow>
-))}
-
-{!settingLoading && settingData.length === 0 ? (
-<TableRow>
-<TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-Belum ada setting SPP.
-</TableCell>
-</TableRow>
-) : null}
-</TableBody>
-</Table>
-</div>
-</CardContent>
-</Card>
-
-<Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
-<DialogContent className="sm:max-w-[560px]">
-<DialogHeader>
-<DialogTitle>Detail Pembayaran SPP</DialogTitle>
-<DialogDescription>Informasi lengkap pembayaran santri</DialogDescription>
-</DialogHeader>
-{paymentDetailLoading ? (
-<div className="py-6 text-center text-muted-foreground">
-<span className="inline-flex items-center gap-2">
-<Loader2 className="w-4 h-4 animate-spin" />
-Memuat detail...
-</span>
-</div>
-) : (
-<div className="grid grid-cols-2 gap-4 py-2 text-sm">
-<div>
-<p className="text-muted-foreground">No Tagihan</p>
-<p className="font-medium">{currentDetail?.noTagihan || "-"}</p>
-</div>
-<div>
-<p className="text-muted-foreground">NIS</p>
-<p className="font-medium">{currentDetail?.nis || "-"}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Nama</p>
-<p className="font-medium">{currentDetail?.nama || "-"}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Kelas</p>
-<p className="font-medium">{currentDetail?.kelas || "-"}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Bulan Tagihan</p>
-<p className="font-medium">{currentDetail?.bulan || "-"}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Jatuh Tempo</p>
-<p className="font-medium">{formatDate(currentDetail?.jatuhTempo || "")}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Nominal</p>
-<p className="font-medium">{formatCurrency(currentDetail?.nominal || 0)}</p>
-</div>
-<div>
-<p className="text-muted-foreground">Terbayar</p>
-<p className="font-medium">{formatCurrency(currentDetail?.terbayar || 0)}</p>
-</div>
-<div className="col-span-2">
-<p className="text-muted-foreground">Status</p>
-<div className="mt-1">
-{currentDetail ? <SppStatusBadge status={currentDetail.status} /> : <Badge variant="outline">-</Badge>}
-</div>
-</div>
-
-<div>
-<p className="text-muted-foreground">Channel Pembayaran</p>
-<p className="font-medium">{currentDetail?.channelPembayaran || "WhatsApp"}</p>
-</div>
-
-<div>
-<p className="text-muted-foreground">Nomor WA</p>
-<p className="font-medium">{currentDetail?.nomorWaPembayaran || "-"}</p>
-</div>
-
-<div className="col-span-2">
-<p className="text-muted-foreground">Kwitansi</p>
-{currentDetail?.kwitansiUrl ? (
-<a
-href={currentDetail.kwitansiUrl}
-target="_blank"
-rel="noreferrer"
-className="font-medium text-primary hover:underline"
->
-Lihat / Unduh Kwitansi
-</a>
-) : (
-<p className="font-medium">Kwitansi belum tersedia. Verifikasi pembayaran terlebih dahulu.</p>
-)}
-</div>
-</div>
-)}
-</DialogContent>
-</Dialog>
-
-<Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-<DialogContent className="sm:max-w-[640px]">
-<DialogHeader>
-<DialogTitle>Catat / Ubah Pembayaran</DialogTitle>
-<DialogDescription>Perbarui data pembayaran dan status tagihan SPP</DialogDescription>
-</DialogHeader>
-<div className="grid gap-4 py-2">
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label>No Tagihan</Label>
-<Input
-value={editPaymentForm.noTagihan}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, noTagihan: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>NIS</Label>
-<Input
-value={editPaymentForm.nis}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, nis: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label>Nama</Label>
-<Input
-value={editPaymentForm.nama}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, nama: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Kelas</Label>
-<Input
-value={editPaymentForm.kelas}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, kelas: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label>Bulan</Label>
-<Input
-value={editPaymentForm.bulan}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, bulan: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Jatuh Tempo</Label>
-<Input
-type="date"
-value={editPaymentForm.jatuhTempo}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, jatuhTempo: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-3 gap-4">
-<div className="space-y-2">
-<Label>Nominal</Label>
-<Input
-value={editPaymentForm.nominal}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, nominal: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Terbayar</Label>
-<Input
-value={editPaymentForm.terbayar}
-onChange={(e) =>
-setEditPaymentForm((prev) => ({ ...prev, terbayar: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Status</Label>
-<Select
-value={editPaymentForm.status}
-onValueChange={(value) =>
-setEditPaymentForm((prev) => ({ ...prev, status: value as any }))
-}
->
-<SelectTrigger>
-<SelectValue placeholder="Pilih status" />
-</SelectTrigger>
-<SelectContent>
-{paymentStatusOptions.map((status) => (
-<SelectItem key={status} value={status}>
-{status}
-</SelectItem>
-))}
-</SelectContent>
-</Select>
-</div>
-</div>
-</div>
-<DialogFooter>
-<Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-Batal
-</Button>
-<Button className="bg-primary text-primary-foreground" onClick={() => void handleUpdatePayment()}>
-{updatePaymentLoading ? (
-<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-) : null}
-Simpan Perubahan
-</Button>
-</DialogFooter>
-</DialogContent>
-</Dialog>
-
-<Dialog open={isEditSettingDialogOpen} onOpenChange={setIsEditSettingDialogOpen}>
-<DialogContent className="sm:max-w-[640px]">
-<DialogHeader>
-<DialogTitle>Edit Setting SPP</DialogTitle>
-<DialogDescription>Perbarui konfigurasi nominal dan aturan SPP</DialogDescription>
-</DialogHeader>
-{settingDetailLoading ? (
-<div className="py-6 text-center text-muted-foreground">
-<span className="inline-flex items-center gap-2">
-<Loader2 className="w-4 h-4 animate-spin" />
-Memuat detail setting...
-</span>
-</div>
-) : (
-<div className="grid gap-4 py-2">
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label>Nama Setting</Label>
-<Input
-value={editSettingForm.nama}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, nama: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Tahun Ajaran</Label>
-<Input
-value={editSettingForm.tahunAjaran}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, tahunAjaran: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-2 gap-4">
-<div className="space-y-2">
-<Label>Jenjang</Label>
-<Input
-value={editSettingForm.jenjang}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, jenjang: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Kelas</Label>
-<Input
-value={editSettingForm.kelas}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, kelas: e.target.value }))
-}
-/>
-</div>
-</div>
-<div className="grid grid-cols-3 gap-4">
-<div className="space-y-2">
-<Label>Nominal</Label>
-<Input
-value={editSettingForm.nominal}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, nominal: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Tanggal Jatuh Tempo</Label>
-<Input
-value={editSettingForm.jatuhTempoHari}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, jatuhTempoHari: e.target.value }))
-}
-/>
-</div>
-<div className="space-y-2">
-<Label>Status</Label>
-<Select
-value={editSettingForm.aktif}
-onValueChange={(value) =>
-setEditSettingForm((prev) => ({ ...prev, aktif: value as "true" | "false" }))
-}
->
-<SelectTrigger>
-<SelectValue placeholder="Pilih status" />
-</SelectTrigger>
-<SelectContent>
-<SelectItem value="true">Aktif</SelectItem>
-<SelectItem value="false">Nonaktif</SelectItem>
-</SelectContent>
-</Select>
-</div>
-</div>
-<div className="space-y-2">
-<Label>Keterangan</Label>
-<Textarea
-value={editSettingForm.keterangan}
-onChange={(e) =>
-setEditSettingForm((prev) => ({ ...prev, keterangan: e.target.value }))
-}
-/>
-</div>
-</div>
-)}
-<DialogFooter>
-<Button variant="outline" onClick={() => setIsEditSettingDialogOpen(false)}>
-Batal
-</Button>
-<Button className="bg-primary text-primary-foreground" onClick={() => void handleUpdateSetting()}>
-{updateSettingLoading ? (
-<Loader2 className="w-4 h-4 mr-2 animate-spin" />
-) : null}
-Simpan Perubahan
-</Button>
-</DialogFooter>
-</DialogContent>
-</Dialog>
-</div>
-)
+      {/* Table Card */}
+      <Card className="border-border/50">
+        <CardHeader>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div>
+              <CardTitle>Daftar Tagihan</CardTitle>
+              <CardDescription>
+                Menampilkan {filteredData.length} data tagihan
+                {totalTunggakanFiltered > 0
+                  ? ` · Total Tunggakan: ${formatCurrency(totalTunggakanFiltered)}`
+                  : ""}
+              </CardDescription>
+            </div>
+            {/* Filters */}
+            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+              <div className="relative w-full sm:w-60">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="search-tagihan"
+                  placeholder="Cari nama, nomor induk..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full sm:w-[200px]" id="filter-status-tagihan">
+                  <Filter className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {sumberOptions.length > 0 && (
+                <Select value={selectedSumber} onValueChange={setSelectedSumber}>
+                  <SelectTrigger className="w-full sm:w-[150px]" id="filter-sumber-tagihan">
+                    <SelectValue placeholder="Sumber" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua</SelectItem>
+                    <SelectItem value="santri">Santri</SelectItem>
+                    <SelectItem value="ppdb">PPDB</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg border border-border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {/* Sesuai kolom FE Guide §5.2 */}
+                  <TableHead>Nama Unit</TableHead>
+                  <TableHead>Nomor Induk</TableHead>
+                  <TableHead>Nama Lengkap</TableHead>
+                  <TableHead>Kelas Sekarang</TableHead>
+                  <TableHead>Tahun Ajaran</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Total Tagihan</TableHead>
+                  <TableHead className="text-right">Total Dibayar</TableHead>
+                  <TableHead className="text-right">Total Tunggakan</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Memuat data tagihan...
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                ) : filteredData.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                      Tidak ada data tagihan yang sesuai filter.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredData.map((row: TagihanRow) => (
+                    <TableRow key={row.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {row.sumber === "ppdb" && (
+                            <Badge variant="outline" className="text-xs px-1 py-0">
+                              PPDB
+                            </Badge>
+                          )}
+                          <span>{row.namaUnit || "-"}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {row.nomorInduk || "-"}
+                      </TableCell>
+                      <TableCell className="font-medium">{row.namaLengkap || "-"}</TableCell>
+                      <TableCell>{row.kelasSaatIni || "-"}</TableCell>
+                      <TableCell>{row.tahunAjaran || "-"}</TableCell>
+                      <TableCell>
+                        <StatusBadge status={row.status} />
+                      </TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatCurrency(row.totalTagihan)}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-emerald-600">
+                        {formatCurrency(row.totalDibayar)}
+                      </TableCell>
+                      <TableCell
+                        className={`text-right font-medium ${
+                          row.totalTunggakan > 0 ? "text-red-600" : "text-muted-foreground"
+                        }`}
+                      >
+                        {formatCurrency(row.totalTunggakan)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
 }

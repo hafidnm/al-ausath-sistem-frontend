@@ -44,6 +44,7 @@ import {
   Wallet,
   Building2,
   Megaphone,
+  Receipt,
 } from "lucide-react"
 
 const menuItems = [
@@ -65,7 +66,8 @@ const menuItems = [
   { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
-  { icon: Wallet, label: "SPP", href: "/dashboard/spp" },
+  { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
+  { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
   { icon: UserCog, label: "Panel Guru", href: "/dashboard/guru-panel" },
   { icon: User, label: "Panel Santri", href: "/dashboard/santri-panel" },
   { icon: Shield, label: "Panel Admin", href: "/dashboard/admin-panel" },
@@ -215,9 +217,9 @@ export default function DashboardLayout({
                 <p className="text-xs text-sidebar-foreground/60 truncate">
                   {user?.email || 'user@example.com'}
                 </p>
+              </div>
             </div>
-        </div>
-      </div>
+          </div>
         </div>
       </aside>
 

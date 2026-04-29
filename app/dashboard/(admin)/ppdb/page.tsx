@@ -6,6 +6,13 @@ import { Download, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -20,9 +27,11 @@ import {
   useDeletePpdb,
   useUpdatePpdbTestResult,
   useUpdatePpdbVerification,
+  useUploadPpdbFile,
 } from "@/hooks/ppdb/admin"
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
 import type { PpdbDetail, TesKonfigurasiJenjangKey, TestQuestion, UpdateTestResultRequest } from "@/types/ppdb/admin"
+import { kelasService, type KelasItem } from "@/lib/services/kelas.service"
 
 import { PpdbStatsCards } from "@/components/ppdb/admin/ppdb-stats-cards"
 import { PpdbTesKonfigurasiCard } from "@/components/ppdb/admin/ppdb-tes-konfigurasi-card"
@@ -66,8 +75,13 @@ export default function PpdbPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [isDetailLoading, setIsDetailLoading] = useState(false)
   const [isExportLoading, setIsExportLoading] = useState(false)
+  const [isTagihanLoading, setIsTagihanLoading] = useState(false)
   const [isTerimaOpen, setIsTerimaOpen] = useState(false)
   const [terimaPendaftar, setTerimaPendaftar] = useState<PpdbDetail | null>(null)
+  const [integrasikanSantri, setIntegrasikanSantri] = useState(false)
+  const [kodeKelasDiterima, setKodeKelasDiterima] = useState("")
+  const [kelasList, setKelasList] = useState<KelasItem[]>([])
+  const [kelasLoading, setKelasLoading] = useState(false)
 
   // Selection & form state
   const [selectedPendaftar, setSelectedPendaftar] = useState<PpdbDetail | null>(null)
@@ -90,6 +104,22 @@ export default function PpdbPage() {
   const { deleteItem: deletePendaftar, loading: deleteLoading } = useDeletePpdb()
   const { updateTestResult, loading: testResultLoading } = useUpdatePpdbTestResult()
   const { updateVerification, loading: verificationLoading } = useUpdatePpdbVerification()
+  const { upload } = useUploadPpdbFile()
+
+  const handleUploadFile = async (jenisBerkas: string, file: File) => {
+    if (!selectedPendaftar) return
+    try {
+      await runActionWithIdFallback(selectedPendaftar, (id) => upload(id, file, jenisBerkas))
+      alert('File berhasil diupload.')
+      // Refresh detail data
+      if (selectedPendaftar) {
+        handleOpenDetail(selectedPendaftar)
+      }
+      fetchList()
+    } catch (err) {
+      alert(getErrorMessage(err, 'Gagal mengupload file'))
+    }
+  }
 
   // Derived
   const selectedPendaftarJenjang = normalizeTesJenjang(selectedPendaftar?.jenjang)
@@ -263,14 +293,15 @@ export default function PpdbPage() {
     } catch (err) { alert(getErrorMessage(err, "Gagal menghapus pendaftar")) }
   }
 
-  const handleVerifikasi = async (p: PpdbDetail, status: "Diterima" | "Ditolak") => {
+  const handleVerifikasi = async (p: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => {
     if (status === "Diterima") {
       setTerimaPendaftar(p)
       setIsTerimaOpen(true)
       return
     }
 
-    if (!confirm("Tolak pendaftar ini?")) return
+    if (status === "Ditolak" && !confirm("Tolak pendaftar ini?")) return
+    if (status === "Menunggu" && !confirm("Ubah status pendaftar menjadi Menunggu?")) return
     try {
       const targetIds = getIdCandidates(p)
       await runActionWithIdFallback(p, (id) => updateVerification(id, { status, keterangan: "" }))
@@ -285,15 +316,36 @@ export default function PpdbPage() {
     } catch (err) { alert(getErrorMessage(err, "Gagal memperbarui verifikasi")) }
   }
 
+  const loadKelasList = useCallback(async () => {
+    setKelasLoading(true)
+    try {
+      const list = await kelasService.getAll({ per_page: "300" })
+      setKelasList(list)
+    } catch {
+      setKelasList([])
+    } finally {
+      setKelasLoading(false)
+    }
+  }, [])
+
   const handleTerimaPendaftarSubmit = async () => {
     if (!terimaPendaftar) {
       alert("Data pendaftar tidak ditemukan")
       return
     }
+    if (integrasikanSantri && !kodeKelasDiterima) {
+      alert("Pilih kode kelas terlebih dahulu sebelum mengintegrasikan santri.")
+      return
+    }
     try {
       const targetIds = getIdCandidates(terimaPendaftar)
       await runActionWithIdFallback(terimaPendaftar, (id) =>
-        updateVerification(id, { status: "Diterima", keterangan: "" }),
+        updateVerification(id, { 
+          status: "Diterima", 
+          keterangan: "",
+          integrasikanLangsungKeSantri: integrasikanSantri,
+          kodeKelasDiterima: integrasikanSantri ? kodeKelasDiterima : undefined
+        }),
       )
       updateStatusByIds(targetIds, "Diterima")
       setSelectedPendaftar((prev) => {
@@ -304,6 +356,8 @@ export default function PpdbPage() {
       })
       setIsTerimaOpen(false)
       setTerimaPendaftar(null)
+      setIntegrasikanSantri(false)
+      setKodeKelasDiterima("")
       void fetchList()
     } catch (err) { alert(getErrorMessage(err, "Gagal menerima pendaftar")) }
   }
@@ -364,6 +418,19 @@ export default function PpdbPage() {
       alert("Koreksi tes berhasil disimpan")
     } catch (err) {
       alert(getErrorMessage(err, "Gagal menyimpan koreksi tes"))
+    }
+  }
+
+  const handleCreateTagihan = async (p: PpdbDetail) => {
+    if (!confirm(`Buat tagihan PPDB untuk ${p.name}?`)) return
+    setIsTagihanLoading(true)
+    try {
+      await runActionWithIdFallback(p, (id) => ppdbAdminApi.createTagihanPpdb(id))
+      alert("Tagihan PPDB berhasil dibuat")
+    } catch (err) {
+      alert(getErrorMessage(err, "Gagal membuat tagihan PPDB"))
+    } finally {
+      setIsTagihanLoading(false)
     }
   }
 
@@ -444,6 +511,8 @@ export default function PpdbPage() {
         onDetail={handleOpenDetail}
         onVerifikasi={handleVerifikasi}
         onDelete={handleDeletePendaftar}
+        onCreateTagihan={handleCreateTagihan}
+        tagihanLoading={isTagihanLoading}
       />
 
       {/* Rekap Diterima & Ditolak */}
@@ -459,15 +528,17 @@ export default function PpdbPage() {
         tesConfig={selectedPendaftarTesConfig}
         isTesResultSaving={testResultLoading}
         onTesResultSave={handleSaveTesResult}
+        onUploadFile={handleUploadFile}
       />
 
-
-
-      {/* Terima Dialog */}
-      <Dialog open={isTerimaOpen} onOpenChange={setIsTerimaOpen}>
-        <DialogContent>
+      {/* Konfirmasi Terima Dialog */}
+      <Dialog open={isTerimaOpen} onOpenChange={(open) => {
+        setIsTerimaOpen(open)
+        if (open) void loadKelasList()
+      }}>
+        <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>Terima Pendaftar</DialogTitle>
+            <DialogTitle>Konfirmasi Penerimaan Santri</DialogTitle>
             <DialogDescription>
               Konfirmasi data pendaftar, lalu klik tombol terima untuk menyetujui pendaftaran.
             </DialogDescription>
@@ -491,6 +562,54 @@ export default function PpdbPage() {
                 disabled
               />
             </div>
+
+            <div className="flex items-center space-x-2 pt-2">
+              <input
+                type="checkbox"
+                id="integrasikanSantri"
+                checked={integrasikanSantri}
+                onChange={(e) => setIntegrasikanSantri(e.target.checked)}
+                className="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-4 w-4"
+              />
+              <Label htmlFor="integrasikanSantri" className="cursor-pointer font-normal">
+                Integrasikan Langsung Data ke Master Santri
+              </Label>
+            </div>
+
+            {integrasikanSantri && (
+              <div className="space-y-2 pt-2">
+                <Label>Pilih Kelas <span className="text-red-500">*</span></Label>
+                {kelasLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Memuat daftar kelas...
+                  </div>
+                ) : (
+                  <Select
+                    value={kodeKelasDiterima}
+                    onValueChange={setKodeKelasDiterima}
+                  >
+                    <SelectTrigger id="select-kode-kelas">
+                      <SelectValue placeholder="-- Pilih Kelas --" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {kelasList.length === 0 ? (
+                        <SelectItem value="__empty" disabled>Tidak ada kelas aktif tersedia</SelectItem>
+                      ) : (
+                        kelasList.map((kelas) => (
+                          <SelectItem key={kelas.kode_kelas} value={kelas.kode_kelas}>
+                            {kelas.kode_kelas}{kelas.nama_kelas ? ` — ${kelas.nama_kelas}` : ""}{kelas.tahun_ajaran ? ` (${kelas.tahun_ajaran})` : ""}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Kelas diperlukan untuk mendaftarkan akun santri secara otomatis.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button

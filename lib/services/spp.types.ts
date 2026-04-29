@@ -1,3 +1,17 @@
+/**
+ * SPP Types — aligned with backend API
+ *
+ * Backend endpoints:
+ *   GET/POST   /api/administrasi/spp/pembayaran
+ *   GET/PUT    /api/administrasi/spp/pembayaran/{id}
+ *   PUT        /api/administrasi/spp/pembayaran/{id}/verifikasi
+ *   GET/POST   /api/administrasi/spp/setting
+ *   GET/PUT    /api/administrasi/spp/setting/{id}
+ *   GET        /api/administrasi/spp/golongan
+ */
+
+// ─── Status enum ──────────────────────────────────────────────────────────────
+
 export type SppStatus =
   | 'Lunas'
   | 'Cicilan'
@@ -8,8 +22,20 @@ export type SppStatus =
   | 'Tagihan Dibuat'
   | 'Ditolak';
 
+// ─── Payment ──────────────────────────────────────────────────────────────────
+
+/** Shape returned to the UI after normalization */
 export interface SppPayment {
   id: string;
+  idSantri: string;
+  idSetting: string;
+  nominalBayar: number;
+  tanggalBayar: string;
+  metodeBayar: string;
+  status: SppStatus;
+  tanggalVerifikasi: string;
+  idPetugasVerifikator: string;
+  // Display helpers derived from related data (may be empty if not returned)
   noTagihan: string;
   nis: string;
   nama: string;
@@ -18,7 +44,6 @@ export interface SppPayment {
   jatuhTempo: string;
   nominal: number;
   terbayar: number;
-  status: SppStatus;
   channelPembayaran: string;
   nomorWaPembayaran: string;
   buktiBayarUrl: string;
@@ -27,17 +52,73 @@ export interface SppPayment {
   catatanVerifikasi: string;
 }
 
+/** POST /api/administrasi/spp/pembayaran */
+export interface CreateSppPaymentRequest {
+  id_santri: string | number;
+  id_setting: string | number;
+  nominal_bayar: number;
+  tanggal_bayar: string; // format: "2026-04-22 10:00:00"
+  metode_bayar: string;  // e.g. "transfer", "cash"
+}
+
+/** PUT /api/administrasi/spp/pembayaran/{id} */
+export type UpdateSppPaymentRequest = Partial<CreateSppPaymentRequest>;
+
+/** PUT /api/administrasi/spp/pembayaran/{id}/verifikasi */
+export interface VerifySppPaymentRequest {
+  status: 'verified';
+}
+
+// ─── Setting ──────────────────────────────────────────────────────────────────
+
+/** Shape returned to UI after normalization */
 export interface SppSetting {
   id: string;
+  kodeKelas: string;
+  idGolonganSpp: string;
+  nominal: number;
+  // Extra display fields that may come from backend relations
   nama: string;
   jenjang: string;
   kelas: string;
   tahunAjaran: string;
-  nominal: number;
   jatuhTempoHari: number | null;
   aktif: boolean;
   keterangan: string;
 }
+
+/** POST /api/administrasi/spp/setting */
+export interface CreateSppSettingRequest {
+  kode_kelas: string;
+  id_golongan_spp: string | number;
+  nominal: number;
+}
+
+/** PUT /api/administrasi/spp/setting/{id} */
+export type UpdateSppSettingRequest = Partial<CreateSppSettingRequest>;
+
+// ─── Golongan ─────────────────────────────────────────────────────────────────
+
+export interface SppGolongan {
+  id: string;
+  namaGolongan: string;
+  nominal: number;
+  jenjang?: string;
+  aktif?: boolean;
+  keterangan?: string;
+}
+
+export interface CreateSppGolonganRequest {
+  namaGolongan: string;
+  jenjang?: string;
+  nominal: number;
+  aktif?: boolean;
+  keterangan?: string;
+}
+
+export type UpdateSppGolonganRequest = Partial<CreateSppGolonganRequest>;
+
+// ─── Summary ──────────────────────────────────────────────────────────────────
 
 export interface SppTunggakanSummary {
   periode: string;
@@ -52,6 +133,8 @@ export interface SppTunggakanSummary {
   jatuhTempoBerikutnya: string;
 }
 
+// ─── List Responses ───────────────────────────────────────────────────────────
+
 export interface SppPaymentListResponse {
   data: SppPayment[];
   message: string;
@@ -62,52 +145,23 @@ export interface SppSettingListResponse {
   message: string;
 }
 
-export interface CreateSppPaymentRequest {
-  idPendaftaran?: string;
-  idSantri?: string;
-  idSetting?: string;
-  jenjang?: string;
-  nominalBayar?: number;
-  tanggalBayar?: string;
-  metodeBayar?: string;
-  idRekening?: string;
-  noTagihan?: string;
-  nis: string;
-  nama: string;
-  kelas: string;
-  bulan: string;
-  jatuhTempo: string;
-  nominal: number;
-  terbayar?: number;
-  status?: SppStatus;
+export interface SppGolonganListResponse {
+  data: SppGolongan[];
+  message: string;
 }
 
-export type UpdateSppPaymentRequest = Partial<CreateSppPaymentRequest>;
+// ─── Query Params ─────────────────────────────────────────────────────────────
 
-export interface VerifySppPaymentRequest {
-  status?:
-    | 'verified'
-    | 'rejected'
-    | 'pending'
-    | 'tagihan_dibuat'
-    | 'menunggu_verifikasi'
-    | 'terverifikasi'
-    | 'ditolak';
-  verified?: boolean;
-  catatan?: string;
-  idPetugasVerifikator?: string;
-  tanggalVerifikasi?: string;
+export interface SppPaymentQuery {
+  per_page?: number;
+  id_santri?: string | number;
+  status?: string;
+  tanggal_mulai?: string;
+  tanggal_selesai?: string;
 }
 
-export interface CreateSppSettingRequest {
-  nama: string;
-  jenjang?: string;
-  kelas?: string;
-  tahunAjaran?: string;
-  nominal: number;
-  jatuhTempoHari?: number | null;
-  aktif?: boolean;
-  keterangan?: string;
+export interface SppSettingQuery {
+  per_page?: number;
+  kode_kelas?: string;
+  id_golongan_spp?: string | number;
 }
-
-export type UpdateSppSettingRequest = Partial<CreateSppSettingRequest>;

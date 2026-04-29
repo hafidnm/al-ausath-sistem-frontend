@@ -1,205 +1,126 @@
+/**
+ * SPP Service — aligned with backend API
+ *
+ * Base path: /api/administrasi/spp
+ *
+ * Endpoints:
+ *   GET/POST   /pembayaran
+ *   GET/PUT/DELETE /pembayaran/{id}
+ *   PUT        /pembayaran/{id}/verifikasi
+ *   GET        /tunggakan-ringkasan
+ *   GET/POST   /setting
+ *   GET/PUT/DELETE /setting/{id}
+ *   GET        /golongan
+ */
 import api from '../axios';
 import type {
   CreateSppPaymentRequest,
   CreateSppSettingRequest,
+  CreateSppGolonganRequest,
+  SppGolongan,
+  SppGolonganListResponse,
   SppPayment,
   SppPaymentListResponse,
+  SppPaymentQuery,
   SppSetting,
   SppSettingListResponse,
+  SppSettingQuery,
   SppStatus,
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
   UpdateSppSettingRequest,
+  UpdateSppGolonganRequest,
   VerifySppPaymentRequest,
 } from './spp.types';
 
 export type {
   CreateSppPaymentRequest,
   CreateSppSettingRequest,
+  CreateSppGolonganRequest,
+  SppGolongan,
+  SppGolonganListResponse,
   SppPayment,
   SppPaymentListResponse,
+  SppPaymentQuery,
   SppSetting,
   SppSettingListResponse,
+  SppSettingQuery,
   SppStatus,
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
   UpdateSppSettingRequest,
+  UpdateSppGolonganRequest,
   VerifySppPaymentRequest,
-} from './spp.types';
+};
 
 type ApiRecord = Record<string, unknown>;
 
-const toStringOrEmpty = (value: unknown): string => {
+const BASE = '/administrasi/spp';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const toStr = (value: unknown): string => {
   if (typeof value === 'string') return value;
   if (typeof value === 'number' || typeof value === 'bigint') return String(value);
   return '';
 };
 
-const toNumberOrZero = (value: unknown): number => {
+const toNum = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
-    const normalized = value.replace(/[^\d.,-]/g, '').replace('.', '').replace(',', '.');
-    const parsed = Number(normalized);
+    const cleaned = value.replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
+    const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
 };
 
-const toBoolean = (value: unknown): boolean => {
+const toBool = (value: unknown): boolean => {
   if (typeof value === 'boolean') return value;
   if (typeof value === 'number') return value === 1;
-  const normalized = toStringOrEmpty(value).trim().toLowerCase();
-  return ['1', 'true', 'yes', 'y', 'aktif', 'active'].includes(normalized);
-};
-
-const getErrorStatus = (error: unknown): number | undefined => {
-  if (!error || typeof error !== 'object') return undefined;
-
-  const errObj = error as {
-    response?: {
-      status?: number;
-    };
-  };
-
-  return errObj.response?.status;
+  const s = toStr(value).trim().toLowerCase();
+  return ['1', 'true', 'yes', 'y', 'aktif', 'active'].includes(s);
 };
 
 const extractErrorMessage = (error: unknown, fallback: string): string => {
   if (error && typeof error === 'object') {
-    const errObj = error as {
-      response?: {
-        data?: {
-          message?: string;
-          error?: string;
-        };
-      };
-      message?: string;
-    };
-
-    return errObj.response?.data?.message || errObj.response?.data?.error || errObj.message || fallback;
+    const e = error as { response?: { data?: { message?: string; error?: string } }; message?: string };
+    return e.response?.data?.message ?? e.response?.data?.error ?? e.message ?? fallback;
   }
-
   return fallback;
 };
 
-const normalizeBasePath = (value: string): string => {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-
-  const withLeadingSlash = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
-  return withLeadingSlash.replace(/\/+$/, '');
-};
-
-const basePathCandidates = [
-  process.env.NEXT_PUBLIC_SPP_API_BASE_PATH,
-  '/administrasi/spp',
-  '/keuangan/spp',
-  '/spp',
-  '',
-]
-  .filter((item): item is string => typeof item === 'string')
-  .map(normalizeBasePath);
-
-const SPP_BASE_PATHS = Array.from(new Set(basePathCandidates));
-
-const buildPath = (basePath: string, endpoint: string): string => {
-  if (!basePath) return endpoint;
-  return `${basePath}${endpoint}`;
-};
-
-const shouldTryNextBasePath = (error: unknown): boolean => {
-  const status = getErrorStatus(error);
-  return status === 404 || status === 405;
-};
-
-const requestWithBasePathFallback = async <T>(
-  callback: (basePath: string) => Promise<T>,
-): Promise<T> => {
-  let lastError: unknown;
-
-  for (let index = 0; index < SPP_BASE_PATHS.length; index += 1) {
-    try {
-      return await callback(SPP_BASE_PATHS[index]);
-    } catch (error) {
-      lastError = error;
-
-      const isLast = index === SPP_BASE_PATHS.length - 1;
-      if (!shouldTryNextBasePath(error) || isLast) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError;
-};
-
-const requestWithEndpointFallback = async <T>(
-  endpointCandidates: string[],
-  callback: (endpoint: string) => Promise<T>,
-): Promise<T> => {
-  let lastError: unknown;
-
-  for (let index = 0; index < endpointCandidates.length; index += 1) {
-    const endpoint = endpointCandidates[index];
-
-    try {
-      return await callback(endpoint);
-    } catch (error) {
-      lastError = error;
-      const status = getErrorStatus(error);
-      const isLast = index === endpointCandidates.length - 1;
-
-      if ((status !== 404 && status !== 405) || isLast) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError;
-};
-
-const BILL_ENDPOINTS = ['/bill', '/pembayaran'];
-
-const isObjectArray = (value: unknown): value is ApiRecord[] => {
-  return Array.isArray(value) && value.every((item) => item && typeof item === 'object');
-};
-
+// Walk a response payload and find the first array of objects
 const extractList = (payload: unknown): ApiRecord[] => {
   const visited = new Set<unknown>();
 
   const walk = (value: unknown): ApiRecord[] => {
-    if (!value || typeof value !== 'object' || visited.has(value)) {
-      return [];
-    }
-
+    if (!value || typeof value !== 'object' || visited.has(value)) return [];
     visited.add(value);
 
-    if (isObjectArray(value)) {
-      return value;
+    if (Array.isArray(value)) {
+      return value.filter((item): item is ApiRecord => !!item && typeof item === 'object');
     }
 
-    const record = value as ApiRecord;
-    const preferredKeys = ['data', 'items', 'list', 'rows', 'pembayaran', 'setting'];
+    const rec = value as ApiRecord;
+    const preferred = ['data', 'items', 'list', 'rows', 'pembayaran', 'setting', 'golongan'];
 
-    for (const key of preferredKeys) {
-      const candidate = record[key];
-      if (isObjectArray(candidate)) {
-        return candidate;
+    for (const key of preferred) {
+      if (Array.isArray(rec[key])) {
+        return (rec[key] as unknown[]).filter(
+          (item): item is ApiRecord => !!item && typeof item === 'object',
+        );
       }
     }
 
-    for (const key of preferredKeys) {
-      const nested = walk(record[key]);
-      if (nested.length > 0) {
-        return nested;
-      }
+    for (const key of preferred) {
+      const nested = walk(rec[key]);
+      if (nested.length > 0) return nested;
     }
 
-    for (const candidate of Object.values(record)) {
-      const nested = walk(candidate);
-      if (nested.length > 0) {
-        return nested;
-      }
+    for (const val of Object.values(rec)) {
+      const nested = walk(val);
+      if (nested.length > 0) return nested;
     }
 
     return [];
@@ -208,176 +129,155 @@ const extractList = (payload: unknown): ApiRecord[] => {
   return walk(payload);
 };
 
-const parseDate = (value: string): Date | null => {
-  if (!value) return null;
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+const extractSingle = (payload: unknown): ApiRecord => {
+  if (!payload || typeof payload !== 'object') return {};
+  const rec = payload as ApiRecord;
+  if (rec.data && typeof rec.data === 'object' && !Array.isArray(rec.data)) {
+    return rec.data as ApiRecord;
+  }
+  return rec;
 };
 
-const derivePaymentStatus = (
+// ─── Status normalization ─────────────────────────────────────────────────────
+
+const normalizeStatus = (
+  raw: unknown,
   nominal: number,
   terbayar: number,
   jatuhTempo: string,
 ): SppStatus => {
+  const s = toStr(raw).trim().toLowerCase();
+
+  if (s === 'tagihan_dibuat' || s === 'draft' || s === 'created') return 'Tagihan Dibuat';
+  if (s === 'ditolak' || s === 'rejected') return 'Ditolak';
+  if (s === 'lunas' || s === 'paid' || s === 'selesai') return 'Lunas';
+  if (s === 'terverifikasi' || s === 'verified' || s === 'valid' || s === 'approved') return 'Terverifikasi';
+  if (
+    s === 'menunggu verifikasi' ||
+    s === 'menunggu_verifikasi' ||
+    s === 'waiting_verification' ||
+    s === 'pending_verification' ||
+    s === 'pending'
+  )
+    return 'Menunggu Verifikasi';
+  if (s === 'cicilan' || s === 'partial' || s === 'installment') return 'Cicilan';
+  if (s === 'belum bayar' || s === 'belum_bayar' || s === 'unpaid') return 'Belum Bayar';
+  if (s === 'terlambat' || s === 'menunggak' || s === 'overdue' || s === 'tunggakan') return 'Terlambat';
+
+  // Derive from amounts/dates
   if (nominal > 0 && terbayar >= nominal) return 'Lunas';
   if (terbayar > 0) return 'Cicilan';
 
-  const dueDate = parseDate(jatuhTempo);
-  if (dueDate) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    dueDate.setHours(0, 0, 0, 0);
-    if (dueDate < today) return 'Terlambat';
+  if (jatuhTempo) {
+    const due = new Date(jatuhTempo);
+    if (!Number.isNaN(due.getTime())) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      due.setHours(0, 0, 0, 0);
+      if (due < today) return 'Terlambat';
+    }
   }
 
   return 'Belum Bayar';
 };
 
-const normalizePaymentStatus = (
-  value: unknown,
-  nominal: number,
-  terbayar: number,
-  jatuhTempo: string,
-): SppStatus => {
-  const raw = toStringOrEmpty(value).trim().toLowerCase();
-
-  if (raw === 'tagihan_dibuat' || raw === 'draft' || raw === 'created') return 'Tagihan Dibuat';
-  if (raw === 'ditolak' || raw === 'rejected') return 'Ditolak';
-
-  if (raw === 'lunas' || raw === 'paid' || raw === 'selesai') return 'Lunas';
-  if (
-    raw === 'terverifikasi' ||
-    raw === 'verified' ||
-    raw === 'valid' ||
-    raw === 'approved'
-  )
-    return 'Terverifikasi';
-  if (
-    raw === 'menunggu verifikasi' ||
-    raw === 'menunggu_verifikasi' ||
-    raw === 'waiting_verification' ||
-    raw === 'pending_verification'
-  )
-    return 'Menunggu Verifikasi';
-  if (raw === 'cicilan' || raw === 'partial' || raw === 'installment') return 'Cicilan';
-  if (
-    raw === 'belum bayar' ||
-    raw === 'belum_bayar' ||
-    raw === 'unpaid' ||
-    raw === 'pending'
-  )
-    return 'Belum Bayar';
-  if (
-    raw === 'terlambat' ||
-    raw === 'menunggak' ||
-    raw === 'overdue' ||
-    raw === 'tunggakan'
-  )
-    return 'Terlambat';
-
-  return derivePaymentStatus(nominal, terbayar, jatuhTempo);
-};
+// ─── Normalizers ──────────────────────────────────────────────────────────────
 
 const normalizePayment = (item: ApiRecord): SppPayment => {
-  const nominal = toNumberOrZero(
-    item.nominal ?? item.nominal_tagihan ?? item.jumlah_tagihan ?? item.biaya_spp,
-  );
-  const terbayar = toNumberOrZero(
-    item.terbayar ?? item.jumlah_bayar ?? item.total_bayar ?? item.jumlah_terbayar,
-  );
-  const jatuhTempo = toStringOrEmpty(
-    item.jatuh_tempo ?? item.jatuhTempo ?? item.tanggal_jatuh_tempo ?? item.due_date,
-  );
+  const nominalBayar = toNum(item.nominal_bayar ?? item.nominalBayar ?? item.nominal ?? item.nominal_tagihan);
+  const terbayar = toNum(item.terbayar ?? item.jumlah_terbayar ?? item.total_terbayar ?? 0);
+  const jatuhTempo = toStr(item.jatuh_tempo ?? item.jatuhTempo ?? item.tanggal_jatuh_tempo ?? '');
 
-  const id =
-    toStringOrEmpty(item.id ?? item.id_pembayaran ?? item.uuid) ||
-    toStringOrEmpty(item.no_tagihan ?? item.noTagihan);
+  const id = toStr(item.id ?? item.id_pembayaran ?? item.uuid) ||
+    toStr(item.no_tagihan ?? item.noTagihan);
 
-  const status = normalizePaymentStatus(
+  const status = normalizeStatus(
     item.status ?? item.status_pembayaran ?? item.payment_status,
-    nominal,
+    nominalBayar,
     terbayar,
     jatuhTempo,
   );
 
   return {
     id,
-    noTagihan:
-      toStringOrEmpty(item.no_tagihan ?? item.noTagihan ?? item.invoice_number ?? item.invoice) ||
-      id,
-    nis: toStringOrEmpty(item.nis ?? item.nisn ?? item.nomor_induk),
-    nama: toStringOrEmpty(item.nama ?? item.nama_santri ?? item.name),
-    kelas: toStringOrEmpty(item.kelas ?? item.kelas_santri ?? item.rombel),
-    bulan: toStringOrEmpty(item.bulan ?? item.periode_bulan ?? item.periode),
-    jatuhTempo,
-    nominal,
-    terbayar,
+    idSantri: toStr(item.id_santri ?? item.idSantri ?? ''),
+    idSetting: toStr(item.id_setting ?? item.idSetting ?? ''),
+    nominalBayar,
+    tanggalBayar: toStr(item.tanggal_bayar ?? item.tanggalBayar ?? item.created_at ?? ''),
+    metodeBayar: toStr(item.metode_bayar ?? item.metodeBayar ?? item.channel_pembayaran ?? ''),
     status,
-    channelPembayaran: toStringOrEmpty(
-      item.channel_pembayaran ?? item.metode_pembayaran ?? item.payment_channel,
-    ),
-    nomorWaPembayaran: toStringOrEmpty(
-      item.nomor_wa_pembayaran ?? item.wa_number ?? item.whatsapp,
-    ),
-    buktiBayarUrl: toStringOrEmpty(
-      item.bukti_bayar_url ?? item.payment_proof_url ?? item.bukti_url,
-    ),
-    kwitansiUrl: toStringOrEmpty(
-      item.kwitansi_url ?? item.receipt_url ?? item.invoice_url,
-    ),
-    verifikasiAt: toStringOrEmpty(
-      item.verified_at ?? item.verifikasi_at ?? item.tanggal_verifikasi,
-    ),
-    catatanVerifikasi: toStringOrEmpty(
-      item.catatan_verifikasi ?? item.verification_note ?? item.keterangan_verifikasi,
-    ),
+    tanggalVerifikasi: toStr(item.tanggal_verifikasi ?? item.tanggalVerifikasi ?? ''),
+    idPetugasVerifikator: toStr(item.id_petugas_verifikator ?? ''),
+    // Display helpers
+    noTagihan: toStr(item.no_tagihan ?? item.noTagihan ?? item.invoice_number ?? '') || id,
+    nis: toStr(item.nis ?? item.nisn ?? item.nomor_induk ?? ''),
+    nama: toStr(item.nama ?? item.nama_santri ?? item.name ?? ''),
+    kelas: toStr(item.kelas ?? item.kelas_santri ?? item.rombel ?? ''),
+    bulan: toStr(item.bulan ?? item.periode_bulan ?? item.periode ?? ''),
+    jatuhTempo,
+    nominal: nominalBayar,
+    terbayar,
+    channelPembayaran: toStr(item.channel_pembayaran ?? item.metode_pembayaran ?? item.metode_bayar ?? ''),
+    nomorWaPembayaran: toStr(item.nomor_wa_pembayaran ?? item.wa_number ?? ''),
+    buktiBayarUrl: toStr(item.bukti_bayar_url ?? item.payment_proof_url ?? ''),
+    kwitansiUrl: toStr(item.kwitansi_url ?? item.receipt_url ?? ''),
+    verifikasiAt: toStr(item.verified_at ?? item.verifikasi_at ?? item.tanggal_verifikasi ?? ''),
+    catatanVerifikasi: toStr(item.catatan_verifikasi ?? item.verification_note ?? ''),
   };
 };
 
 const normalizeSetting = (item: ApiRecord): SppSetting => {
-  const id = toStringOrEmpty(item.id ?? item.id_setting ?? item.uuid);
-
-  const jatuhTempoHariRaw =
-    item.jatuh_tempo_hari ?? item.jatuhTempoHari ?? item.hari_jatuh_tempo ?? item.due_day;
-  const jatuhTempoHari =
-    jatuhTempoHariRaw === null || jatuhTempoHariRaw === undefined
-      ? null
-      : toNumberOrZero(jatuhTempoHariRaw);
-
+  const id = toStr(item.id ?? item.id_setting ?? item.uuid);
   return {
     id,
-    nama: toStringOrEmpty(item.nama ?? item.nama_setting ?? item.nama_unit) || `Setting ${id || '-'}`,
-    jenjang: toStringOrEmpty(item.jenjang ?? item.unit ?? item.tingkat),
-    kelas: toStringOrEmpty(item.kelas ?? item.nama_kelas),
-    tahunAjaran: toStringOrEmpty(item.tahun_ajaran ?? item.tahunAjaran ?? item.periode),
-    nominal: toNumberOrZero(item.nominal ?? item.nominal_spp ?? item.biaya),
-    jatuhTempoHari,
-    aktif: toBoolean(item.aktif ?? item.active ?? item.is_active ?? item.status),
-    keterangan: toStringOrEmpty(item.keterangan ?? item.deskripsi ?? item.catatan),
+    kodeKelas: toStr(item.kode_kelas ?? item.kodeKelas ?? item.kelas ?? ''),
+    idGolonganSpp: toStr(item.id_golongan_spp ?? item.idGolonganSpp ?? ''),
+    nominal: toNum(item.nominal ?? item.nominal_spp ?? item.biaya ?? 0),
+    // Display helpers
+    nama:
+      toStr(item.nama ?? item.nama_setting ?? item.nama_kelas ?? '') ||
+      [toStr(item.kode_kelas ?? ''), toStr(item.jenjang ?? '')].filter(Boolean).join(' - ') ||
+      `Setting ${id || '-'}`,
+    jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? ''),
+    kelas: toStr(item.kelas ?? item.nama_kelas ?? item.kode_kelas ?? ''),
+    tahunAjaran: toStr(item.tahun_ajaran ?? item.tahunAjaran ?? item.periode ?? ''),
+    jatuhTempoHari:
+      item.jatuh_tempo_hari == null && item.jatuhTempoHari == null
+        ? null
+        : toNum(item.jatuh_tempo_hari ?? item.jatuhTempoHari ?? item.due_day ?? 0),
+    aktif: toBool(item.aktif ?? item.active ?? item.is_active ?? item.status),
+    keterangan: toStr(item.keterangan ?? item.deskripsi ?? item.catatan ?? ''),
   };
 };
+
+const normalizeGolongan = (item: ApiRecord): SppGolongan => ({
+  id: toStr(item.id ?? item.id_golongan_spp ?? ''),
+  namaGolongan: toStr(item.nama_golongan ?? item.namaGolongan ?? item.nama ?? ''),
+  nominal: toNum(item.nominal ?? 0),
+});
+
+// ─── Summary ──────────────────────────────────────────────────────────────────
 
 const summarizeFromPayments = (payments: SppPayment[]): SppTunggakanSummary => {
   const totalTagihan = payments.length;
-  const totalLunas = payments.filter((item) => item.status === 'Lunas').length;
-  const totalCicilan = payments.filter((item) => item.status === 'Cicilan').length;
-  const totalBelumBayar = payments.filter((item) => item.status === 'Belum Bayar').length;
-  const totalTerlambat = payments.filter((item) => item.status === 'Terlambat').length;
-
-  const totalNominal = payments.reduce((sum, item) => sum + item.nominal, 0);
-  const totalTerbayar = payments.reduce((sum, item) => sum + item.terbayar, 0);
+  const totalLunas = payments.filter((p) => p.status === 'Lunas').length;
+  const totalCicilan = payments.filter((p) => p.status === 'Cicilan').length;
+  const totalBelumBayar = payments.filter((p) => p.status === 'Belum Bayar').length;
+  const totalTerlambat = payments.filter((p) => p.status === 'Terlambat').length;
+  const totalNominal = payments.reduce((s, p) => s + p.nominal, 0);
+  const totalTerbayar = payments.reduce((s, p) => s + p.terbayar, 0);
   const totalSisa = Math.max(totalNominal - totalTerbayar, 0);
 
   const dueDates = payments
-    .map((item) => parseDate(item.jatuhTempo))
-    .filter((item): item is Date => Boolean(item))
+    .map((p) => new Date(p.jatuhTempo))
+    .filter((d) => !Number.isNaN(d.getTime()))
     .sort((a, b) => a.getTime() - b.getTime());
 
   const now = new Date();
-  const nextDueDate = dueDates.find((item) => item.getTime() >= now.getTime()) ?? dueDates[0] ?? null;
+  const nextDue = dueDates.find((d) => d >= now) ?? dueDates[0] ?? null;
 
   return {
-    periode: '',
+    periode: payments[0]?.bulan ?? '',
     totalTagihan,
     totalLunas,
     totalCicilan,
@@ -386,57 +286,35 @@ const summarizeFromPayments = (payments: SppPayment[]): SppTunggakanSummary => {
     totalNominal,
     totalTerbayar,
     totalSisa,
-    jatuhTempoBerikutnya: nextDueDate ? nextDueDate.toISOString() : '',
+    jatuhTempoBerikutnya: nextDue ? nextDue.toISOString() : '',
   };
 };
 
-const normalizeSummary = (
+const normalizeSummaryPayload = (
   payload: unknown,
-  fallbackPayments: SppPayment[],
+  fallback: SppTunggakanSummary,
 ): SppTunggakanSummary => {
-  const baseSummary = summarizeFromPayments(fallbackPayments);
+  if (!payload || typeof payload !== 'object') return fallback;
+  const raw = extractSingle(payload) as ApiRecord;
 
-  const dataRecord =
-    payload && typeof payload === 'object' && (payload as ApiRecord).data && typeof (payload as ApiRecord).data === 'object'
-      ? ((payload as ApiRecord).data as ApiRecord)
-      : (payload as ApiRecord);
+  const pick = (key: string, ...aliases: string[]): number =>
+    toNum([key, ...aliases].map((k) => raw[k]).find((v) => v != null) ?? 0);
 
-  if (!dataRecord || typeof dataRecord !== 'object') {
-    return baseSummary;
-  }
-
-  const totalTagihan =
-    toNumberOrZero(dataRecord.total_tagihan ?? dataRecord.totalTagihan) || baseSummary.totalTagihan;
-  const totalLunas =
-    toNumberOrZero(dataRecord.total_lunas ?? dataRecord.totalLunas ?? dataRecord.lunas) ||
-    baseSummary.totalLunas;
-  const totalCicilan =
-    toNumberOrZero(dataRecord.total_cicilan ?? dataRecord.totalCicilan ?? dataRecord.cicilan) ||
-    baseSummary.totalCicilan;
-
+  const totalTagihan = pick('total_tagihan', 'totalTagihan') || fallback.totalTagihan;
+  const totalLunas = pick('total_lunas', 'totalLunas', 'lunas') || fallback.totalLunas;
+  const totalCicilan = pick('total_cicilan', 'totalCicilan', 'cicilan') || fallback.totalCicilan;
   const totalBelumBayar =
-    toNumberOrZero(
-      dataRecord.total_belum_bayar ?? dataRecord.totalBelumBayar ?? dataRecord.belum_bayar,
-    ) || baseSummary.totalBelumBayar;
-
+    pick('total_belum_bayar', 'totalBelumBayar', 'belum_bayar') || fallback.totalBelumBayar;
   const totalTerlambat =
-    toNumberOrZero(
-      dataRecord.total_terlambat ?? dataRecord.totalTerlambat ?? dataRecord.menunggak,
-    ) || baseSummary.totalTerlambat;
-
-  const totalNominal =
-    toNumberOrZero(dataRecord.total_nominal ?? dataRecord.totalNominal ?? dataRecord.nominal) ||
-    baseSummary.totalNominal;
-
+    pick('total_terlambat', 'totalTerlambat', 'menunggak') || fallback.totalTerlambat;
+  const totalNominal = pick('total_nominal', 'totalNominal', 'nominal') || fallback.totalNominal;
   const totalTerbayar =
-    toNumberOrZero(dataRecord.total_terbayar ?? dataRecord.totalTerbayar ?? dataRecord.terbayar) ||
-    baseSummary.totalTerbayar;
-
-  const explicitSisa = toNumberOrZero(dataRecord.total_sisa ?? dataRecord.totalSisa ?? dataRecord.total_tunggakan);
+    pick('total_terbayar', 'totalTerbayar', 'terbayar') || fallback.totalTerbayar;
+  const explicitSisa = pick('total_sisa', 'totalSisa', 'total_tunggakan');
   const totalSisa = explicitSisa || Math.max(totalNominal - totalTerbayar, 0);
 
   return {
-    periode: toStringOrEmpty(dataRecord.periode ?? dataRecord.bulan ?? dataRecord.period),
+    periode: toStr(raw.periode ?? raw.bulan ?? raw.period ?? '') || fallback.periode,
     totalTagihan,
     totalLunas,
     totalCicilan,
@@ -445,264 +323,141 @@ const normalizeSummary = (
     totalNominal,
     totalTerbayar,
     totalSisa,
-    jatuhTempoBerikutnya: toStringOrEmpty(
-      dataRecord.jatuh_tempo_berikutnya ?? dataRecord.jatuhTempoBerikutnya ?? dataRecord.next_due_date,
-    ) || baseSummary.jatuhTempoBerikutnya,
+    jatuhTempoBerikutnya:
+      toStr(raw.jatuh_tempo_berikutnya ?? raw.jatuhTempoBerikutnya ?? raw.next_due_date ?? '') ||
+      fallback.jatuhTempoBerikutnya,
   };
 };
 
-const mapPaymentPayload = (data: CreateSppPaymentRequest | UpdateSppPaymentRequest): ApiRecord => {
-  const payload: ApiRecord = {};
-
-  if (data.idPendaftaran !== undefined) payload.id_pendaftaran = data.idPendaftaran;
-  if (data.idSantri !== undefined) payload.id_santri = data.idSantri;
-  if (data.idSetting !== undefined) payload.id_setting = data.idSetting;
-  if (data.jenjang !== undefined) payload.jenjang = data.jenjang;
-  if (data.nominalBayar !== undefined) payload.nominal_bayar = data.nominalBayar;
-  if (data.tanggalBayar !== undefined) payload.tanggal_bayar = data.tanggalBayar;
-  if (data.metodeBayar !== undefined) payload.metode_bayar = data.metodeBayar;
-  if (data.idRekening !== undefined) payload.id_rekening = data.idRekening;
-
-  if (data.noTagihan !== undefined) payload.no_tagihan = data.noTagihan;
-  if (data.nis !== undefined) payload.nis = data.nis;
-  if (data.nama !== undefined) payload.nama = data.nama;
-  if (data.kelas !== undefined) payload.kelas = data.kelas;
-  if (data.bulan !== undefined) payload.bulan = data.bulan;
-  if (data.jatuhTempo !== undefined) payload.jatuh_tempo = data.jatuhTempo;
-  if (data.nominal !== undefined) payload.nominal = data.nominal;
-  if (data.terbayar !== undefined) payload.terbayar = data.terbayar;
-  if (data.status !== undefined) payload.status = data.status;
-
-  return payload;
-};
-
-const normalizeVerificationStatusPayload = (
-  data?: VerifySppPaymentRequest,
-): 'tagihan_dibuat' | 'menunggu_verifikasi' | 'terverifikasi' | 'ditolak' => {
-  const raw = toStringOrEmpty(data?.status).trim().toLowerCase();
-
-  if (raw === 'tagihan_dibuat') return 'tagihan_dibuat';
-  if (raw === 'menunggu_verifikasi' || raw === 'pending') return 'menunggu_verifikasi';
-  if (raw === 'ditolak' || raw === 'rejected') return 'ditolak';
-  if (raw === 'terverifikasi' || raw === 'verified') return 'terverifikasi';
-
-  if (data?.verified === false) return 'ditolak';
-  return 'terverifikasi';
-};
-
-const mapSettingPayload = (data: CreateSppSettingRequest | UpdateSppSettingRequest): ApiRecord => {
-  const payload: ApiRecord = {};
-
-  if (data.nama !== undefined) payload.nama = data.nama;
-  if (data.jenjang !== undefined) payload.jenjang = data.jenjang;
-  if (data.kelas !== undefined) payload.kelas = data.kelas;
-  if (data.tahunAjaran !== undefined) payload.tahun_ajaran = data.tahunAjaran;
-  if (data.nominal !== undefined) payload.nominal = data.nominal;
-  if (data.jatuhTempoHari !== undefined) payload.jatuh_tempo_hari = data.jatuhTempoHari;
-  if (data.aktif !== undefined) payload.aktif = data.aktif;
-  if (data.keterangan !== undefined) payload.keterangan = data.keterangan;
-
-  return payload;
-};
+// ─── Service ──────────────────────────────────────────────────────────────────
 
 export const sppService = {
-  getTunggakanSummary: async (): Promise<SppTunggakanSummary> => {
-    const pathCandidates = ['/tunggakan-ringkasan', '/tunggakan'];
-    let lastError: unknown;
+  // ── Payments ───────────────────────────────────────────────────────────────
 
-    for (const path of pathCandidates) {
-      try {
-        const response = await requestWithBasePathFallback((basePath) =>
-          api.get(buildPath(basePath, path)),
-        );
-
-        const normalizedPayments = extractList(response.data).map(normalizePayment);
-        return normalizeSummary(response.data, normalizedPayments);
-      } catch (error) {
-        lastError = error;
-        const status = getErrorStatus(error);
-        if (status !== 404 && status !== 405) {
-          const message = extractErrorMessage(error, 'Failed to fetch tunggakan summary');
-          throw new Error(message);
-        }
-      }
-    }
-
-    const message = extractErrorMessage(lastError, 'Failed to fetch tunggakan summary');
-    throw new Error(message);
-  },
-
-  getPayments: async (): Promise<SppPaymentListResponse> => {
+  async getPayments(query?: import('./spp.types').SppPaymentQuery): Promise<SppPaymentListResponse> {
     try {
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) => api.get(buildPath(basePath, endpoint))),
-      );
+      const response = await api.get(`${BASE}/pembayaran`, { params: query });
       const data = extractList(response.data).map(normalizePayment);
-
-      return {
-        data,
-        message: 'success',
-      };
+      return { data, message: 'success' };
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to fetch SPP payments');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memuat daftar pembayaran SPP'));
     }
   },
 
-  getPaymentDetail: async (id: string): Promise<SppPayment> => {
+  async getPaymentDetail(id: string): Promise<SppPayment> {
     try {
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) => api.get(buildPath(basePath, `${endpoint}/${id}`))),
-      );
-
-      const payload = response.data as ApiRecord;
-      const data =
-        payload.data && typeof payload.data === 'object'
-          ? (payload.data as ApiRecord)
-          : (payload as ApiRecord);
-
-      return normalizePayment(data);
+      const response = await api.get(`${BASE}/pembayaran/${id}`);
+      return normalizePayment(extractSingle(response.data));
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to fetch payment detail');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memuat detail pembayaran'));
     }
   },
 
-  createPayment: async (data: CreateSppPaymentRequest) => {
+  async createPayment(data: CreateSppPaymentRequest): Promise<unknown> {
     try {
-      const payload = mapPaymentPayload(data);
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) => api.post(buildPath(basePath, endpoint), payload)),
-      );
+      const response = await api.post(`${BASE}/pembayaran`, data);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to create payment');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal mencatat pembayaran'));
     }
   },
 
-  updatePayment: async (id: string, data: UpdateSppPaymentRequest) => {
+  async updatePayment(id: string, data: UpdateSppPaymentRequest): Promise<unknown> {
     try {
-      const payload = mapPaymentPayload(data);
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) =>
-          api.put(buildPath(basePath, `${endpoint}/${id}`), payload),
-        ),
-      );
+      const response = await api.put(`${BASE}/pembayaran/${id}`, data);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to update payment');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memperbarui pembayaran'));
     }
   },
 
-  verifyPayment: async (id: string, data?: VerifySppPaymentRequest) => {
+  async verifyPayment(id: string, _payload?: VerifySppPaymentRequest): Promise<unknown> {
     try {
-      const normalizedStatus = normalizeVerificationStatusPayload(data);
-      const payload = {
-        status: normalizedStatus,
-        id_petugas_verifikator: data?.idPetugasVerifikator,
-        tanggal_verifikasi: data?.tanggalVerifikasi,
-        verified: data?.verified ?? normalizedStatus === 'terverifikasi',
-        catatan: data?.catatan,
-      };
-
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) =>
-          api.put(buildPath(basePath, `${endpoint}/${id}/verifikasi`), payload),
-        ),
-      );
+      const body: VerifySppPaymentRequest = { status: 'verified' };
+      const response = await api.put(`${BASE}/pembayaran/${id}/verifikasi`, body);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to verify payment');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memverifikasi pembayaran'));
     }
   },
 
-  deletePayment: async (id: string) => {
+  async deletePayment(id: string): Promise<unknown> {
     try {
-      const response = await requestWithEndpointFallback(BILL_ENDPOINTS, (endpoint) =>
-        requestWithBasePathFallback((basePath) => api.delete(buildPath(basePath, `${endpoint}/${id}`))),
-      );
+      const response = await api.delete(`${BASE}/pembayaran/${id}`);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to delete payment');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal menghapus pembayaran'));
     }
   },
 
-  getSettings: async (): Promise<SppSettingListResponse> => {
+  async getTunggakanSummary(): Promise<SppTunggakanSummary> {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.get(buildPath(basePath, '/setting')),
-      );
+      const response = await api.get(`${BASE}/tunggakan-ringkasan`);
+      const payments = extractList(response.data).map(normalizePayment);
+      const fallback = summarizeFromPayments(payments);
+      return normalizeSummaryPayload(response.data, fallback);
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat ringkasan tunggakan'));
+    }
+  },
 
+  // ── Settings ───────────────────────────────────────────────────────────────
+
+  async getSettings(query?: import('./spp.types').SppSettingQuery): Promise<SppSettingListResponse> {
+    try {
+      const response = await api.get(`${BASE}/setting`, { params: query });
       const data = extractList(response.data).map(normalizeSetting);
-
-      return {
-        data,
-        message: 'success',
-      };
+      return { data, message: 'success' };
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to fetch SPP settings');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memuat pengaturan SPP'));
     }
   },
 
-  getSettingDetail: async (id: string): Promise<SppSetting> => {
+  async getSettingDetail(id: string): Promise<SppSetting> {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.get(buildPath(basePath, `/setting/${id}`)),
-      );
-
-      const payload = response.data as ApiRecord;
-      const data =
-        payload.data && typeof payload.data === 'object'
-          ? (payload.data as ApiRecord)
-          : (payload as ApiRecord);
-
-      return normalizeSetting(data);
+      const response = await api.get(`${BASE}/setting/${id}`);
+      return normalizeSetting(extractSingle(response.data));
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to fetch setting detail');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memuat detail setting'));
     }
   },
 
-  createSetting: async (data: CreateSppSettingRequest) => {
+  async createSetting(data: CreateSppSettingRequest): Promise<unknown> {
     try {
-      const payload = mapSettingPayload(data);
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.post(buildPath(basePath, '/setting'), payload),
-      );
+      const response = await api.post(`${BASE}/setting`, data);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to create SPP setting');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal membuat setting SPP'));
     }
   },
 
-  updateSetting: async (id: string, data: UpdateSppSettingRequest) => {
+  async updateSetting(id: string, data: UpdateSppSettingRequest): Promise<unknown> {
     try {
-      const payload = mapSettingPayload(data);
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.put(buildPath(basePath, `/setting/${id}`), payload),
-      );
+      const response = await api.put(`${BASE}/setting/${id}`, data);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to update SPP setting');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal memperbarui setting SPP'));
     }
   },
 
-  deleteSetting: async (id: string) => {
+  async deleteSetting(id: string): Promise<unknown> {
     try {
-      const response = await requestWithBasePathFallback((basePath) =>
-        api.delete(buildPath(basePath, `/setting/${id}`)),
-      );
+      const response = await api.delete(`${BASE}/setting/${id}`);
       return response.data;
     } catch (error) {
-      const message = extractErrorMessage(error, 'Failed to delete SPP setting');
-      throw new Error(message);
+      throw new Error(extractErrorMessage(error, 'Gagal menghapus setting SPP'));
+    }
+  },
+
+  // ── Golongan ───────────────────────────────────────────────────────────────
+
+  async getGolongan(): Promise<SppGolonganListResponse> {
+    try {
+      const response = await api.get(`${BASE}/golongan`);
+      const data = extractList(response.data).map(normalizeGolongan);
+      return { data, message: 'success' };
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat golongan SPP'));
     }
   },
 };

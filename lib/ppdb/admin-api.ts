@@ -67,18 +67,20 @@ const normalizeTesJenjang = (value: unknown): TesKonfigurasiJenjangKey | null =>
 };
 
 const mapVerificationStatus = (
-  status: 'Terverifikasi' | 'Ditolak' | 'Diterima',
-): 'verified' | 'rejected' | 'accepted' => {
+  status: 'Terverifikasi' | 'Ditolak' | 'Diterima' | 'Menunggu',
+): 'verified' | 'rejected' | 'accepted' | 'pending' => {
   if (status === 'Ditolak') return 'rejected';
   if (status === 'Diterima') return 'accepted';
+  if (status === 'Menunggu') return 'pending';
   return 'verified';
 };
 
 const mapVerificationHasil = (
-  status: 'Terverifikasi' | 'Ditolak' | 'Diterima',
-): 'terverifikasi' | 'ditolak' | 'diterima' => {
+  status: 'Terverifikasi' | 'Ditolak' | 'Diterima' | 'Menunggu',
+): 'terverifikasi' | 'ditolak' | 'diterima' | 'menunggu' => {
   if (status === 'Ditolak') return 'ditolak';
   if (status === 'Diterima') return 'diterima';
+  if (status === 'Menunggu') return 'menunggu';
   return 'terverifikasi';
 };
 
@@ -522,10 +524,10 @@ export const ppdbAdminApi = {
     return response.data;
   },
 
-  async uploadFile(id: string, file: File, fileType: string): Promise<unknown> {
+  async uploadFile(id: string, file: File, tipeFile: string): Promise<unknown> {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('fileType', fileType);
+    formData.append('jenis_berkas', tipeFile);
 
     const response = await requestWithBasePathFallback((basePath) =>
       api.post(buildPath(basePath, `/${id}/berkas`), formData, {
@@ -589,71 +591,44 @@ export const ppdbAdminApi = {
   },
 
   async updateVerification(id: string, payload: UpdateVerificationRequest): Promise<unknown> {
-    const statusCode = mapVerificationStatus(payload.status);
-    const hasil = mapVerificationHasil(payload.status);
+    // Backend accepts: { status_verifikasi: 'diterima'|'ditolak', catatan: string, kode_kelas_diterima?, ... }
+    const hasil = mapVerificationHasil(payload.status); // 'diterima' | 'ditolak' | 'terverifikasi'
 
-    const endpointSuffixes = ['/verifikasi', '/status-verifikasi', '/validasi'];
-    const payloadCandidates: Rec[] = [
-      {
-        hasil,
-        status: statusCode,
-        status_verifikasi: hasil,
-        hasil_verifikasi: hasil,
-        catatan: payload.catatan ?? payload.keterangan,
-        keterangan: payload.keterangan ?? payload.catatan,
-        id_petugas: payload.idPetugas,
-        tanggal_verif: payload.tanggalVerif,
-        kode_kelas_diterima: payload.kodeKelasDiterima,
-        integrasikan_langsung_ke_santri: payload.integrasikanLangsungKeSantri,
-        auto_buat_akun_santri: payload.autoBuatAkunSantri,
-      },
-      {
-        status: statusCode,
-        keterangan: payload.keterangan ?? payload.catatan,
-      },
-      payload as unknown as Rec,
-    ];
+    const body: Rec = {
+      status_verifikasi: hasil,
+      catatan: payload.catatan ?? payload.keterangan ?? '',
+    };
 
-    let lastError: unknown;
+    if (payload.kodeKelasDiterima) body.kode_kelas_diterima = payload.kodeKelasDiterima;
+    if (payload.idPetugas) body.id_petugas = payload.idPetugas;
+    if (payload.tanggalVerif) body.tanggal_verif = payload.tanggalVerif;
+    if (payload.integrasikanLangsungKeSantri !== undefined)
+      body.integrasikan_langsung_ke_santri = payload.integrasikanLangsungKeSantri;
+    if (payload.autoBuatAkunSantri !== undefined)
+      body.auto_buat_akun_santri = payload.autoBuatAkunSantri;
 
-    for (const endpointSuffix of endpointSuffixes) {
-      for (const body of payloadCandidates) {
-        try {
-          const response = await requestWithBasePathFallback((basePath) =>
-            api.put(buildPath(basePath, `/${id}${endpointSuffix}`), body),
-          );
-
-          return response.data;
-        } catch (error) {
-          lastError = error;
-          const status = getErrorStatus(error);
-          if (status === 400 || status === 422) {
-            continue;
-          }
-          if (status === 404 || status === 405) {
-            break;
-          }
-          throw error;
-        }
-      }
-    }
-
-    const fallbackResponse = await requestWithBasePathFallback((basePath) =>
-      api.put(buildPath(basePath, `/${id}`), {
-        status: statusCode,
-        status_verifikasi: hasil,
-        hasil_verifikasi: hasil,
-        catatan: payload.catatan ?? payload.keterangan,
-        keterangan: payload.keterangan ?? payload.catatan,
-      }),
+    const response = await requestWithBasePathFallback((basePath) =>
+      api.put(buildPath(basePath, `/${id}/verifikasi`), body),
     );
 
-    return fallbackResponse.data;
+    return response.data;
   },
 
   async addNotification(id: string, payload: AddNotificationRequest): Promise<unknown> {
     const response = await requestWithBasePathFallback((basePath) =>
       api.post(buildPath(basePath, `/${id}/notifikasi`), payload),
+    );
+
+    return response.data;
+  },
+
+  /**
+   * POST /api/administrasi/ppdb/pendaftar/{id}/tagihan
+   * Buat tagihan PPDB untuk pendaftar yang sudah diterima.
+   */
+  async createTagihanPpdb(id: string): Promise<unknown> {
+    const response = await requestWithBasePathFallback((basePath) =>
+      api.post(buildPath(basePath, `/${id}/tagihan`), {}),
     );
 
     return response.data;
@@ -683,12 +658,14 @@ export const ppdbAdminApi = {
     payload: UpdateTesKonfigurasiJenjangRequest,
   ): Promise<TesKonfigurasiJenjang> {
     const normalizedFormSchema = Array.isArray(payload.formSchema) ? payload.formSchema : [];
+    // Menggunakan 1 / 0 untuk nilai boolean agar lebih aman dan ter-persist di backend
+    const isAktifVal = payload.fiturSoalAktif ? 1 : 0;
     const requestPayload: Rec = {
       jenjang,
-      fitur_soal_aktif: payload.fiturSoalAktif,
-      fiturSoalAktif: payload.fiturSoalAktif,
-      soal_tes: payload.soalTes ?? '',
-      soalTes: payload.soalTes ?? '',
+      fitur_soal_aktif: isAktifVal,
+      fiturSoalAktif: isAktifVal,
+      soal_tes: payload.soalTes?.trim() ?? '',
+      soalTes: payload.soalTes?.trim() ?? '',
       form_schema: normalizedFormSchema,
       formSchema: normalizedFormSchema,
     };
