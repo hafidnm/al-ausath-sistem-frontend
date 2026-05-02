@@ -83,6 +83,13 @@ export interface PublishRaporPayload {
   tanggal_terbit?: string
 }
 
+export interface WithdrawRaporPayload {
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+  nomor_induk?: string
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -295,6 +302,11 @@ export const raporService = {
 
   async publish(payload: PublishRaporPayload): Promise<RaporItem> {
     const response = await api.post("/akademik/raport/publish", payload)
+    return normalizeRaporItem(response.data?.data ?? response.data)
+  },
+
+  async withdraw(payload: WithdrawRaporPayload): Promise<RaporItem> {
+    const response = await api.post("/akademik/raport/withdraw", payload)
     return normalizeRaporItem(response.data?.data ?? response.data)
   },
 }

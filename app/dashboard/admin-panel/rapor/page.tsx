@@ -80,6 +80,7 @@ export default function AdminPanelRaporPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isPublishing, setIsPublishing] = useState(false)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -478,6 +479,44 @@ export default function AdminPanelRaporPage() {
     }
   }
 
+  const handleWithdraw = async () => {
+    if (!isReportReady) {
+      setError("Pilih rapor terlebih dahulu sebelum dapat menarik")
+      return
+    }
+
+    if (!isPublishedReport) {
+      setError("Hanya rapor berstatus TERBIT yang dapat ditarik")
+      return
+    }
+
+    if (!selectedParams.nomor_induk || !selectedParams.kode_kelas || !selectedParams.tahun_ajaran || !selectedParams.semester) {
+      setError("Data rapor tidak lengkap untuk menarik")
+      return
+    }
+
+    try {
+      setIsWithdrawing(true)
+      setError("")
+      setSuccess("")
+
+      const withdrawn = await raporService.withdraw({
+        nomor_induk: selectedParams.nomor_induk,
+        kode_kelas: selectedParams.kode_kelas,
+        tahun_ajaran: selectedParams.tahun_ajaran,
+        semester: selectedParams.semester,
+      })
+
+      setSelected(withdrawn)
+      setSuccess("Rapor berhasil ditarik kembali ke status DRAFT")
+      await fetchReports()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menarik rapor")
+    } finally {
+      setIsWithdrawing(false)
+    }
+  }
+
   const totalTerbit = items.filter((item) => (item.status || "").toUpperCase() === "TERBIT").length
   const totalDraft = items.length - totalTerbit
 
@@ -569,7 +608,9 @@ export default function AdminPanelRaporPage() {
             isReportReady={isReportReady}
             isPublishedReport={isPublishedReport}
             isPublishing={isPublishing}
+            isWithdrawing={isWithdrawing}
             onPublish={handlePublish}
+            onWithdraw={handleWithdraw}
           />
         </div>
       </div>

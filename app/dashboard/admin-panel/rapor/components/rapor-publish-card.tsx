@@ -1,6 +1,6 @@
 "use client"
 
-import { AlertCircle, CheckCircle2, Loader2, Send } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -13,7 +13,9 @@ interface RaporPublishCardProps {
   isReportReady: boolean
   isPublishedReport: boolean
   isPublishing: boolean
+  isWithdrawing: boolean
   onPublish: () => void
+  onWithdraw: () => void
 }
 
 export function RaporPublishCard({
@@ -22,9 +24,12 @@ export function RaporPublishCard({
   isReportReady,
   isPublishedReport,
   isPublishing,
+  isWithdrawing,
   onPublish,
+  onWithdraw,
 }: RaporPublishCardProps) {
-  const canPublish = isReportReady && !isPublishedReport && !isPublishing
+  const canPublish = isReportReady && !isPublishedReport && !isPublishing && !isWithdrawing
+  const canWithdraw = isReportReady && isPublishedReport && !isPublishing && !isWithdrawing
 
   return (
     <Card className="border-border/50">
@@ -103,9 +108,30 @@ export function RaporPublishCard({
           )}
         </Button>
 
+        {/* Withdraw Button */}
+        <Button
+          onClick={onWithdraw}
+          disabled={!canWithdraw}
+          variant="destructive"
+          className="w-full"
+          size="lg"
+        >
+          {isWithdrawing ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sedang Menarik...
+            </>
+          ) : (
+            <>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Tarik Rapor
+            </>
+          )}
+        </Button>
+
         <p className="text-xs text-muted-foreground">
           {isPublishedReport
-            ? "✓ Rapor telah diterbitkan dan dapat diakses santri"
+            ? "✓ Rapor telah diterbitkan. Klik 'Tarik Rapor' untuk mengembalikan ke DRAFT"
             : "Klik tombol di atas untuk mengubah status rapor menjadi TERBIT"}
         </p>
       </CardContent>
