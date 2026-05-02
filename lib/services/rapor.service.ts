@@ -306,7 +306,7 @@ export const raporService = {
   },
 
   async withdraw(payload: WithdrawRaporPayload): Promise<RaporItem> {
-    const response = await api.post("/akademik/raport/withdraw", payload)
+    const response = await api.post("/akademik/raport/tarik", payload)
     return normalizeRaporItem(response.data?.data ?? response.data)
   },
 }

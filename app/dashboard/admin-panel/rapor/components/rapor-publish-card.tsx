@@ -1,9 +1,20 @@
 "use client"
 
+import { useState } from "react"
 import { AlertCircle, CheckCircle2, Loader2, RotateCcw, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import type { RaporDetail, RaporItem } from "@/lib/services/rapor.service"
 import { ReportStatusBadge } from "./report-status-badge"
 
@@ -28,8 +39,23 @@ export function RaporPublishCard({
   onPublish,
   onWithdraw,
 }: RaporPublishCardProps) {
+  const [pendingAction, setPendingAction] = useState<"publish" | "withdraw" | null>(null)
+
   const canPublish = isReportReady && !isPublishedReport && !isPublishing && !isWithdrawing
   const canWithdraw = isReportReady && isPublishedReport && !isPublishing && !isWithdrawing
+  const actionLabel = pendingAction === "publish" ? "Terbitkan Rapor" : "Tarik Rapor"
+
+  const handleConfirmAction = () => {
+    if (pendingAction === "publish") {
+      onPublish()
+    }
+
+    if (pendingAction === "withdraw") {
+      onWithdraw()
+    }
+
+    setPendingAction(null)
+  }
 
   return (
     <Card className="border-border/50">
@@ -90,7 +116,7 @@ export function RaporPublishCard({
 
         {/* Publish Button */}
         <Button
-          onClick={onPublish}
+          onClick={() => setPendingAction("publish")}
           disabled={!canPublish}
           className="w-full"
           size="lg"
@@ -110,7 +136,7 @@ export function RaporPublishCard({
 
         {/* Withdraw Button */}
         <Button
-          onClick={onWithdraw}
+          onClick={() => setPendingAction("withdraw")}
           disabled={!canWithdraw}
           variant="destructive"
           className="w-full"
@@ -134,6 +160,27 @@ export function RaporPublishCard({
             ? "✓ Rapor telah diterbitkan. Klik 'Tarik Rapor' untuk mengembalikan ke DRAFT"
             : "Klik tombol di atas untuk mengubah status rapor menjadi TERBIT"}
         </p>
+
+        <AlertDialog open={pendingAction !== null} onOpenChange={(open) => !open && setPendingAction(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {pendingAction === "publish"
+                  ? "Konfirmasi Terbitkan Rapor"
+                  : "Konfirmasi Tarik Rapor"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {pendingAction === "publish"
+                  ? "Pastikan semua nilai dan catatan wali sudah benar. Setelah diterbitkan, status rapor akan berubah menjadi TERBIT."
+                  : "Rapor akan dikembalikan ke status DRAFT. Gunakan ini hanya jika perlu memperbaiki data sebelum diterbitkan kembali."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Batal</AlertDialogCancel>
+              <AlertDialogAction onClick={handleConfirmAction}>{actionLabel}</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )
