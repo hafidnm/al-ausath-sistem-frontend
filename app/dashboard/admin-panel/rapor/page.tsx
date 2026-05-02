@@ -9,6 +9,7 @@ import { RaporFeedbackAlert } from "./components/rapor-feedback-alert"
 import { RaporFiltersCard } from "./components/rapor-filters-card"
 import { RaporGenerateCard } from "./components/rapor-generate-card"
 import { RaporHeader } from "./components/rapor-header"
+import { RaporPublishCard } from "./components/rapor-publish-card"
 import RaporPreviewDialog from "./components/rapor-preview-dialog"
 import { RaporSummaryCards } from "./components/rapor-summary-cards"
 import { RaporTable } from "./components/rapor-table"
@@ -78,6 +79,7 @@ export default function AdminPanelRaporPage() {
   const [isSelecting, setIsSelecting] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isPublishing, setIsPublishing] = useState(false)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -437,6 +439,45 @@ export default function AdminPanelRaporPage() {
     }
   }
 
+  const handlePublish = async () => {
+    if (!isReportReady) {
+      setError("Generate rapor dulu sebelum dapat menerbitkan")
+      return
+    }
+
+    if (isPublishedReport) {
+      setError("Rapor sudah berstatus TERBIT dan tidak dapat diterbitkan kembali")
+      return
+    }
+
+    if (!selectedParams.nomor_induk || !selectedParams.kode_kelas || !selectedParams.tahun_ajaran || !selectedParams.semester) {
+      setError("Data rapor tidak lengkap untuk menerbitkan")
+      return
+    }
+
+    try {
+      setIsPublishing(true)
+      setError("")
+      setSuccess("")
+
+      const published = await raporService.publish({
+        nomor_induk: selectedParams.nomor_induk,
+        kode_kelas: selectedParams.kode_kelas,
+        tahun_ajaran: selectedParams.tahun_ajaran,
+        semester: selectedParams.semester,
+        tanggal_terbit: new Date().toISOString().split("T")[0],
+      })
+
+      setSelected(published)
+      setSuccess("Rapor berhasil diterbitkan")
+      await fetchReports()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menerbitkan rapor")
+    } finally {
+      setIsPublishing(false)
+    }
+  }
+
   const totalTerbit = items.filter((item) => (item.status || "").toUpperCase() === "TERBIT").length
   const totalDraft = items.length - totalTerbit
 
@@ -520,6 +561,15 @@ export default function AdminPanelRaporPage() {
             onCatatanFormChange={setCatatanForm}
             onSaveCatatan={handleSaveCatatan}
             onReloadDetail={() => selected && loadReportDetail(selected)}
+          />
+
+          <RaporPublishCard
+            detail={detail}
+            selected={selected}
+            isReportReady={isReportReady}
+            isPublishedReport={isPublishedReport}
+            isPublishing={isPublishing}
+            onPublish={handlePublish}
           />
         </div>
       </div>

@@ -75,6 +75,14 @@ export interface UpsertCatatanWaliPayload extends GetRaporCatatanParams {
   keseharian_keterampilan?: string
 }
 
+export interface PublishRaporPayload {
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+  nomor_induk?: string
+  tanggal_terbit?: string
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -283,5 +291,10 @@ export const raporService = {
     })
 
     return response.data
+  },
+
+  async publish(payload: PublishRaporPayload): Promise<RaporItem> {
+    const response = await api.post("/akademik/raport/publish", payload)
+    return normalizeRaporItem(response.data?.data ?? response.data)
   },
 }
