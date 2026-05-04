@@ -195,6 +195,11 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/pembayaran');
+      return;
+    }
+
     // Redirect ke pengumuman HANYA jika sudah benar-benar selesai:
     // - step menunggu-pengumuman/pengumuman, ATAU
     // - formCompleted DAN semua dokumen wajib sudah ada
@@ -216,11 +221,6 @@ export default function PpdbDashboardPage() {
 
     if (shouldGoPengumuman) {
       router.replace('/ppdb/dashboard/pengumuman');
-      return;
-    }
-
-    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/pembayaran');
       return;
     }
   }, [data, router]);
@@ -317,6 +317,11 @@ export default function PpdbDashboardPage() {
 
       if (shouldGoTes) {
         router.replace('/ppdb/tes');
+        return;
+      }
+
+      if (refreshedDashboard?.step === 'pembayaran-ppdb' || refreshedDashboard?.step === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/pembayaran');
         return;
       }
 
