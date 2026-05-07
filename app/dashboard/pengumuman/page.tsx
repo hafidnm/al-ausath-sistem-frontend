@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Plus, Edit2, Trash2, Loader2, Megaphone, Pin, Search, Filter } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, Megaphone, Pin, Search, Filter, Paperclip, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -92,6 +92,8 @@ export default function PengumumanPage() {
   const [isOpen, setIsOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Pengumuman | null>(null)
   const [form, setForm] = useState<CreatePengumumanRequest>(emptyForm)
+  const [lampiranFile, setLampiranFile] = useState<File | null>(null)
+  const [hapusLampiran, setHapusLampiran] = useState(false)
 
   // Filters
   const [searchQ, setSearchQ] = useState("")
@@ -132,6 +134,8 @@ export default function PengumumanPage() {
   const openAdd = () => {
     setEditTarget(null)
     setForm(emptyForm)
+    setLampiranFile(null)
+    setHapusLampiran(false)
     setIsOpen(true)
   }
 
@@ -146,6 +150,8 @@ export default function PengumumanPage() {
       urutan: p.urutan,
       tanggal_selesai: p.tanggal_selesai,
     })
+    setLampiranFile(null)
+    setHapusLampiran(false)
     setIsOpen(true)
   }
 
@@ -160,6 +166,8 @@ export default function PengumumanPage() {
         ...form,
         urutan: Number(form.urutan),
         tanggal_selesai: form.tanggal_selesai || null,
+        lampiran: lampiranFile,
+        hapus_lampiran: hapusLampiran,
       }
       if (editTarget) {
         await pengumumanService.update(editTarget.id, payload)
@@ -167,6 +175,8 @@ export default function PengumumanPage() {
         await pengumumanService.create(payload)
       }
       setIsOpen(false)
+      setLampiranFile(null)
+      setHapusLampiran(false)
       await fetchList()
     } catch (err) {
       alert(getErrorMessage(err, "Gagal menyimpan pengumuman"))
@@ -320,6 +330,7 @@ export default function PengumumanPage() {
                     <TableHead>Judul</TableHead>
                     <TableHead>Kategori</TableHead>
                     <TableHead>Berakhir</TableHead>
+                    <TableHead>Lampiran</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -343,6 +354,21 @@ export default function PengumumanPage() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {p.tanggal_selesai ? formatDate(p.tanggal_selesai) : "Tidak terbatas"}
+                      </TableCell>
+                      <TableCell>
+                        {p.lampiran_url ? (
+                          <a
+                            href={p.lampiran_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            {p.lampiran_nama_asli || "Lihat"}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -454,6 +480,44 @@ export default function PengumumanPage() {
                 }
               />
               <p className="text-xs text-muted-foreground">Kosongkan jika pengumuman tidak memiliki batas waktu.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Lampiran (PDF/Gambar/Dokumen)</Label>
+              <Input
+                id="form-lampiran"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                onChange={(e) => setLampiranFile(e.target.files?.[0] || null)}
+              />
+              {lampiranFile ? (
+                <p className="text-xs text-muted-foreground">File baru: {lampiranFile.name}</p>
+              ) : editTarget?.lampiran_url ? (
+                <div className="flex items-center justify-between rounded-md border border-border p-2">
+                  <a
+                    href={editTarget.lampiran_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    {editTarget.lampiran_nama_asli || "Lampiran saat ini"}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setHapusLampiran((prev) => !prev)}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    {hapusLampiran ? "Batal hapus" : "Hapus lampiran"}
+                  </Button>
+                </div>
+              ) : null}
+              {hapusLampiran && (
+                <p className="text-xs text-destructive">Lampiran akan dihapus saat disimpan.</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-border p-3">

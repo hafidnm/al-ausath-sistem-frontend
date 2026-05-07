@@ -64,6 +64,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { pembayaranService } from '@/lib/services/pembayaran.service'
+import printKwitansi from '@/lib/utils/printKwitansi'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -318,6 +320,18 @@ function VerifikasiPembayaranTab() {
           window.open(waUrl, "_blank");
         } else {
           toast({ title: "Info", description: "Nomor WhatsApp tidak tersedia untuk mengirim konfirmasi otomatis." });
+        }
+        // Attempt to generate / open kwitansi after verification
+        try {
+          const det = await pembayaranService.getDetail(row.id)
+          if (det.informasiKwitansi?.tersedia && det.informasiKwitansi.url) {
+            window.open(det.informasiKwitansi.url, '_blank')
+          } else {
+            await printKwitansi(det)
+          }
+        } catch (e) {
+          console.error('Error generating kwitansi:', e)
+          toast({ title: 'Kwitansi', description: 'Gagal membuat kwitansi otomatis.', variant: 'destructive' })
         }
       }
 

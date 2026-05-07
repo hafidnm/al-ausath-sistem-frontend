@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Download, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -70,6 +71,7 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PpdbPage() {
+  const router = useRouter()
   // Dialog state
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -268,21 +270,11 @@ export default function PpdbPage() {
   }
 
   const handleOpenDetail = async (p: PpdbDetail) => {
-    setSelectedPendaftar(p)
-    const j = normalizeTesJenjang(p.jenjang)
-    if (j) setSelectedJenjangTes(j)
-    setIsDetailOpen(true)
-    setIsDetailLoading(true)
-    try {
-      const res = await runActionWithIdFallback(p, (id) => ppdbAdminApi.getDetail(id))
-      if (res) {
-        const detail = res as PpdbDetail
-        setSelectedPendaftar(detail)
-        const dj = normalizeTesJenjang(detail.jenjang)
-        if (dj) setSelectedJenjangTes(dj)
-      }
-    } catch (err) { console.error("Error fetching detail:", err) }
-    finally { setIsDetailLoading(false) }
+    // Navigate to detail page using the pendaftar ID
+    const idToUse = p.pendaftaranId || p.id
+    if (idToUse) {
+      router.push(`/dashboard/ppdb/${idToUse}`)
+    }
   }
 
   const handleDeletePendaftar = async (p: PpdbDetail) => {
@@ -526,8 +518,8 @@ export default function PpdbPage() {
       {/* Rekap Diterima & Ditolak */}
       <PpdbRekapCard data={ppdbData} />
 
-      {/* Detail Dialog */}
-      <PpdbDetailDialog
+      {/* Detail Dialog — now deprecated in favor of dedicated detail page */}
+      {/* <PpdbDetailDialog
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         pendaftar={selectedPendaftar}
@@ -537,7 +529,7 @@ export default function PpdbPage() {
         isTesResultSaving={testResultLoading}
         onTesResultSave={handleSaveTesResult}
         onUploadFile={handleUploadFile}
-      />
+      /> */}
 
       {/* Konfirmasi Terima Dialog */}
       <Dialog open={isTerimaOpen} onOpenChange={(open) => {

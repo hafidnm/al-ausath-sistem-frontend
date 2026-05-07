@@ -34,6 +34,8 @@ export type JenisTransaksi = 'SPP' | 'PPDB';
 /** Row untuk halaman Tagihan (GET /tagihan) */
 export interface TagihanRow {
   id: string;
+  idSantri: string;
+  idPendaftaran: string;
   namaUnit: string;
   nomorInduk: string;
   namaLengkap: string;
@@ -44,6 +46,40 @@ export interface TagihanRow {
   totalDibayar: number;
   totalTunggakan: number;
   sumber: 'santri' | 'ppdb';
+}
+
+export interface TagihanDetailResponse {
+  profil: {
+    id: string;
+    sumber: 'santri' | 'ppdb';
+    nama_lengkap: string;
+    nomor_induk: string;
+    nama_unit: string;
+    kelas_sekarang: string | null;
+    tahun_ajaran: string | null;
+    status: string | null;
+  };
+  ringkasan: {
+    jumlah_invoice: number;
+    total_tagihan: number;
+    total_dibayar: number;
+    total_tunggakan: number;
+  };
+  invoice: Array<{
+    id_pembayaran: number;
+    nomor_invoice: string;
+    periode_tagihan: string | null;
+    rincian_tagihan: string | null;
+    jumlah_tagihan: number;
+    jumlah_dibayar: number;
+    jumlah_tunggakan: number;
+    status: string;
+    status_key: StatusPembayaran;
+    status_label: string;
+    waktu_invoice: string | null;
+    kwitansi_tersedia: boolean;
+    kwitansi_url: string | null;
+  }>;
 }
 
 /** Row untuk halaman Proses Pembayaran (GET /proses) */
@@ -164,8 +200,14 @@ const toStr = (v: unknown): string => {
 const toNum = (v: unknown): number => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   if (typeof v === 'string') {
-    const parsed = Number(v.replace(/[^\d.]/g, ''));
-    return Number.isFinite(parsed) ? parsed : 0;
+    let cleaned = v.replace(/[^\d.,-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(',', '.');
+    }
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
   }
   return 0;
 };
@@ -248,11 +290,22 @@ const normalizeStatus = (raw: unknown): StatusPembayaran => {
 // ─── Normalizers ──────────────────────────────────────────────────────────────
 
 const normalizeTagihanRow = (item: ApiRecord): TagihanRow => ({
-  id: toStr(item.id ?? item.id_pembayaran ?? item.id_tagihan ?? ''),
+  id: toStr(
+    item.id_santri
+      ?? item.idSantri
+      ?? item.id_pendaftaran
+      ?? item.idPendaftaran
+      ?? item.id
+      ?? item.id_pembayaran
+      ?? item.id_tagihan
+      ?? '',
+  ),
+  idSantri: toStr(item.id_santri ?? item.idSantri ?? ''),
+  idPendaftaran: toStr(item.id_pendaftaran ?? item.idPendaftaran ?? ''),
   namaUnit: toStr(item.nama_unit ?? item.namaUnit ?? item.unit ?? item.jenjang ?? '-'),
   nomorInduk: toStr(item.nomor_induk ?? item.nomorInduk ?? item.nis ?? item.nisn ?? '-'),
   namaLengkap: toStr(item.nama_lengkap ?? item.namaLengkap ?? item.nama ?? '-'),
-  kelasSaatIni: toStr(item.kelas_saat_ini ?? item.kelasSaatIni ?? item.kelas ?? '-'),
+  kelasSaatIni: toStr(item.kelas_saat_ini ?? item.kelas_sekarang ?? item.kelasSaatIni ?? item.kelas ?? '-'),
   tahunAjaran: toStr(item.tahun_ajaran ?? item.tahunAjaran ?? item.periode ?? '-'),
   status: normalizeStatus(item.status ?? item.status_pembayaran ?? ''),
   totalTagihan: toNum(item.total_tagihan ?? item.totalTagihan ?? item.nominal ?? 0),
@@ -328,6 +381,52 @@ export const pembayaranService = {
       return { data };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat daftar tagihan'));
+    }
+  },
+
+  /** GET /api/administrasi/pembayaran/tagihan/{id}/detail */
+  async getTagihanDetail(id: string): Promise<TagihanDetailResponse> {
+    try {
+      const response = await api.get(`${BASE}/tagihan/${id}/detail`);
+      const raw = extractSingle(response.data);
+
+      return {
+        profil: {
+          id: toStr((raw.profil as ApiRecord)?.id ?? id),
+          sumber: toStr((raw.profil as ApiRecord)?.sumber).toLowerCase() === 'ppdb' ? 'ppdb' : 'santri',
+          nama_lengkap: toStr((raw.profil as ApiRecord)?.nama_lengkap ?? '-'),
+          nomor_induk: toStr((raw.profil as ApiRecord)?.nomor_induk ?? '-'),
+          nama_unit: toStr((raw.profil as ApiRecord)?.nama_unit ?? '-'),
+          kelas_sekarang: toStr((raw.profil as ApiRecord)?.kelas_sekarang ?? '') || null,
+          tahun_ajaran: toStr((raw.profil as ApiRecord)?.tahun_ajaran ?? '') || null,
+          status: toStr((raw.profil as ApiRecord)?.status ?? '') || null,
+        },
+        ringkasan: {
+          jumlah_invoice: toNum((raw.ringkasan as ApiRecord)?.jumlah_invoice ?? 0),
+          total_tagihan: toNum((raw.ringkasan as ApiRecord)?.total_tagihan ?? 0),
+          total_dibayar: toNum((raw.ringkasan as ApiRecord)?.total_dibayar ?? 0),
+          total_tunggakan: toNum((raw.ringkasan as ApiRecord)?.total_tunggakan ?? 0),
+        },
+        invoice: Array.isArray(raw.invoice)
+          ? (raw.invoice as ApiRecord[]).map((item) => ({
+              id_pembayaran: toNum(item.id_pembayaran ?? 0),
+              nomor_invoice: toStr(item.nomor_invoice ?? '-'),
+              periode_tagihan: toStr(item.periode_tagihan ?? '') || null,
+              rincian_tagihan: toStr(item.rincian_tagihan ?? '') || null,
+              jumlah_tagihan: toNum(item.jumlah_tagihan ?? 0),
+              jumlah_dibayar: toNum(item.jumlah_dibayar ?? 0),
+              jumlah_tunggakan: toNum(item.jumlah_tunggakan ?? 0),
+              status: toStr(item.status ?? ''),
+              status_key: normalizeStatus(item.status_key ?? item.status ?? ''),
+              status_label: toStr(item.status_label ?? '-'),
+              waktu_invoice: toStr(item.waktu_invoice ?? '') || null,
+              kwitansi_tersedia: Boolean(item.kwitansi_tersedia ?? false),
+              kwitansi_url: toStr(item.kwitansi_url ?? '') || null,
+            }))
+          : [],
+      };
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat detail tagihan'));
     }
   },
 
@@ -439,12 +538,13 @@ export const pembayaranService = {
       const response = await api.get(`${BASE}/ringkasan`);
       const raw = extractSingle(response.data);
       return {
-        totalTagihan: toNum(raw.total_tagihan ?? raw.totalTagihan ?? 0),
-        totalDibayar: toNum(raw.total_dibayar ?? raw.totalDibayar ?? 0),
-        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ?? 0),
-        menungguKonfirmasi: toNum(raw.menunggu_konfirmasi ?? raw.menungguKonfirmasi ?? 0),
-        lunas: toNum(raw.lunas ?? 0),
-        dibatalkan: toNum(raw.dibatalkan ?? 0),
+        totalTagihan: toNum(raw.nominal_total ?? raw.total_tagihan ?? raw.totalTagihan ?? 0),
+        totalDibayar: toNum(raw.nominal_terverifikasi ?? raw.total_dibayar ?? raw.totalDibayar ?? 0),
+        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ?? 
+          (toNum(raw.nominal_total ?? 0) - toNum(raw.nominal_terverifikasi ?? 0))),
+        menungguKonfirmasi: toNum(raw.status_menunggu_verifikasi ?? raw.menunggu_konfirmasi ?? raw.menungguKonfirmasi ?? 0),
+        lunas: toNum(raw.status_terverifikasi ?? raw.lunas ?? 0),
+        dibatalkan: toNum(raw.status_ditolak ?? raw.dibatalkan ?? 0),
       };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat ringkasan pembayaran'));

@@ -27,10 +27,16 @@ export interface Pengumuman {
   id: number;
   judul: string;
   konten: string;
+  lampiran_path: string | null;
+  lampiran_nama_asli: string | null;
+  lampiran_mime: string | null;
+  lampiran_size: number | null;
+  lampiran_url: string | null;
   kategori: PengumumanKategori | string;
   is_aktif: boolean;
   is_pinned: boolean;
   urutan: number;
+  tanggal_mulai: string | null;
   tanggal_selesai: string | null;
   created_at: string;
   updated_at: string;
@@ -51,7 +57,10 @@ export interface CreatePengumumanRequest {
   is_aktif: boolean;
   is_pinned: boolean;
   urutan: number;
+  tanggal_mulai?: string | null;
   tanggal_selesai: string | null;
+  lampiran?: File | null;
+  hapus_lampiran?: boolean;
 }
 
 export type UpdatePengumumanRequest = Partial<CreatePengumumanRequest>;
@@ -71,14 +80,32 @@ const extractErrorMessage = (error: unknown, fallback: string): string => {
 
 type ApiRecord = Record<string, unknown>;
 
+const toBool = (value: unknown): boolean => {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value === 1;
+  if (typeof value === 'string') {
+    const raw = value.trim().toLowerCase();
+    return ['1', 'true', 'yes', 'y', 'on', 'aktif'].includes(raw);
+  }
+  return false;
+};
+
 const normalizePengumuman = (item: ApiRecord): Pengumuman => ({
   id: Number(item.id ?? item.id_pengumuman ?? 0),
   judul: String(item.judul ?? ''),
   konten: String(item.konten ?? ''),
+  lampiran_path: item.lampiran_path ? String(item.lampiran_path) : null,
+  lampiran_nama_asli: item.lampiran_nama_asli ? String(item.lampiran_nama_asli) : null,
+  lampiran_mime: item.lampiran_mime ? String(item.lampiran_mime) : null,
+  lampiran_size: item.lampiran_size !== undefined && item.lampiran_size !== null
+    ? Number(item.lampiran_size)
+    : null,
+  lampiran_url: item.lampiran_url ? String(item.lampiran_url) : null,
   kategori: String(item.kategori ?? 'umum') as PengumumanKategori,
-  is_aktif: Boolean(item.is_aktif ?? item.aktif ?? false),
-  is_pinned: Boolean(item.is_pinned ?? item.pinned ?? false),
+  is_aktif: toBool(item.is_aktif ?? item.aktif ?? false),
+  is_pinned: toBool(item.is_pinned ?? item.pinned ?? false),
   urutan: Number(item.urutan ?? 0),
+  tanggal_mulai: item.tanggal_mulai ? String(item.tanggal_mulai) : null,
   tanggal_selesai: item.tanggal_selesai ? String(item.tanggal_selesai) : null,
   created_at: String(item.created_at ?? ''),
   updated_at: String(item.updated_at ?? ''),
@@ -96,6 +123,34 @@ const extractList = (payload: unknown): ApiRecord[] => {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const pengumumanService = {
+    buildFormData(data: CreatePengumumanRequest | UpdatePengumumanRequest): FormData {
+      const fd = new FormData();
+      const rec = data as Record<string, unknown>;
+
+      Object.entries(rec).forEach(([key, value]) => {
+        if (value === undefined) return;
+
+        if (key === 'lampiran' && value instanceof File) {
+          fd.append('lampiran', value);
+          return;
+        }
+
+        if (value === null) {
+          fd.append(key, '');
+          return;
+        }
+
+        if (typeof value === 'boolean') {
+          fd.append(key, value ? '1' : '0');
+          return;
+        }
+
+        fd.append(key, String(value));
+      });
+
+      return fd;
+    },
+
   // ── Admin operations ────────────────────────────────────────────────────────
 
   async getList(query?: PengumumanListQuery): Promise<Pengumuman[]> {
@@ -120,7 +175,9 @@ export const pengumumanService = {
 
   async create(data: CreatePengumumanRequest): Promise<Pengumuman> {
     try {
-      const response = await api.post(ADMIN_BASE, data);
+      const response = await api.post(ADMIN_BASE, this.buildFormData(data), {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       const raw = response.data as ApiRecord;
       const item = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as ApiRecord;
       return normalizePengumuman(item);
@@ -131,7 +188,9 @@ export const pengumumanService = {
 
   async update(id: number, data: UpdatePengumumanRequest): Promise<Pengumuman> {
     try {
-      const response = await api.put(`${ADMIN_BASE}/${id}`, data);
+      const response = await api.post(`${ADMIN_BASE}/${id}?_method=PUT`, this.buildFormData(data), {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       const raw = response.data as ApiRecord;
       const item = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as ApiRecord;
       return normalizePengumuman(item);
@@ -156,6 +215,26 @@ export const pengumumanService = {
       return extractList(response.data).map(normalizePengumuman);
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat pengumuman publik'));
+    }
+  },
+
+  async getPublicDetail(id: number): Promise<Pengumuman> {
+    try {
+      // Try public endpoint first, fall back to admin endpoint if needed
+      try {
+        const response = await api.get(`${PUBLIC_BASE}/${id}`);
+        const raw = response.data as ApiRecord;
+        const item = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as ApiRecord;
+        return normalizePengumuman(item);
+      } catch {
+        // Fallback to admin endpoint for detail retrieval
+        const response = await api.get(`${ADMIN_BASE}/${id}`);
+        const raw = response.data as ApiRecord;
+        const item = (raw.data && typeof raw.data === 'object' ? raw.data : raw) as ApiRecord;
+        return normalizePengumuman(item);
+      }
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat detail pengumuman'));
     }
   },
 };

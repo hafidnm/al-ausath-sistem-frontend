@@ -29,6 +29,7 @@ import {
   Clock3,
   Loader2,
   Filter,
+  Eye,
 } from "lucide-react"
 import { useTagihan, useRingkasanPembayaran } from "@/hooks/use-pembayaran"
 import type { TagihanRow, StatusPembayaran } from "@/hooks/use-pembayaran"
@@ -88,8 +89,8 @@ export default function TagihanPage() {
   const stats = useMemo(() => {
     if (ringkasan) return ringkasan
     return {
-      totalTagihan: tagihanData.length,
-      totalDibayar: tagihanData.filter((r) => r.status === "lunas").length,
+      totalTagihan: tagihanData.reduce((s, r) => s + r.totalTagihan, 0),
+      totalDibayar: tagihanData.reduce((s, r) => s + r.totalDibayar, 0),
       totalTunggakan: tagihanData.reduce((s, r) => s + r.totalTunggakan, 0),
       menungguKonfirmasi: tagihanData.filter((r) => r.status === "menunggu_konfirmasi").length,
       lunas: tagihanData.filter((r) => r.status === "lunas").length,
@@ -119,6 +120,10 @@ export default function TagihanPage() {
   }, [tagihanData, searchQuery, selectedStatus, selectedSumber])
 
   const totalTunggakanFiltered = filteredData.reduce((s, r) => s + r.totalTunggakan, 0)
+  const totalSantriTagihan = useMemo(() => {
+    const ids = new Set(tagihanData.map((row) => row.id).filter(Boolean))
+    return ids.size
+  }, [tagihanData])
 
   if (error) {
     return (
@@ -163,8 +168,8 @@ export default function TagihanPage() {
                 <Receipt className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Total Tagihan</p>
-                <p className="text-xl font-bold text-foreground">{stats.totalTagihan}</p>
+                <p className="text-xs text-muted-foreground">Jumlah Santri</p>
+                <p className="text-xl font-bold text-foreground">{totalSantriTagihan}</p>
               </div>
             </div>
           </CardContent>
@@ -177,8 +182,8 @@ export default function TagihanPage() {
                 <CheckCircle2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Lunas</p>
-                <p className="text-xl font-bold text-foreground">{stats.lunas}</p>
+                <p className="text-xs text-muted-foreground">Total Tagihan</p>
+                <p className="text-lg font-bold text-foreground">{formatCurrency(stats.totalTagihan)}</p>
               </div>
             </div>
           </CardContent>
@@ -191,8 +196,8 @@ export default function TagihanPage() {
                 <Clock3 className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Menunggu Konfirmasi</p>
-                <p className="text-xl font-bold text-foreground">{stats.menungguKonfirmasi}</p>
+                <p className="text-xs text-muted-foreground">Sudah Dibayar</p>
+                <p className="text-lg font-bold text-emerald-600">{formatCurrency(stats.totalDibayar)}</p>
               </div>
             </div>
           </CardContent>
@@ -206,7 +211,7 @@ export default function TagihanPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Tunggakan</p>
-                <p className="text-lg font-bold text-foreground">
+                <p className="text-lg font-bold text-red-600">
                   {formatCurrency(
                     typeof stats.totalTunggakan === "number"
                       ? stats.totalTunggakan
@@ -287,12 +292,13 @@ export default function TagihanPage() {
                   <TableHead className="text-right">Total Tagihan</TableHead>
                   <TableHead className="text-right">Total Dibayar</TableHead>
                   <TableHead className="text-right">Total Tunggakan</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       <span className="inline-flex items-center gap-2">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         Memuat data tagihan...
@@ -301,7 +307,7 @@ export default function TagihanPage() {
                   </TableRow>
                 ) : filteredData.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       Tidak ada data tagihan yang sesuai filter.
                     </TableCell>
                   </TableRow>
@@ -339,6 +345,13 @@ export default function TagihanPage() {
                         }`}
                       >
                         {formatCurrency(row.totalTunggakan)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={`/dashboard/spp/${row.idSantri || row.idPendaftaran || row.id}`}>
+                            <Eye className="w-4 h-4 mr-1" /> Detail
+                          </a>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))

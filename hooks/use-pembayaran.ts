@@ -8,6 +8,7 @@ import {
   type UbahStatusRequest,
   type RingkasanPembayaran,
   type StatusPembayaran,
+  type TagihanDetailResponse,
   type TunggakanSantri,
 } from '@/lib/services/pembayaran.service';
 import { useAsyncQuery, useAsyncMutation } from '@/hooks/shared/use-async-request';
@@ -20,6 +21,7 @@ export type {
   UbahStatusRequest,
   RingkasanPembayaran,
   StatusPembayaran,
+  TagihanDetailResponse,
   TunggakanSantri,
 };
 
@@ -34,6 +36,17 @@ export function useTagihan() {
 
   const fetchTagihan = useCallback(async () => run(), [run]);
   return { data, loading, error, fetchTagihan };
+}
+
+export function useTagihanDetail() {
+  const query = useCallback((id: string) => pembayaranService.getTagihanDetail(id), []);
+  const { data, loading, error, run } = useAsyncQuery(query, null as TagihanDetailResponse | null, {
+    fallbackError: 'Gagal memuat detail tagihan',
+    logLabel: 'Error fetching detail tagihan:',
+  });
+
+  const fetchTagihanDetail = useCallback(async (id: string) => run(id), [run]);
+  return { data, loading, error, fetchTagihanDetail };
 }
 
 // ─── Proses Pembayaran ────────────────────────────────────────────────────────
