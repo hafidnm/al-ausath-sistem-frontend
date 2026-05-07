@@ -4,6 +4,8 @@ import {
   RataRataPerKelasItem,
   BerprestasiParams,
   SantriBerprestasiItem,
+  BimbinganParams,
+  SantriPerluBimbinganItem,
   nilaiStatistikService,
 } from "@/lib/services/nilai-statistik.service"
 import { useAsyncQuery } from "@/hooks/shared/use-async-request"
@@ -44,4 +46,23 @@ export function useNilaiStatistikBerprestasi() {
   )
 
   return { data, loading, error, fetchBerprestasi }
+}
+
+export function useNilaiStatistikPerluBimbingan() {
+  const query = useCallback(async (params?: BimbinganParams) => {
+    const response = await nilaiStatistikService.getPerluBimbingan(params)
+    return response.data
+  }, [])
+
+  const { data, loading, error, run } = useAsyncQuery(query, [] as SantriPerluBimbinganItem[], {
+    fallbackError: "Gagal memuat data santri perlu bimbingan",
+    logLabel: "Error fetching santri perlu bimbingan:",
+  })
+
+  const fetchPerluBimbingan = useCallback(
+    async (params?: BimbinganParams) => run(params),
+    [run],
+  )
+
+  return { data, loading, error, fetchPerluBimbingan }
 }

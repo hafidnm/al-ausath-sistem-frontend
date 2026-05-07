@@ -78,6 +78,39 @@ export interface BerprestasiResponse {
   }
 }
 
+export interface BimbinganParams extends NilaiStatistikParams {
+  threshold?: number | string
+  limit?: number | string
+}
+
+export interface BimbinganDetailItem {
+  kode_mapel: string
+  nilai_akhir: number
+  nilai_tampil?: number
+  status_ketuntasan: string
+  flag_warna: string
+}
+
+export interface SantriPerluBimbinganItem {
+  nomor_induk: string
+  rata_rata: number
+  mapel_perlu_bimbingan: number
+  mapel_belum_tuntas: number
+  mapel_detail: BimbinganDetailItem[]
+}
+
+export interface BimbinganResponse {
+  data?: SantriPerluBimbinganItem[]
+  count?: number
+  filters?: {
+    threshold?: number | null
+    limit?: number | null
+    kode_kelas?: string | null
+    tahun_ajaran?: string | null
+    semester?: number | null
+  }
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -114,6 +147,36 @@ const normalizeBerprestasiParams = (params?: BerprestasiParams): BerprestasiPara
   const limitValue = params?.limit
   if (limitValue !== undefined && limitValue !== null && String(limitValue).trim() !== "") {
     normalized.limit = clampNumber(toNumber(limitValue, 10), 1, 100)
+  }
+
+  return normalized
+}
+
+const normalizeBimbinganParams = (params?: BimbinganParams): BimbinganParams => {
+  const normalized: BimbinganParams = {}
+
+  const kodeKelas = params?.kode_kelas?.trim()
+  if (kodeKelas) {
+    normalized.kode_kelas = kodeKelas
+  }
+
+  const tahunAjaran = params?.tahun_ajaran?.trim()
+  if (tahunAjaran) {
+    normalized.tahun_ajaran = tahunAjaran
+  }
+
+  if (params?.semester === 1 || params?.semester === 2) {
+    normalized.semester = params.semester
+  }
+
+  const thresholdValue = params?.threshold
+  if (thresholdValue !== undefined && thresholdValue !== null && String(thresholdValue).trim() !== "") {
+    normalized.threshold = clampNumber(toNumber(thresholdValue, 65), 0, 100)
+  }
+
+  const limitValue = params?.limit
+  if (limitValue !== undefined && limitValue !== null && String(limitValue).trim() !== "") {
+    normalized.limit = clampNumber(toNumber(limitValue, 50), 1, 500)
   }
 
   return normalized
@@ -181,6 +244,38 @@ export const nilaiStatistikService = {
         nilai_akhir: toNumber(detail.nilai_akhir, 0),
         nilai_tampil: detail.nilai_tampil ? toNumber(detail.nilai_tampil, 0) : undefined,
         status_ketuntasan: detail.status_ketuntasan ?? "",
+      })),
+    }))
+
+    return {
+      data: items,
+      count: response.data?.count ?? 0,
+      filters: response.data?.filters,
+    }
+  },
+
+  async getPerluBimbingan(params?: BimbinganParams): Promise<{
+    data: SantriPerluBimbinganItem[]
+    count: number
+    filters: BimbinganResponse["filters"]
+  }> {
+    const response = await api.get<BimbinganResponse>("/akademik/nilai-statistik/perlu-bimbingan", {
+      params: normalizeBimbinganParams(params),
+    })
+
+    const items = (response.data?.data ?? []).map((item) => ({
+      nomor_induk: item.nomor_induk ?? "",
+      rata_rata: toNumber(item.rata_rata, 0),
+      mapel_perlu_bimbingan: toNumber(item.mapel_perlu_bimbingan, 0),
+      mapel_belum_tuntas: toNumber(item.mapel_belum_tuntas, 0),
+      mapel_detail: (item.mapel_detail ?? []).map((detail) => ({
+        kode_mapel: detail.kode_mapel ?? "",
+        nilai_akhir: toNumber(detail.nilai_akhir, 0),
+        nilai_tampil: detail.nilai_tampil !== undefined && detail.nilai_tampil !== null
+          ? toNumber(detail.nilai_tampil, 0)
+          : undefined,
+        status_ketuntasan: detail.status_ketuntasan ?? "",
+        flag_warna: detail.flag_warna ?? "",
       })),
     }))
 
