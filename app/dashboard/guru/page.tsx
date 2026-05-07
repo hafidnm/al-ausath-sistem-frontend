@@ -768,7 +768,6 @@ export default function GuruPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("telepon")}>NOMOR TELEPON<ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "telepon" && "text-foreground")} /></button>
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">FOTO PROFIL</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("peran")}>PERAN PETUGAS<ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "peran" && "text-foreground")} /></button>
                   </TableHead>
@@ -785,7 +784,7 @@ export default function GuruPage() {
               <TableBody>
                 {displayedRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                       {isLoading ? "Memuat data petugas..." : "Data petugas tidak ditemukan."}
                     </TableCell>
                   </TableRow>
@@ -808,9 +807,6 @@ export default function GuruPage() {
                       <TableCell>{guru.nama}</TableCell>
                       <TableCell>{guru.email}</TableCell>
                       <TableCell>{guru.telepon}</TableCell>
-                      <TableCell>
-                        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-xs text-muted-foreground">IMG</div>
-                      </TableCell>
                       <TableCell>
                         <Badge
                           className={cn(

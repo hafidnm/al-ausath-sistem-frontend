@@ -3,6 +3,7 @@ import api from "../axios"
 export interface SesiAbsensiApiItem {
   id?: number
   id_sesi_absensi?: number
+  id_sesi?: number
   mapel?: string
   nama_mapel?: string
   mata_pelajaran?: string
@@ -18,9 +19,23 @@ export interface SesiAbsensiApiItem {
   total_siswa?: number
   total_santri?: number
   id_jadwal?: number
+  id_petugas_hadir?: number
+  id_petugas_pengganti?: number | null
   tanggal?: string
+  waktu_mulai?: string
+  waktu_selesai?: string
   status_sesi?: string
   keterangan?: string
+  is_validated?: boolean
+  validated_by?: number | null
+  validated_at?: string | null
+  created_at?: string
+  updated_at?: string
+  jadwal?: Record<string, unknown>
+  petugas_hadir?: Record<string, unknown>
+  petugas_pengganti?: Record<string, unknown>
+  absensi_pengajar?: Record<string, unknown>[]
+  absensi_santri?: Record<string, unknown>[]
 }
 
 export interface SesiAbsensiListResponse {

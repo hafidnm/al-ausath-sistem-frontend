@@ -520,15 +520,14 @@ export default function JadwalPembelajaranPage() {
             value: String(toNumber(item.id_kelas_mapel ?? item.id, 0)),
             label: [
               toText(item.nama_kelas || item.kelas?.nama_kelas),
-              toText(item.nama_mapel || item.mapel?.nama_mapel),
-              toText(item.petugas?.nama_lengkap),
+              toText(item.nama_mapel || item.mapel?.nama_mapel || item.mata_pelajaran?.nama_mapel || item.mataPelajaran?.nama_mapel),
             ]
               .filter(Boolean)
               .join(" - "),
             kodeKelas: toText(item.kode_kelas || item.kelas?.kode_kelas),
             namaKelas: toText(item.nama_kelas || item.kelas?.nama_kelas),
             kodeMapel: toText(item.kode_mapel || item.mapel?.kode_mapel),
-            namaMapel: toText(item.nama_mapel || item.mapel?.nama_mapel),
+            namaMapel: toText(item.nama_mapel || item.mapel?.nama_mapel || item.mata_pelajaran?.nama_mapel || item.mataPelajaran?.nama_mapel),
             idPetugas: item.id_petugas == null ? null : toNumber(item.id_petugas, 0) || null,
             namaPetugas: toText(item.petugas?.nama_lengkap),
             kodeUnit: "",

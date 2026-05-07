@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -208,6 +209,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 }
 
 export default function SantriPage() {
+  const router = useRouter()
   const { toast } = useToast()
 
   const [rows, setRows] = useState<SantriRow[]>([])
@@ -453,23 +455,11 @@ export default function SantriPage() {
   }
 
   const openDetail = (row: SantriRow) => {
-    setDetailRow(row)
-    setIsDetailDialogOpen(true)
+    router.push(`/dashboard/santri/${row.id}`)
   }
 
   const openEdit = (row: SantriRow) => {
-    setEditingId(row.id)
-    setEditingFormData({
-      nomor_induk: row.nomorInduk,
-      nama_lengkap_santri: row.namaLengkap,
-      kode_kelas: row.kodeKelas,
-      jenis_kelamin: row.jenisKelamin,
-      status: row.status,
-      nama_wali: row.namaWali,
-      nomor_telepon: row.nomorTelepon,
-      alamat_email: row.alamatEmail,
-    })
-    setIsEditDialogOpen(true)
+    router.push(`/dashboard/santri/${row.id}/edit`)
   }
 
   const handleUpdate = async () => {
@@ -720,18 +710,14 @@ export default function SantriPage() {
         <h1 className="text-3xl font-semibold uppercase tracking-wide text-foreground">Daftar Santri</h1>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <Button
-              size="sm"
-              className="h-10 bg-primary px-4 text-primary-foreground hover:bg-primary/90"
-              onClick={() => {
-                resetAddForm()
-                setIsAddDialogOpen(true)
-              }}
-            >
+          <Button asChild size="sm" className="h-10 bg-primary px-4 text-primary-foreground hover:bg-primary/90">
+            <Link href="/dashboard/santri/tambah">
               <Plus className="mr-2 h-4 w-4" />
               Tambah
-            </Button>
+            </Link>
+          </Button>
+
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Tambah Santri Baru</DialogTitle>

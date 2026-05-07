@@ -290,7 +290,7 @@ export default function GuruPanelPage() {
   const [loadingJadwal, setLoadingJadwal] = useState(false)
   const [jadwalMengajar, setJadwalMengajar] = useState<JadwalItem[]>([])
   const [aktivitasSesi, setAktivitasSesi] = useState<JadwalItem[]>([])
-  const [currentUser, setCurrentUser] = useState<{ id: number; nama_lengkap: string; peran_akun: string } | null>(null)
+  const [currentUser, setCurrentUser] = useState<{ id: number; id_petugas?: number | null; nama_lengkap: string; peran_akun: string } | null>(null)
   const [isLoadingUser, setIsLoadingUser] = useState(false)
 
   const [rekapTab, setRekapTab] = useState("riwayat")
@@ -327,16 +327,51 @@ export default function GuruPanelPage() {
     return names[index] || ""
   }, [])
 
+  const isAdminUser = useMemo(() => {
+    return String(currentUser?.peran_akun || "").toLowerCase().includes("admin")
+  }, [currentUser])
+
+  const currentPetugasId = useMemo(() => {
+    if (!currentUser) return null
+
+    const explicitId = normalizeNumber(currentUser.id_petugas ?? 0)
+    if (explicitId > 0) return explicitId
+
+    return normalizeNumber(currentUser.id)
+  }, [currentUser])
+
+  const petugasLabelById = useMemo(() => {
+    const map = new Map<number, string>()
+    for (const option of petugasOptions) {
+      map.set(option.id, option.label)
+    }
+    return map
+  }, [petugasOptions])
+
   const todaySchedule = useMemo(() => {
     const today = jadwalMengajar.filter((j) => String(j.hari || "").toUpperCase() === dayName)
 
-    if (!currentUser) return today
+    if (!currentPetugasId) return today
 
-    const isAdmin = String(currentUser.peran_akun || "").toLowerCase().includes("admin")
-    if (isAdmin) return today
+    if (isAdminUser) return today
 
-    return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentUser.id))
-  }, [currentUser, dayName, jadwalMengajar])
+    return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentPetugasId))
+  }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser])
+
+  const jadwalDilimpahkan = useMemo(() => {
+    const delegated = aktivitasSesi.filter((item) => Number(item.id_petugas_pengganti || 0) > 0)
+
+    const visible = !currentPetugasId || isAdminUser
+      ? delegated
+      : delegated.filter((item) => Number(item.id_petugas_pengganti) === Number(currentPetugasId))
+
+    return [...visible].sort((a, b) => {
+      // Sort terbaru dulu (created_at descending)
+      const timeA = new Date(String(a.tanggal || "") + " " + String(a.waktu_mulai || "")).getTime()
+      const timeB = new Date(String(b.tanggal || "") + " " + String(b.waktu_mulai || "")).getTime()
+      return timeB - timeA
+    })
+  }, [aktivitasSesi, currentPetugasId, isAdminUser])
 
   const sortedJadwalMengajar = useMemo(() => {
     return [...jadwalMengajar].sort((a, b) => {
@@ -362,6 +397,11 @@ export default function GuruPanelPage() {
   const isSantriStepValid = santriList.length > 0 && santriList.every((s) => !!attendanceData[s.nomor_induk])
   const selectedPetugasPenggantiLabel =
     petugasOptions.find((option) => String(option.id) === guruPenggantiId)?.label || "-"
+
+  const getPetugasLabel = (id?: number | null) => {
+    if (!id) return "-"
+    return petugasLabelById.get(Number(id)) || `ID ${id}`
+  }
 
   const extractApiErrorMessage = (error: any, fallback: string) => {
     const message = error?.response?.data?.message
@@ -393,6 +433,7 @@ export default function GuruPanelPage() {
       if (user) {
         setCurrentUser({
           id: normalizeNumber(user.id),
+          id_petugas: normalizeNumber((user as { id_petugas?: number | null; petugas?: { id_petugas?: number | null } }).id_petugas ?? (user as { petugas?: { id_petugas?: number | null } }).petugas?.id_petugas ?? 0) || null,
           nama_lengkap: String(user.nama_lengkap || ""),
           peran_akun: String(user.peran_akun || ""),
         })
@@ -813,6 +854,62 @@ export default function GuruPanelPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
                   <p>Tidak ada sesi untuk hari ini.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-primary" />
+                Jadwal Dialihkan
+              </CardTitle>
+              <CardDescription>
+                {isAdminUser
+                  ? "Daftar jadwal yang dialihkan ke guru pengganti (id_petugas_pengganti ≠ null)"
+                  : "Jadwal yang dialihkan ke Anda sebagai guru pengganti"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {jadwalDilimpahkan.length > 0 ? (
+                jadwalDilimpahkan.map((item) => (
+                  <div
+                    key={item.id_sesi}
+                    className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 p-4 lg:flex-row lg:items-center lg:justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
+                        <ArrowRight className="h-6 w-6 text-amber-600" />
+                      </div>
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-semibold text-foreground">{item.mapel}</h4>
+                          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700">
+                            Dilimpahkan
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {item.kelas} ({item.jenjang}) - {item.hari || "-"} | {item.jam}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Petugas pengganti: {getPetugasLabel(item.id_petugas_pengganti)} | Ruangan: {item.ruangan || "-"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" className="bg-transparent" onClick={() => handleOpenInput(item)}>
+                        <UserCheck className="mr-2 h-4 w-4" />
+                        Input
+                      </Button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  <UserCheck className="mx-auto mb-2 h-12 w-12 opacity-50" />
+                  <p>Tidak ada jadwal yang dialihkan ke Anda.</p>
                 </div>
               )}
             </CardContent>
