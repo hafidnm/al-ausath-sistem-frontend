@@ -1,5 +1,11 @@
 import { useCallback } from "react"
-import { NilaiStatistikParams, RataRataPerKelasItem, nilaiStatistikService } from "@/lib/services/nilai-statistik.service"
+import {
+  NilaiStatistikParams,
+  RataRataPerKelasItem,
+  BerprestasiParams,
+  SantriBerprestasiItem,
+  nilaiStatistikService,
+} from "@/lib/services/nilai-statistik.service"
 import { useAsyncQuery } from "@/hooks/shared/use-async-request"
 
 export function useNilaiStatistikPerKelas() {
@@ -19,4 +25,23 @@ export function useNilaiStatistikPerKelas() {
   )
 
   return { data, loading, error, fetchPerKelas }
+}
+
+export function useNilaiStatistikBerprestasi() {
+  const query = useCallback(async (params?: BerprestasiParams) => {
+    const response = await nilaiStatistikService.getBerprestasi(params)
+    return response.data
+  }, [])
+
+  const { data, loading, error, run } = useAsyncQuery(query, [] as SantriBerprestasiItem[], {
+    fallbackError: "Gagal memuat data santri berprestasi",
+    logLabel: "Error fetching santri berprestasi:",
+  })
+
+  const fetchBerprestasi = useCallback(
+    async (params?: BerprestasiParams) => run(params),
+    [run],
+  )
+
+  return { data, loading, error, fetchBerprestasi }
 }
