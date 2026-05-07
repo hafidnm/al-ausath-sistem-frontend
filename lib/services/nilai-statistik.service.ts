@@ -31,6 +31,22 @@ export interface NilaiStatistikResponse {
   }
 }
 
+export interface RataRataPerKelasItem {
+  kode_kelas: string
+  nama_kelas: string
+  rata_rata: number
+  jumlah_santri: number
+}
+
+export interface RataRataPerKelasResponse {
+  data?: RataRataPerKelasItem[]
+  filters?: {
+    tahun_ajaran?: string | null
+    semester?: number | null
+    kode_mapel?: string | null
+  }
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -55,6 +71,27 @@ export const nilaiStatistikService = {
 
     return {
       data: normalizeData(response.data?.data),
+      filters: response.data?.filters,
+    }
+  },
+
+  async getPerKelas(params?: NilaiStatistikParams): Promise<{
+    data: RataRataPerKelasItem[]
+    filters: RataRataPerKelasResponse["filters"]
+  }> {
+    const response = await api.get<RataRataPerKelasResponse>("/akademik/nilai-statistik/per-kelas", {
+      params,
+    })
+
+    const items = (response.data?.data ?? []).map((item) => ({
+      kode_kelas: item.kode_kelas ?? "",
+      nama_kelas: item.nama_kelas ?? "",
+      rata_rata: toNumber(item.rata_rata, 0),
+      jumlah_santri: toNumber(item.jumlah_santri, 0),
+    }))
+
+    return {
+      data: items,
       filters: response.data?.filters,
     }
   },
