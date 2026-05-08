@@ -195,6 +195,11 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/pembayaran');
+      return;
+    }
+
     // Redirect ke pengumuman HANYA jika sudah benar-benar selesai:
     // - step menunggu-pengumuman/pengumuman, ATAU
     // - formCompleted DAN semua dokumen wajib sudah ada
@@ -216,11 +221,6 @@ export default function PpdbDashboardPage() {
 
     if (shouldGoPengumuman) {
       router.replace('/ppdb/dashboard/pengumuman');
-      return;
-    }
-
-    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/pembayaran');
       return;
     }
   }, [data, router]);
@@ -278,6 +278,24 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    // Validasi: semua dokumen wajib harus sudah terupload
+    const allDocsUploaded = Boolean(
+      data?.berkasAktaUrl &&
+      data?.berkasKkUrl &&
+      data?.berkasRekomendasiUstadzUrl &&
+      data?.berkasSuratPernyataanUrl
+    );
+
+    if (!allDocsUploaded) {
+      toast({
+        title: 'Dokumen belum lengkap',
+        description:
+          'Upload semua dokumen wajib terlebih dahulu: Akta, KK, Rekomendasi Ustadz, dan Surat Pernyataan.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const hasPendingFiles = Boolean(
       files.dokumenAkta
       || files.dokumenKk
@@ -317,6 +335,11 @@ export default function PpdbDashboardPage() {
 
       if (shouldGoTes) {
         router.replace('/ppdb/tes');
+        return;
+      }
+
+      if (refreshedDashboard?.step === 'pembayaran-ppdb' || refreshedDashboard?.step === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/pembayaran');
         return;
       }
 
@@ -782,10 +805,30 @@ export default function PpdbDashboardPage() {
             </div>
 
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-              <Button onClick={() => void handleSaveForm()} disabled={updateLoading}>
-                {updateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
-                Simpan Form PPDB
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  onClick={() => void handleSaveForm()} 
+                  disabled={updateLoading || !Boolean(
+                    data?.berkasAktaUrl &&
+                    data?.berkasKkUrl &&
+                    data?.berkasRekomendasiUstadzUrl &&
+                    data?.berkasSuratPernyataanUrl
+                  )}
+                >
+                  {updateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                  Simpan Form PPDB
+                </Button>
+                {!Boolean(
+                  data?.berkasAktaUrl &&
+                  data?.berkasKkUrl &&
+                  data?.berkasRekomendasiUstadzUrl &&
+                  data?.berkasSuratPernyataanUrl
+                ) && (
+                  <p className="text-xs text-destructive flex items-center gap-1">
+                    <span>⚠️ Upload semua dokumen wajib sebelum submit</span>
+                  </p>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">{autoSaveDescription}</p>
             </div>
           </CardContent>

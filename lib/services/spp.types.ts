@@ -74,24 +74,37 @@ export interface VerifySppPaymentRequest {
 /** Shape returned to UI after normalization */
 export interface SppSetting {
   id: string;
-  kodeKelas: string;
-  idGolonganSpp: string;
+  idUnit: string | null;
+  kodeKelas: string | null;
+  jenjang: string | null;
+  idGolonganSpp: string | null;
+  idKategoriTagihan: string | null;
   nominal: number;
-  // Extra display fields that may come from backend relations
+  // Extra display fields
   nama: string;
-  jenjang: string;
   kelas: string;
   tahunAjaran: string;
   jatuhTempoHari: number | null;
   aktif: boolean;
   keterangan: string;
+  // Relations
+  unit?: { id_unit: number; nama_unit: string; kode_unit: string };
+  kategoriTagihan?: { id_kategori: number; nama_tagihan: string; kode_kategori: string };
+  golonganSpp?: { id_golongan: number; nama_golongan: string };
 }
 
 /** POST /api/administrasi/spp/setting */
 export interface CreateSppSettingRequest {
-  kode_kelas: string;
-  id_golongan_spp: string | number;
-  nominal: number;
+  id_unit?: number | null;
+  jenjang?: string | null;
+  kode_kelas?: string | null;
+  id_golongan_spp?: number | null;
+  kategori_tagihan_id?: number | null;
+  nominal?: number;
+  jumlah?: number;
+  periode?: string | null;
+  keterangan?: string | null;
+  aktif?: boolean;
 }
 
 /** PUT /api/administrasi/spp/setting/{id} */

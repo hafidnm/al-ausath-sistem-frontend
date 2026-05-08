@@ -68,7 +68,14 @@ const toStr = (value: unknown): string => {
 const toNum = (value: unknown): number => {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string') {
-    const cleaned = value.replace(/[^\d.,-]/g, '').replace(/\./g, '').replace(',', '.');
+    // If it contains both dot and comma, assume comma is decimal (Indonesian format)
+    // Otherwise, assume dot is decimal (International format)
+    let cleaned = value.replace(/[^\d.,-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+       cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else if (cleaned.includes(',')) {
+       cleaned = cleaned.replace(',', '.');
+    }
     const parsed = Number(cleaned);
     return Number.isFinite(parsed) ? parsed : 0;
   }
@@ -230,15 +237,17 @@ const normalizeSetting = (item: ApiRecord): SppSetting => {
   const id = toStr(item.id ?? item.id_setting ?? item.uuid);
   return {
     id,
+    idUnit: toStr(item.id_unit ?? item.idUnit ?? ''),
     kodeKelas: toStr(item.kode_kelas ?? item.kodeKelas ?? item.kelas ?? ''),
+    jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? ''),
     idGolonganSpp: toStr(item.id_golongan_spp ?? item.idGolonganSpp ?? ''),
-    nominal: toNum(item.nominal ?? item.nominal_spp ?? item.biaya ?? 0),
+    idKategoriTagihan: toStr(item.kategori_tagihan_id ?? item.idKategoriTagihan ?? ''),
+    nominal: toNum(item.nominal ?? item.nominal_spp ?? item.biaya ?? item.jumlah ?? 0),
     // Display helpers
     nama:
       toStr(item.nama ?? item.nama_setting ?? item.nama_kelas ?? '') ||
       [toStr(item.kode_kelas ?? ''), toStr(item.jenjang ?? '')].filter(Boolean).join(' - ') ||
       `Setting ${id || '-'}`,
-    jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? ''),
     kelas: toStr(item.kelas ?? item.nama_kelas ?? item.kode_kelas ?? ''),
     tahunAjaran: toStr(item.tahun_ajaran ?? item.tahunAjaran ?? item.periode ?? ''),
     jatuhTempoHari:
@@ -247,6 +256,10 @@ const normalizeSetting = (item: ApiRecord): SppSetting => {
         : toNum(item.jatuh_tempo_hari ?? item.jatuhTempoHari ?? item.due_day ?? 0),
     aktif: toBool(item.aktif ?? item.active ?? item.is_active ?? item.status),
     keterangan: toStr(item.keterangan ?? item.deskripsi ?? item.catatan ?? ''),
+    // Relations
+    unit: item.unit as any,
+    kategoriTagihan: (item.kategori_tagihan ?? item.kategoriTagihan) as any,
+    golonganSpp: (item.golongan_spp ?? item.golonganSpp) as any,
   };
 };
 

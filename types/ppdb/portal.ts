@@ -6,7 +6,9 @@ export type PpdbPortalStep =
   | 'lengkapi-form'
   | 'tes'
   | 'menunggu-pengumuman'
-  | 'pengumuman';
+  | 'pengumuman'
+  | 'pembayaran-ppdb'
+  | 'siap-menjadi-santri';
 
 export interface PpdbPortalRegisterRequest {
   email: string;
@@ -141,6 +143,14 @@ export interface PpdbPortalDashboard {
   pengumumanOpen: boolean;
   formCompleted: boolean;
   step: PpdbPortalStep;
+  /** Data tagihan PPDB (biaya administrasi Rp 100.000) */
+  pembayaranPpdb: {
+    id_pembayaran: number | null;
+    status: string | null;
+    nominal_bayar: number;
+    has_tagihan: boolean;
+  } | null;
+  statusVerifikasi: string;
 }
 
 export interface PpdbPortalTesStatus {

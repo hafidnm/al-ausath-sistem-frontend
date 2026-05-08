@@ -17,6 +17,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuPortal,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -51,7 +52,7 @@ import {
   type ProsesRow,
   type StatusPembayaran,
 } from "@/hooks/use-pembayaran"
-import { kelasService, type KelasItem } from "@/lib/services/kelas.service"
+import { dataKelasService } from "@/lib/services/kelas.service"
 import {
   AlertCircle,
   BadgeCheck,
@@ -63,6 +64,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { pembayaranService } from '@/lib/services/pembayaran.service'
+import printKwitansi from '@/lib/utils/printKwitansi'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,10 +92,11 @@ const StatusBadge = ({ status }: { status: StatusPembayaran }) => {
   return <Badge className={`font-medium ${cls}`}>{label}</Badge>
 }
 
-const STATUS_ACTIONS: Array<{ value: StatusPembayaran; label: string }> = [
+const STATUS_ACTIONS: Array<{ value: StatusPembayaran; label: string; danger?: boolean }> = [
+  { value: "lunas", label: "✅ Terima / Lunas" },
   { value: "menunggu_pembayaran", label: "Menunggu Pembayaran" },
   { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
-  { value: "dibatalkan", label: "Dibatalkan" },
+  { value: "dibatalkan", label: "Batalkan", danger: true },
 ]
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -102,7 +106,7 @@ function ProsesPembayaranTab() {
   const [search, setSearch] = useState("")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [kelasList, setKelasList] = useState<KelasItem[]>([])
+  const [kelasList, setKelasList] = useState<{ id: number; kode_kelas: string; nama_kelas?: string; tahun_ajaran?: string }[]>([])
   const [kelasLoading, setKelasLoading] = useState(false)
   const [unitList, setUnitList] = useState<string[]>([])
 
@@ -112,11 +116,24 @@ function ProsesPembayaranTab() {
     const loadKelas = async () => {
       setKelasLoading(true)
       try {
-        const list = await kelasService.getAll({ per_page: "300" })
+        const result = await dataKelasService.getAll({ per_page: 500 })
+        const list = result.data
+          .filter(item => item.kode_kelas)
+          .map(item => ({
+            id: item.id_kelas ?? item.id ?? -1,
+            kode_kelas: item.kode_kelas ?? "",
+            nama_kelas: item.nama_kelas ?? "",
+            tahun_ajaran: item.tahun_ajaran ?? "",
+          }))
         setKelasList(list)
-        const units = Array.from(new Set(list.map(k => k.kode_kelas.split("-")[0]).filter(Boolean))).sort()
+        const units = Array.from(new Set(list.map(k => (k.kode_kelas.split("-")[0] ?? "")).filter(Boolean))).sort()
         setUnitList(units)
-      } catch { setKelasList([]) } finally { setKelasLoading(false) }
+      } catch (err) {
+        console.error("Error loading kelas:", err)
+        setKelasList([])
+      } finally {
+        setKelasLoading(false)
+      }
     }
     void loadKelas()
   }, [fetchProses])
@@ -195,6 +212,7 @@ function ProsesPembayaranTab() {
               <TableHead>Kelas</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Invoice</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -214,6 +232,13 @@ function ProsesPembayaranTab() {
                   <span className="text-xs text-muted-foreground">
                     {row.daftarInvoice.length > 0 ? `${row.daftarInvoice.length} invoice` : "Tidak ada"}
                   </span>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={`/dashboard/pembayaran/santri/${row.id}`}>
+                      <Eye className="w-4 h-4 mr-1" /> Detail
+                    </a>
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -238,17 +263,31 @@ function VerifikasiPembayaranTab() {
   const [selectedJenis, setSelectedJenis] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [kelasList, setKelasList] = useState<KelasItem[]>([])
+  const [kelasList, setKelasList] = useState<{ id: number; kode_kelas: string; nama_kelas?: string; tahun_ajaran?: string }[]>([])
   const [unitList, setUnitList] = useState<string[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
   const [selectedRow, setSelectedRow] = useState<VerifikasiRow | null>(null)
 
   useEffect(() => {
     void fetchVerifikasi()
-    void kelasService.getAll({ per_page: "300" }).then(list => {
-      setKelasList(list)
-      setUnitList(Array.from(new Set(list.map(k => k.kode_kelas.split("-")[0]).filter(Boolean))).sort())
-    }).catch(() => {})
+    const loadKelas = async () => {
+      try {
+        const result = await dataKelasService.getAll({ per_page: 500 })
+        const list = result.data
+          .filter(item => item.kode_kelas)
+          .map(item => ({
+            id: item.id_kelas ?? item.id ?? -1,
+            kode_kelas: item.kode_kelas ?? "",
+            nama_kelas: item.nama_kelas ?? "",
+            tahun_ajaran: item.tahun_ajaran ?? "",
+          }))
+        setKelasList(list)
+        setUnitList(Array.from(new Set(list.map(k => (k.kode_kelas.split("-")[0] ?? "")).filter(Boolean))).sort())
+      } catch (err) {
+        console.error("Error loading kelas:", err)
+      }
+    }
+    void loadKelas()
   }, [fetchVerifikasi])
 
   const filtered = useMemo(() => {
@@ -272,6 +311,30 @@ function VerifikasiPembayaranTab() {
     try {
       await ubahStatus(row.id, { status })
       toast({ title: "Status Diperbarui", description: `Status berhasil diubah ke ${status}.` })
+      
+      if (status === "lunas" || status === "terverifikasi") {
+        const phone = row.noHp || "";
+        const message = encodeURIComponent(`Assalamu'alaikum, pemberitahuan dari Ponpes Al-Ausath.\n\nPembayaran ${row.jenisTransaksi} atas nama *${row.namaLengkap}* telah *berhasil diverifikasi* (Lunas).\n\nTerima kasih.`);
+        if (phone) {
+          const waUrl = `https://wa.me/${phone.replace(/^0/, "62")}?text=${message}`;
+          window.open(waUrl, "_blank");
+        } else {
+          toast({ title: "Info", description: "Nomor WhatsApp tidak tersedia untuk mengirim konfirmasi otomatis." });
+        }
+        // Attempt to generate / open kwitansi after verification
+        try {
+          const det = await pembayaranService.getDetail(row.id)
+          if (det.informasiKwitansi?.tersedia && det.informasiKwitansi.url) {
+            window.open(det.informasiKwitansi.url, '_blank')
+          } else {
+            await printKwitansi(det)
+          }
+        } catch (e) {
+          console.error('Error generating kwitansi:', e)
+          toast({ title: 'Kwitansi', description: 'Gagal membuat kwitansi otomatis.', variant: 'destructive' })
+        }
+      }
+
       void fetchVerifikasi()
     } catch (err) {
       toast({ title: "Gagal", description: err instanceof Error ? err.message : "Gagal mengubah status", variant: "destructive" })
@@ -398,14 +461,16 @@ function VerifikasiPembayaranTab() {
                         <DropdownMenuSubTrigger>
                           <AlertCircle className="w-4 h-4 mr-2" /> Ubah Status
                         </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent>
-                          {STATUS_ACTIONS.map((s) => (
-                            <DropdownMenuItem key={s.value} onClick={() => void handleUbahStatus(row, s.value)}
-                              className={s.value === "dibatalkan" ? "text-destructive" : ""}>
-                              {s.label}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
+                        <DropdownMenuPortal>
+                          <DropdownMenuSubContent>
+                            {STATUS_ACTIONS.map((s) => (
+                              <DropdownMenuItem key={s.value} onClick={() => void handleUbahStatus(row, s.value)}
+                                className={s.danger ? "text-destructive" : s.value === "lunas" ? "text-emerald-600 font-medium" : ""}>
+                                {s.label}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuSubContent>
+                        </DropdownMenuPortal>
                       </DropdownMenuSub>
                       <DropdownMenuSeparator />
                       {/* Hapus */}
@@ -455,6 +520,27 @@ function VerifikasiPembayaranTab() {
                   <div className="col-span-2"><Label className="text-xs text-muted-foreground">Tanggal</Label><p className="font-medium">{formatDateTime(detail.informasiInvoice.tanggal)}</p></div>
                 </div>
               </div>
+              {/* Bukti Pembayaran */}
+              {detail.informasiInvoice.bukti_bayar_url && (
+                <div>
+                  <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Bukti Pembayaran</p>
+                  <div className="rounded-md border p-2 bg-muted/30">
+                    <a href={detail.informasiInvoice.bukti_bayar_url} target="_blank" rel="noreferrer">
+                      <img 
+                        src={detail.informasiInvoice.bukti_bayar_url} 
+                        alt="Bukti Bayar" 
+                        className="w-full max-w-sm rounded object-contain border bg-white"
+                      />
+                    </a>
+                    {detail.informasiInvoice.catatan_bayar && (
+                      <div className="mt-3 text-sm">
+                        <Label className="text-xs text-muted-foreground">Catatan:</Label>
+                        <p className="font-medium">{detail.informasiInvoice.catatan_bayar}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               {/* Riwayat */}
               {detail.riwayatPembayaran.length > 0 && (
                 <div>

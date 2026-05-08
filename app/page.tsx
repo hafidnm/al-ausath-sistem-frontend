@@ -15,9 +15,40 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
 import { usePpdbPortalRegister } from "@/hooks/ppdb/santri"
+import { pengumumanService, type Pengumuman } from "@/lib/services/pengumuman.service"
 import { BookOpen, Users, GraduationCap, Star, Moon, Menu, Calendar, Bell, MapPin, Phone, Mail, Clock, CheckCircle2, Building2, ChevronDown, LogIn, UserPlus, Loader2 } from "lucide-react"
 
 export default function LandingPage() {
+  const [pengumuman, setPengumuman] = React.useState<Pengumuman[]>([])
+  const [pengumumanLoading, setPengumumanLoading] = React.useState(true)
+  const [pengumumanError, setPengumumanError] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    let isMounted = true
+
+    const loadPengumuman = async () => {
+      setPengumumanLoading(true)
+      setPengumumanError(null)
+
+      try {
+        const items = await pengumumanService.getPublic()
+        if (!isMounted) return
+        setPengumuman(items)
+      } catch (error) {
+        if (!isMounted) return
+        setPengumumanError(error instanceof Error ? error.message : "Gagal memuat pengumuman")
+      } finally {
+        if (isMounted) setPengumumanLoading(false)
+      }
+    }
+
+    void loadPengumuman()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
@@ -232,44 +263,53 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="max-w-5xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <AnnouncementCard
-              date="1 Feb 2026"
-              title="Pembukaan PPDB Gelombang 2"
-              description="Pendaftaran santri baru gelombang 2 telah dibuka. Dapatkan potongan biaya untuk pendaftar awal."
-              badge="PPDB"
-            />
-            <AnnouncementCard
-              date="28 Jan 2026"
-              title="Jadwal Ujian Tengah Semester"
-              description="Ujian tengah semester akan dilaksanakan pada 10-15 Februari 2026. Persiapkan diri dengan baik."
-              badge="Akademik"
-            />
-            <AnnouncementCard
-              date="25 Jan 2026"
-              title="Lomba Tahfidz Antar Kelas"
-              description="Akan diadakan lomba tahfidz tingkat pesantren. Pendaftaran dibuka hingga 5 Februari 2026."
-              badge="Kegiatan"
-            />
-            <AnnouncementCard
-              date="20 Jan 2026"
-              title="Pelatihan Guru Sistem e-Rapor"
-              description="Seluruh guru dan ustadz akan mengikuti pelatihan penggunaan sistem e-Rapor digital."
-              badge="Teknologi"
-            />
-            <AnnouncementCard
-              date="15 Jan 2026"
-              title="Libur Semester Genap"
-              description="Libur semester genap akan dimulai pada 20 Juni 2026. Santri diharapkan kembali pada 10 Juli 2026."
-              badge="Akademik"
-            />
-            <AnnouncementCard
-              date="10 Jan 2026"
-              title="Pengumuman Beasiswa Prestasi"
-              description="Dibuka pendaftaran beasiswa prestasi untuk santri berprestasi akademik dan non-akademik."
-              badge="Beasiswa"
-            />
-          </div>
+          {pengumumanLoading ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="animate-pulse border-border/50">
+                  <CardHeader>
+                    <div className="h-4 w-24 rounded bg-muted" />
+                    <div className="h-6 w-4/5 rounded bg-muted mt-4" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-4 w-full rounded bg-muted" />
+                      <div className="h-4 w-5/6 rounded bg-muted" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : pengumumanError ? (
+            <Card className="max-w-3xl mx-auto border-destructive/30 bg-destructive/5">
+              <CardContent className="p-6 text-center space-y-2">
+                <p className="font-semibold text-destructive">Pengumuman gagal dimuat</p>
+                <p className="text-sm text-muted-foreground">{pengumumanError}</p>
+              </CardContent>
+            </Card>
+          ) : pengumuman.length === 0 ? (
+            <Card className="max-w-3xl mx-auto border-border/60">
+              <CardContent className="p-6 text-center space-y-2">
+                <p className="font-semibold text-foreground">Belum ada pengumuman aktif</p>
+                <p className="text-sm text-muted-foreground">
+                  Informasi terbaru akan tampil di sini ketika admin mempublikasikannya.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="max-w-5xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {pengumuman.slice(0, 6).map((item) => (
+                <AnnouncementCard
+                  key={item.id}
+                  id={item.id}
+                  date={item.tanggal_mulai || item.created_at}
+                  title={item.judul}
+                  description={item.konten}
+                  badge={item.kategori}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -680,27 +720,40 @@ function StatCard({ number, label }: { number: string; label: string }) {
 }
 
 function AnnouncementCard({
+  id,
   date,
   title,
   description,
   badge,
 }: {
+  id: number
   date: string
   title: string
   description: string
   badge: string
 }) {
+  const formattedDate = new Date(date).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+
   return (
     <Card className="hover:shadow-lg transition-shadow">
       <CardHeader>
         <div className="flex items-start justify-between mb-2">
           <Badge variant="secondary" className="text-xs">{badge}</Badge>
-          <span className="text-xs text-muted-foreground">{date}</span>
+          <span className="text-xs text-muted-foreground">{formattedDate}</span>
         </div>
         <CardTitle className="text-lg">{title}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-sm text-muted-foreground line-clamp-4">{description}</p>
+        <div className="mt-4">
+          <Link href={`/pengumuman/${id}`} className="text-sm font-medium text-primary hover:underline">
+            Baca selengkapnya
+          </Link>
+        </div>
       </CardContent>
     </Card>
   )

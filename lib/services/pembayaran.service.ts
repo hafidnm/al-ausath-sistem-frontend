@@ -34,6 +34,8 @@ export type JenisTransaksi = 'SPP' | 'PPDB';
 /** Row untuk halaman Tagihan (GET /tagihan) */
 export interface TagihanRow {
   id: string;
+  idSantri: string;
+  idPendaftaran: string;
   namaUnit: string;
   nomorInduk: string;
   namaLengkap: string;
@@ -44,6 +46,40 @@ export interface TagihanRow {
   totalDibayar: number;
   totalTunggakan: number;
   sumber: 'santri' | 'ppdb';
+}
+
+export interface TagihanDetailResponse {
+  profil: {
+    id: string;
+    sumber: 'santri' | 'ppdb';
+    nama_lengkap: string;
+    nomor_induk: string;
+    nama_unit: string;
+    kelas_sekarang: string | null;
+    tahun_ajaran: string | null;
+    status: string | null;
+  };
+  ringkasan: {
+    jumlah_invoice: number;
+    total_tagihan: number;
+    total_dibayar: number;
+    total_tunggakan: number;
+  };
+  invoice: Array<{
+    id_pembayaran: number;
+    nomor_invoice: string;
+    periode_tagihan: string | null;
+    rincian_tagihan: string | null;
+    jumlah_tagihan: number;
+    jumlah_dibayar: number;
+    jumlah_tunggakan: number;
+    status: string;
+    status_key: StatusPembayaran;
+    status_label: string;
+    waktu_invoice: string | null;
+    kwitansi_tersedia: boolean;
+    kwitansi_url: string | null;
+  }>;
 }
 
 /** Row untuk halaman Proses Pembayaran (GET /proses) */
@@ -77,6 +113,7 @@ export interface VerifikasiRow {
   jenisTransaksi: JenisTransaksi;
   statusPembayaran: StatusPembayaran;
   waktuInvoice: string;
+  noHp?: string;
 }
 
 /** Detail invoice (GET /{id}/detail) */
@@ -94,6 +131,8 @@ export interface PembayaranDetail {
     total: number;
     tanggal: string;
     status: StatusPembayaran;
+    bukti_bayar_url?: string | null;
+    catatan_bayar?: string | null;
   };
   riwayatPembayaran: RiwayatPembayaranItem[];
   tagihanKustom: TagihanKustomItem[];
@@ -133,6 +172,23 @@ export interface RingkasanPembayaran {
   dibatalkan: number;
 }
 
+export interface TunggakanSantri {
+  id_santri: string;
+  nomor_induk: string;
+  nama_santri: string;
+  kode_kelas: string;
+  jumlah_transaksi_tunggakan: number;
+  total_tunggakan: number;
+  rincian: {
+    id_pembayaran: string;
+    id_setting: number;
+    nominal_bayar: number;
+    tanggal_bayar: string;
+    status: StatusPembayaran;
+    kategori: string;
+  }[];
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const toStr = (v: unknown): string => {
@@ -144,8 +200,14 @@ const toStr = (v: unknown): string => {
 const toNum = (v: unknown): number => {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
   if (typeof v === 'string') {
-    const parsed = Number(v.replace(/[^\d.]/g, ''));
-    return Number.isFinite(parsed) ? parsed : 0;
+    let cleaned = v.replace(/[^\d.,-]/g, '');
+    if (cleaned.includes(',') && cleaned.includes('.')) {
+      cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+    } else if (cleaned.includes(',')) {
+      cleaned = cleaned.replace(',', '.');
+    }
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
   }
   return 0;
 };
@@ -228,11 +290,22 @@ const normalizeStatus = (raw: unknown): StatusPembayaran => {
 // ─── Normalizers ──────────────────────────────────────────────────────────────
 
 const normalizeTagihanRow = (item: ApiRecord): TagihanRow => ({
-  id: toStr(item.id ?? item.id_pembayaran ?? item.id_tagihan ?? ''),
+  id: toStr(
+    item.id_santri
+      ?? item.idSantri
+      ?? item.id_pendaftaran
+      ?? item.idPendaftaran
+      ?? item.id
+      ?? item.id_pembayaran
+      ?? item.id_tagihan
+      ?? '',
+  ),
+  idSantri: toStr(item.id_santri ?? item.idSantri ?? ''),
+  idPendaftaran: toStr(item.id_pendaftaran ?? item.idPendaftaran ?? ''),
   namaUnit: toStr(item.nama_unit ?? item.namaUnit ?? item.unit ?? item.jenjang ?? '-'),
   nomorInduk: toStr(item.nomor_induk ?? item.nomorInduk ?? item.nis ?? item.nisn ?? '-'),
   namaLengkap: toStr(item.nama_lengkap ?? item.namaLengkap ?? item.nama ?? '-'),
-  kelasSaatIni: toStr(item.kelas_saat_ini ?? item.kelasSaatIni ?? item.kelas ?? '-'),
+  kelasSaatIni: toStr(item.kelas_saat_ini ?? item.kelas_sekarang ?? item.kelasSaatIni ?? item.kelas ?? '-'),
   tahunAjaran: toStr(item.tahun_ajaran ?? item.tahunAjaran ?? item.periode ?? '-'),
   status: normalizeStatus(item.status ?? item.status_pembayaran ?? ''),
   totalTagihan: toNum(item.total_tagihan ?? item.totalTagihan ?? item.nominal ?? 0),
@@ -251,39 +324,48 @@ const normalizeTagihanRow = (item: ApiRecord): TagihanRow => ({
 });
 
 const normalizeVerifikasiRow = (item: ApiRecord): VerifikasiRow => {
-  const jenisRaw = toStr(item.jenis_transaksi ?? item.jenisTransaksi ?? item.jenis ?? '').toUpperCase();
+  // BE sends "Administrasi PPDB" or "Tagihan" for jenis_transaksi.
+  // Use `.includes('PPDB')` (case-insensitive) instead of strict equality.
+  const jenisRaw = toStr(item.jenis_transaksi ?? item.jenisTransaksi ?? item.jenis ?? '');
   return {
     id: toStr(item.id ?? item.id_pembayaran ?? ''),
     namaUnit: toStr(item.nama_unit ?? item.namaUnit ?? item.unit ?? item.jenjang ?? '-'),
     nomorInduk: toStr(item.nomor_induk ?? item.nomorInduk ?? item.nis ?? '-'),
     namaLengkap: toStr(item.nama_lengkap ?? item.namaLengkap ?? item.nama ?? '-'),
     nomorInvoice: toStr(item.nomor_invoice ?? item.nomorInvoice ?? item.no_tagihan ?? '-'),
-    totalPembayaran: toNum(item.total_pembayaran ?? item.totalPembayaran ?? item.nominal ?? 0),
-    jenisTransaksi: jenisRaw === 'PPDB' ? 'PPDB' : 'SPP',
-    statusPembayaran: normalizeStatus(item.status_pembayaran ?? item.status ?? ''),
-    waktuInvoice: toStr(item.waktu_invoice ?? item.waktuInvoice ?? item.created_at ?? ''),
+    totalPembayaran: toNum(item.total_pembayaran ?? item.totalPembayaran ?? item.nominal_bayar ?? item.nominal ?? 0),
+    jenisTransaksi: jenisRaw.toUpperCase().includes('PPDB') ? 'PPDB' : 'SPP',
+    statusPembayaran: normalizeStatus(item.status_pembayaran ?? item.status_key ?? item.status ?? ''),
+    waktuInvoice: toStr(item.waktu_invoice ?? item.waktuInvoice ?? item.tanggal_bayar ?? item.created_at ?? ''),
+    noHp: toStr(item.no_hp ?? item.phone ?? item.telepon ?? item.whatsapp ?? ''),
   };
 };
 
 const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
-  const rawInvoices = Array.isArray(item.daftar_invoice ?? item.invoices)
-    ? ((item.daftar_invoice ?? item.invoices) as ApiRecord[])
-    : [];
+  // BE endpoint `/proses` returns `invoice` (singular), not `daftar_invoice`.
+  // Also accept `invoices` and `daftar_invoice` as fallbacks for robustness.
+  const rawInvoices = Array.isArray(item.invoice)
+    ? (item.invoice as ApiRecord[])
+    : Array.isArray(item.daftar_invoice)
+      ? (item.daftar_invoice as ApiRecord[])
+      : Array.isArray(item.invoices)
+        ? (item.invoices as ApiRecord[])
+        : [];
 
   return {
     id: toStr(item.id ?? item.id_santri ?? ''),
     namaLengkap: toStr(item.nama_lengkap ?? item.namaLengkap ?? item.nama ?? '-'),
     jenisKelamin: toStr(item.jenis_kelamin ?? item.jenisKelamin ?? '-'),
     nomorInduk: toStr(item.nomor_induk ?? item.nomorInduk ?? item.nis ?? '-'),
-    unitSaatIni: toStr(item.unit_saat_ini ?? item.unitSaatIni ?? item.unit ?? '-'),
-    kelasSaatIni: toStr(item.kelas_saat_ini ?? item.kelasSaatIni ?? item.kelas ?? '-'),
+    unitSaatIni: toStr(item.unit_sekarang ?? item.unit_saat_ini ?? item.unitSaatIni ?? item.unit ?? '-'),
+    kelasSaatIni: toStr(item.kelas_sekarang ?? item.kelas_saat_ini ?? item.kelasSaatIni ?? item.kelas ?? '-'),
     status: normalizeStatus(item.status ?? ''),
     daftarInvoice: rawInvoices.map((inv) => ({
-      id: toStr(inv.id ?? ''),
+      id: toStr(inv.id_pembayaran ?? inv.id ?? ''),
       nomorInvoice: toStr(inv.nomor_invoice ?? inv.no_tagihan ?? '-'),
-      nominal: toNum(inv.nominal ?? 0),
-      status: normalizeStatus(inv.status ?? ''),
-      tanggal: toStr(inv.tanggal ?? inv.created_at ?? ''),
+      nominal: toNum(inv.jumlah_tagihan ?? inv.nominal_bayar ?? inv.nominal ?? 0),
+      status: normalizeStatus(inv.status_key ?? inv.status ?? ''),
+      tanggal: toStr(inv.waktu_invoice ?? inv.tanggal ?? inv.created_at ?? ''),
     })),
   };
 };
@@ -299,6 +381,52 @@ export const pembayaranService = {
       return { data };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat daftar tagihan'));
+    }
+  },
+
+  /** GET /api/administrasi/pembayaran/tagihan/{id}/detail */
+  async getTagihanDetail(id: string): Promise<TagihanDetailResponse> {
+    try {
+      const response = await api.get(`${BASE}/tagihan/${id}/detail`);
+      const raw = extractSingle(response.data);
+
+      return {
+        profil: {
+          id: toStr((raw.profil as ApiRecord)?.id ?? id),
+          sumber: toStr((raw.profil as ApiRecord)?.sumber).toLowerCase() === 'ppdb' ? 'ppdb' : 'santri',
+          nama_lengkap: toStr((raw.profil as ApiRecord)?.nama_lengkap ?? '-'),
+          nomor_induk: toStr((raw.profil as ApiRecord)?.nomor_induk ?? '-'),
+          nama_unit: toStr((raw.profil as ApiRecord)?.nama_unit ?? '-'),
+          kelas_sekarang: toStr((raw.profil as ApiRecord)?.kelas_sekarang ?? '') || null,
+          tahun_ajaran: toStr((raw.profil as ApiRecord)?.tahun_ajaran ?? '') || null,
+          status: toStr((raw.profil as ApiRecord)?.status ?? '') || null,
+        },
+        ringkasan: {
+          jumlah_invoice: toNum((raw.ringkasan as ApiRecord)?.jumlah_invoice ?? 0),
+          total_tagihan: toNum((raw.ringkasan as ApiRecord)?.total_tagihan ?? 0),
+          total_dibayar: toNum((raw.ringkasan as ApiRecord)?.total_dibayar ?? 0),
+          total_tunggakan: toNum((raw.ringkasan as ApiRecord)?.total_tunggakan ?? 0),
+        },
+        invoice: Array.isArray(raw.invoice)
+          ? (raw.invoice as ApiRecord[]).map((item) => ({
+              id_pembayaran: toNum(item.id_pembayaran ?? 0),
+              nomor_invoice: toStr(item.nomor_invoice ?? '-'),
+              periode_tagihan: toStr(item.periode_tagihan ?? '') || null,
+              rincian_tagihan: toStr(item.rincian_tagihan ?? '') || null,
+              jumlah_tagihan: toNum(item.jumlah_tagihan ?? 0),
+              jumlah_dibayar: toNum(item.jumlah_dibayar ?? 0),
+              jumlah_tunggakan: toNum(item.jumlah_tunggakan ?? 0),
+              status: toStr(item.status ?? ''),
+              status_key: normalizeStatus(item.status_key ?? item.status ?? ''),
+              status_label: toStr(item.status_label ?? '-'),
+              waktu_invoice: toStr(item.waktu_invoice ?? '') || null,
+              kwitansi_tersedia: Boolean(item.kwitansi_tersedia ?? false),
+              kwitansi_url: toStr(item.kwitansi_url ?? '') || null,
+            }))
+          : [],
+      };
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat detail tagihan'));
     }
   },
 
@@ -344,12 +472,17 @@ export const pembayaranService = {
         informasiInvoice: {
           nomorInvoice: toStr(invoice.nomor_invoice ?? invoice.nomorInvoice ?? invoice.no_tagihan ?? '-'),
           jenisTransaksi:
-            toStr(invoice.jenis_transaksi ?? invoice.jenisTransaksi ?? '').toUpperCase() === 'PPDB'
+            // BE may send "Administrasi PPDB" — use contains check
+            toStr(invoice.jenis_transaksi ?? invoice.jenisTransaksi ?? '').toUpperCase().includes('PPDB')
               ? 'PPDB'
               : 'SPP',
-          total: toNum(invoice.total ?? invoice.nominal ?? 0),
-          tanggal: toStr(invoice.tanggal ?? invoice.created_at ?? ''),
-          status: normalizeStatus(invoice.status ?? raw.status ?? ''),
+          // BE sends `nominal_bayar`, not `total`
+          total: toNum(invoice.nominal_bayar ?? invoice.total ?? invoice.nominal ?? 0),
+          // BE sends `tanggal_bayar`, not `tanggal`
+          tanggal: toStr(invoice.tanggal_bayar ?? invoice.tanggal ?? invoice.created_at ?? ''),
+          status: normalizeStatus(invoice.status_key ?? invoice.status ?? raw.status ?? ''),
+          bukti_bayar_url: toStr(invoice.bukti_bayar_url ?? '') || null,
+          catatan_bayar: toStr(invoice.catatan_bayar ?? '') || null,
         },
         riwayatPembayaran: Array.isArray(raw.riwayat_pembayaran ?? raw.riwayat)
           ? ((raw.riwayat_pembayaran ?? raw.riwayat) as ApiRecord[]).map((r) => ({
@@ -405,15 +538,46 @@ export const pembayaranService = {
       const response = await api.get(`${BASE}/ringkasan`);
       const raw = extractSingle(response.data);
       return {
-        totalTagihan: toNum(raw.total_tagihan ?? raw.totalTagihan ?? 0),
-        totalDibayar: toNum(raw.total_dibayar ?? raw.totalDibayar ?? 0),
-        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ?? 0),
-        menungguKonfirmasi: toNum(raw.menunggu_konfirmasi ?? raw.menungguKonfirmasi ?? 0),
-        lunas: toNum(raw.lunas ?? 0),
-        dibatalkan: toNum(raw.dibatalkan ?? 0),
+        totalTagihan: toNum(raw.nominal_total ?? raw.total_tagihan ?? raw.totalTagihan ?? 0),
+        totalDibayar: toNum(raw.nominal_terverifikasi ?? raw.total_dibayar ?? raw.totalDibayar ?? 0),
+        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ?? 
+          (toNum(raw.nominal_total ?? 0) - toNum(raw.nominal_terverifikasi ?? 0))),
+        menungguKonfirmasi: toNum(raw.status_menunggu_verifikasi ?? raw.menunggu_konfirmasi ?? raw.menungguKonfirmasi ?? 0),
+        lunas: toNum(raw.status_terverifikasi ?? raw.lunas ?? 0),
+        dibatalkan: toNum(raw.status_ditolak ?? raw.dibatalkan ?? 0),
       };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat ringkasan pembayaran'));
+    }
+  },
+
+  /** GET /api/administrasi/spp/tunggakan-ringkasan (BE route is under /spp/, not /pembayaran/) */
+  async getTunggakanSantri(idSantri: string): Promise<TunggakanSantri | null> {
+    try {
+      const response = await api.get(`/administrasi/spp/tunggakan-ringkasan`, {
+        params: { id_santri: idSantri },
+      });
+      const data = extractList(response.data);
+      if (data.length === 0) return null;
+      const raw = data[0];
+      return {
+        id_santri: toStr(raw.id_santri),
+        nomor_induk: toStr(raw.nomor_induk),
+        nama_santri: toStr(raw.nama_santri),
+        kode_kelas: toStr(raw.kode_kelas),
+        jumlah_transaksi_tunggakan: toNum(raw.jumlah_transaksi_tunggakan),
+        total_tunggakan: toNum(raw.total_tunggakan),
+        rincian: Array.isArray(raw.rincian) ? (raw.rincian as ApiRecord[]).map(r => ({
+          id_pembayaran: toStr(r.id_pembayaran),
+          id_setting: toNum(r.id_setting),
+          nominal_bayar: toNum(r.nominal_bayar),
+          tanggal_bayar: toStr(r.tanggal_bayar),
+          status: normalizeStatus(r.status),
+          kategori: toStr(r.kategori ?? '-'),
+        })) : [],
+      };
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal memuat tunggakan santri'));
     }
   },
 };

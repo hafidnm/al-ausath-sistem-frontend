@@ -144,6 +144,8 @@ const normalizeStep = (value: unknown): PpdbPortalStep => {
 
   if (step.includes('tes')) return 'tes';
   if (step === 'pengumuman' || step === 'announcement') return 'pengumuman';
+  if (step === 'pembayaran-ppdb' || step === 'pembayaran_ppdb' || step === 'pembayaran') return 'pembayaran-ppdb';
+  if (step === 'siap-menjadi-santri' || step === 'siap_menjadi_santri' || step === 'diterima' || step === 'accepted') return 'siap-menjadi-santri';
   if (
     step === 'menunggu-pengumuman'
     || step === 'menunggu_pengumuman'
@@ -174,7 +176,26 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   const pendaftaranSelesai = asBool(pickValue(sources, ['pendaftaranSelesai', 'pendaftaran_selesai']));
   const pengumumanOpen = asBool(pickValue(sources, ['pengumumanOpen', 'pengumuman_open', 'is_pengumuman_dibuka']));
 
+  const statusVerifikasi = pickText(sources, [
+    'statusVerifikasi', 'status_verifikasi', 'hasil_verifikasi',
+  ]);
+
+  // Resolve pembayaranPpdb — BE returns nested under data.pembayaran_ppdb, data.flow.pembayaran_ppdb, dll
+  const root = asRecord(payload);
+  const dataRoot = resolveData(payload);
+  const flowData = asRecord(dataRoot.flow ?? root.flow);
+  
+  const rawPembayaran = asRecord(
+    dataRoot.pembayaran_ppdb ?? dataRoot.pembayaranPpdb ??
+    dataRoot.tagihan_ppdb ?? dataRoot.tagihanPpdb ??
+    flowData.pembayaran_ppdb ?? flowData.pembayaranPpdb ??
+    root.pembayaran_ppdb ?? root.pembayaranPpdb ?? null
+  );
+  const hasPembayaran = Boolean(rawPembayaran.id_pembayaran ?? rawPembayaran.id);
+
+  // Resolve correct step — check pembayaran step from BE
   const rawStep = pickValue(sources, ['step', 'tahap']);
+  // BE returns 'pembayaran-ppdb' when payment is pending, 'siap-menjadi-santri' when payment verified
   const derivedStep = showHalamanTes
     ? 'tes'
     : formCompleted || pendaftaranSelesai || soalJawab.trim().length > 0
@@ -236,6 +257,7 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     ]),
     alamat: pickText(sources, ['alamat', 'alamat_lengkap']),
     status: status as PpdbPortalDashboard['status'],
+    statusVerifikasi,
     tesRequired: asBool(pickValue(sources, ['tesRequired', 'tes_required'])),
     tesAvailable: asBool(pickValue(sources, ['tesAvailable', 'tes_available'])),
     fiturSoalAktif: asBool(pickValue(sources, ['fiturSoalAktif', 'fitur_soal_aktif'])),
@@ -248,6 +270,12 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     pengumumanOpen,
     formCompleted,
     step,
+    pembayaranPpdb: hasPembayaran ? {
+      id_pembayaran: Number(rawPembayaran.id_pembayaran ?? rawPembayaran.id) || null,
+      status: asString(rawPembayaran.status) || null,
+      nominal_bayar: Number(rawPembayaran.nominal_bayar ?? rawPembayaran.nominal ?? 100000),
+      has_tagihan: true,
+    } : null,
   };
 };
 

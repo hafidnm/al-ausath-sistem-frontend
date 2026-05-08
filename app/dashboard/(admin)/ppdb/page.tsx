@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Download, Loader2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -31,7 +32,7 @@ import {
 } from "@/hooks/ppdb/admin"
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
 import type { PpdbDetail, TesKonfigurasiJenjangKey, TestQuestion, UpdateTestResultRequest } from "@/types/ppdb/admin"
-import { kelasService, type KelasItem } from "@/lib/services/kelas.service"
+import { dataKelasService, type KelasItem } from "@/lib/services/kelas.service"
 
 import { PpdbStatsCards } from "@/components/ppdb/admin/ppdb-stats-cards"
 import { PpdbTesKonfigurasiCard } from "@/components/ppdb/admin/ppdb-tes-konfigurasi-card"
@@ -70,6 +71,7 @@ const getErrorMessage = (error: unknown, fallback: string) =>
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PpdbPage() {
+  const router = useRouter()
   // Dialog state
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
@@ -268,21 +270,11 @@ export default function PpdbPage() {
   }
 
   const handleOpenDetail = async (p: PpdbDetail) => {
-    setSelectedPendaftar(p)
-    const j = normalizeTesJenjang(p.jenjang)
-    if (j) setSelectedJenjangTes(j)
-    setIsDetailOpen(true)
-    setIsDetailLoading(true)
-    try {
-      const res = await runActionWithIdFallback(p, (id) => ppdbAdminApi.getDetail(id))
-      if (res) {
-        const detail = res as PpdbDetail
-        setSelectedPendaftar(detail)
-        const dj = normalizeTesJenjang(detail.jenjang)
-        if (dj) setSelectedJenjangTes(dj)
-      }
-    } catch (err) { console.error("Error fetching detail:", err) }
-    finally { setIsDetailLoading(false) }
+    // Navigate to detail page using the pendaftar ID
+    const idToUse = p.pendaftaranId || p.id
+    if (idToUse) {
+      router.push(`/dashboard/ppdb/${idToUse}`)
+    }
   }
 
   const handleDeletePendaftar = async (p: PpdbDetail) => {
@@ -297,6 +289,7 @@ export default function PpdbPage() {
     if (status === "Diterima") {
       setTerimaPendaftar(p)
       setIsTerimaOpen(true)
+      void loadKelasList()
       return
     }
 
@@ -319,9 +312,16 @@ export default function PpdbPage() {
   const loadKelasList = useCallback(async () => {
     setKelasLoading(true)
     try {
-      const list = await kelasService.getAll({ per_page: "300" })
-      setKelasList(list)
-    } catch {
+      const result = await dataKelasService.getAll({ per_page: 500, status: "AKTIF", status_ppdb: "AKTIF" })
+      const mappedList = result.data.map(item => ({
+        id: item.id_kelas ?? item.id ?? -1,
+        kode_kelas: item.kode_kelas ?? "",
+        nama_kelas: item.nama_kelas ?? "",
+        tahun_ajaran: item.tahun_ajaran ?? item.tahunAjaranRelasi?.tahun_ajaran ?? item.tahun_ajaran_relasi?.tahun_ajaran ?? "",
+      })).filter(item => item.kode_kelas)
+      setKelasList(mappedList)
+    } catch (err) {
+      console.error("Error loading kelas list:", err)
       setKelasList([])
     } finally {
       setKelasLoading(false)
@@ -333,8 +333,8 @@ export default function PpdbPage() {
       alert("Data pendaftar tidak ditemukan")
       return
     }
-    if (integrasikanSantri && !kodeKelasDiterima) {
-      alert("Pilih kode kelas terlebih dahulu sebelum mengintegrasikan santri.")
+    if (!kodeKelasDiterima) {
+      alert("Pilih kode kelas terlebih dahulu sebelum menerima santri.")
       return
     }
     try {
@@ -344,7 +344,7 @@ export default function PpdbPage() {
           status: "Diterima", 
           keterangan: "",
           integrasikanLangsungKeSantri: integrasikanSantri,
-          kodeKelasDiterima: integrasikanSantri ? kodeKelasDiterima : undefined
+          kodeKelasDiterima: kodeKelasDiterima
         }),
       )
       updateStatusByIds(targetIds, "Diterima")
@@ -518,8 +518,8 @@ export default function PpdbPage() {
       {/* Rekap Diterima & Ditolak */}
       <PpdbRekapCard data={ppdbData} />
 
-      {/* Detail Dialog */}
-      <PpdbDetailDialog
+      {/* Detail Dialog — now deprecated in favor of dedicated detail page */}
+      {/* <PpdbDetailDialog
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         pendaftar={selectedPendaftar}
@@ -529,7 +529,7 @@ export default function PpdbPage() {
         isTesResultSaving={testResultLoading}
         onTesResultSave={handleSaveTesResult}
         onUploadFile={handleUploadFile}
-      />
+      /> */}
 
       {/* Konfirmasi Terima Dialog */}
       <Dialog open={isTerimaOpen} onOpenChange={(open) => {
@@ -563,6 +563,39 @@ export default function PpdbPage() {
               />
             </div>
 
+            <div className="space-y-2 pt-2">
+              <Label>Pilih Kelas <span className="text-red-500">*</span></Label>
+              {kelasLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Memuat daftar kelas...
+                </div>
+              ) : (
+                <Select
+                  value={kodeKelasDiterima}
+                  onValueChange={setKodeKelasDiterima}
+                >
+                  <SelectTrigger id="select-kode-kelas">
+                    <SelectValue placeholder="-- Pilih Kelas --" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kelasList.length === 0 ? (
+                      <SelectItem value="__empty" disabled>Tidak ada kelas aktif tersedia</SelectItem>
+                    ) : (
+                      kelasList.map((kelas) => (
+                        <SelectItem key={kelas.kode_kelas} value={kelas.kode_kelas}>
+                          {kelas.kode_kelas}{kelas.nama_kelas ? ` — ${kelas.nama_kelas}` : ""}{kelas.tahun_ajaran ? ` (${kelas.tahun_ajaran})` : ""}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Kelas wajib diisi saat menerima santri untuk keperluan master data.
+              </p>
+            </div>
+
             <div className="flex items-center space-x-2 pt-2">
               <input
                 type="checkbox"
@@ -572,44 +605,9 @@ export default function PpdbPage() {
                 className="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-4 w-4"
               />
               <Label htmlFor="integrasikanSantri" className="cursor-pointer font-normal">
-                Integrasikan Langsung Data ke Master Santri
+                Integrasikan Langsung Data ke Master Santri Sekarang
               </Label>
             </div>
-
-            {integrasikanSantri && (
-              <div className="space-y-2 pt-2">
-                <Label>Pilih Kelas <span className="text-red-500">*</span></Label>
-                {kelasLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Memuat daftar kelas...
-                  </div>
-                ) : (
-                  <Select
-                    value={kodeKelasDiterima}
-                    onValueChange={setKodeKelasDiterima}
-                  >
-                    <SelectTrigger id="select-kode-kelas">
-                      <SelectValue placeholder="-- Pilih Kelas --" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {kelasList.length === 0 ? (
-                        <SelectItem value="__empty" disabled>Tidak ada kelas aktif tersedia</SelectItem>
-                      ) : (
-                        kelasList.map((kelas) => (
-                          <SelectItem key={kelas.kode_kelas} value={kelas.kode_kelas}>
-                            {kelas.kode_kelas}{kelas.nama_kelas ? ` — ${kelas.nama_kelas}` : ""}{kelas.tahun_ajaran ? ` (${kelas.tahun_ajaran})` : ""}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Kelas diperlukan untuk mendaftarkan akun santri secara otomatis.
-                </p>
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button
