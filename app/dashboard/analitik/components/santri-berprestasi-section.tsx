@@ -13,6 +13,7 @@ import { AlertCircle, RotateCcw } from "lucide-react"
 import { kelasService, type KelasItem } from "@/lib/services/kelas.service"
 import { type BerprestasiParams } from "@/lib/services/nilai-statistik.service"
 import { useNilaiStatistikBerprestasi } from "@/hooks/use-nilai-statistik"
+import { santriService } from "@/lib/services/santri.service"
 import { endpointInfos } from "../data/analitik-data"
 import { EndpointInfoCard } from "./endpoint-info-card"
 
@@ -45,6 +46,7 @@ export function SantriBerprestasiSection() {
   const { data, loading, error, fetchBerprestasi } = useNilaiStatistikBerprestasi()
   const [kelasOptions, setKelasOptions] = useState<KelasItem[]>([])
   const [kelasLoading, setKelasLoading] = useState(false)
+  const [namesMap, setNamesMap] = useState<Record<string, string>>({})
   const [filters, setFilters] = useState<BerprestasiFilterState>(DEFAULT_FILTERS)
 
   useEffect(() => {
@@ -81,6 +83,41 @@ export function SantriBerprestasiSection() {
   useEffect(() => {
     fetchBerprestasi(buildRequestParams(filters))
   }, [filters, fetchBerprestasi])
+
+  // When berprestasi data changes, fetch santri names (by nomor_induk) so we can display them.
+  useEffect(() => {
+    let isMounted = true
+
+    const fetchNames = async () => {
+      if (!data || data.length === 0) {
+        if (isMounted) setNamesMap({})
+        return
+      }
+
+      const entries = await Promise.all(
+        data.map(async (row) => {
+          try {
+            const res = await santriService.search(row.nomor_induk, 1)
+            const first = res?.[0]
+            const name = first?.nama_lengkap ?? first?.nomor_induk ?? ""
+            return [row.nomor_induk, name] as [string, string]
+          } catch (err) {
+            return [row.nomor_induk, ""] as [string, string]
+          }
+        }),
+      )
+
+      if (isMounted) {
+        setNamesMap(Object.fromEntries(entries))
+      }
+    }
+
+    fetchNames()
+
+    return () => {
+      isMounted = false
+    }
+  }, [data])
 
   const handleFilterChange = (key: keyof BerprestasiFilterState, value: string) => {
     setFilters((prev) => ({
@@ -233,7 +270,11 @@ export function SantriBerprestasiSection() {
                 <div key={row.nomor_induk} className="rounded-lg border border-border/60 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-foreground">Nomor Induk: {row.nomor_induk}</p>
+                      <p className="font-semibold text-foreground">
+                        Nomor Induk: {row.nomor_induk}
+                        {" \u2014 "}
+                        {namesMap[row.nomor_induk] ? namesMap[row.nomor_induk] : "Nama tidak tersedia"}
+                      </p>
                       <p className="text-xs text-muted-foreground">Mapel dinilai: {row.mapel_count}</p>
                     </div>
                     <Badge className="bg-primary/10 text-primary border-0">
