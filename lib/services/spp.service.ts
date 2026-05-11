@@ -462,6 +462,18 @@ export const sppService = {
     }
   },
 
+  async generateTagihanPeriode(
+    id: string,
+    payload: { bulan_mulai: number; tahun_mulai: number; bulan_selesai: number; tahun_selesai: number },
+  ): Promise<{ message: string; data: { jumlah_tagihan_baru: number; jumlah_santri: number; jumlah_periode: number; periode: string[] } }> {
+    try {
+      const response = await api.post(`${BASE}/setting/${id}/generate`, payload);
+      return response.data;
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal generate tagihan periode'));
+    }
+  },
+
   // ── Golongan ───────────────────────────────────────────────────────────────
 
   async getGolongan(): Promise<SppGolonganListResponse> {

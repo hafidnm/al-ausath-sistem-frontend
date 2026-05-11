@@ -44,12 +44,14 @@ import {
   Building2,
   CalendarDays,
   GraduationCap,
-  Tag
+  Tag,
+  Zap
 } from "lucide-react"
 import { useSppSettings, useCreateSppSetting, useUpdateSppSetting, useDeleteSppSetting } from "@/hooks/use-spp-setting"
 import { useMasterData } from "@/hooks/use-master-data"
 import { useToast } from "@/hooks/use-toast"
 import { CreateSppSettingRequest } from "@/lib/services/spp.types"
+import { sppService } from "@/lib/services/spp.service"
 
 export default function PengaturanPage() {
   const { toast } = useToast()
@@ -61,6 +63,19 @@ export default function PengaturanPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Generate dialog state
+  const [generateDialogOpen, setGenerateDialogOpen] = useState(false)
+  const [generateTargetId, setGenerateTargetId] = useState<string | null>(null)
+  const [generateLoading, setGenerateLoading] = useState(false)
+  const currentYear = new Date().getFullYear()
+  const [generateForm, setGenerateForm] = useState({
+    bulan_mulai: 7,
+    tahun_mulai: currentYear,
+    bulan_selesai: 6,
+    tahun_selesai: currentYear + 1,
+  })
   const [formData, setFormData] = useState<CreateSppSettingRequest>({
     id_unit: null,
     jenjang: null,
@@ -71,6 +86,11 @@ export default function PengaturanPage() {
     keterangan: "",
     aktif: true
   })
+
+  // Auto-fetch data saat component pertama kali mount
+  useEffect(() => {
+    fetchSettings()
+  }, [fetchSettings])
 
   const resetForm = () => {
     setFormData({
@@ -118,13 +138,49 @@ export default function PengaturanPage() {
     }
   }
 
+  const handleOpenGenerate = (id: string) => {
+    setGenerateTargetId(id)
+    setGenerateForm({ bulan_mulai: 7, tahun_mulai: currentYear, bulan_selesai: 6, tahun_selesai: currentYear + 1 })
+    setGenerateDialogOpen(true)
+  }
+
+  const handleGenerate = async () => {
+    if (!generateTargetId) return
+    setGenerateLoading(true)
+    try {
+      const res = await sppService.generateTagihanPeriode(generateTargetId, generateForm)
+      toast({
+        title: "Berhasil Generate Tagihan!",
+        description: res.message,
+      })
+      setGenerateDialogOpen(false)
+      fetchSettings()
+    } catch (e: any) {
+      toast({ title: "Gagal", description: e?.message ?? "Terjadi kesalahan", variant: "destructive" })
+    } finally {
+      setGenerateLoading(false)
+    }
+  }
+
+  const BULAN = [
+    "Januari","Februari","Maret","April","Mei","Juni",
+    "Juli","Agustus","September","Oktober","November","Desember",
+  ]
+
   const handleDelete = async (id: string) => {
     if (!confirm("Hapus pengaturan ini?")) return
+    setDeleteLoading(id)
     try {
       await deleteSetting(id)
       toast({ title: "Berhasil", description: "Pengaturan berhasil dihapus" })
-      fetchSettings()
-    } catch (e) {}
+      await fetchSettings()
+    } catch (e: any) {
+      const errorMsg = e?.message || "Gagal menghapus pengaturan. Silakan coba lagi."
+      toast({ title: "Gagal", description: errorMsg, variant: "destructive" })
+      console.error("Delete error:", e)
+    } finally {
+      setDeleteLoading(null)
+    }
   }
 
   const formatCurrency = (v: number) => 
@@ -348,11 +404,29 @@ export default function PengaturanPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              title="Generate Tagihan Periode"
+                              onClick={() => handleOpenGenerate(item.id)}
+                            >
+                              <Zap className="w-4 h-4 text-amber-500" />
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleEdit(item)}>
                               <Edit className="w-4 h-4 text-blue-600" />
                             </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)}>
-                              <Trash2 className="w-4 h-4 text-destructive" />
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDelete(item.id)}
+                              disabled={deleteLoading === item.id}
+                              title={deleteLoading === item.id ? "Menghapus..." : "Hapus"}
+                            >
+                              {deleteLoading === item.id ? (
+                                <RefreshCw className="w-4 h-4 text-destructive animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>
@@ -364,6 +438,82 @@ export default function PengaturanPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── Generate Tagihan Periode Dialog ─────────────────────────────── */}
+        <Dialog open={generateDialogOpen} onOpenChange={setGenerateDialogOpen}>
+          <DialogContent className="sm:max-w-[480px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-500" /> Generate Tagihan Per Periode
+              </DialogTitle>
+              <DialogDescription>
+                Buat tagihan bulanan otomatis untuk setiap santri yang sesuai dengan setting ini.
+                Sistem akan membuat 1 tagihan per bulan per santri.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Bulan Mulai</Label>
+                  <Select
+                    value={String(generateForm.bulan_mulai)}
+                    onValueChange={(v) => setGenerateForm({ ...generateForm, bulan_mulai: Number(v) })}
+                  >
+                    <SelectTrigger id="gen-bulan-mulai"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BULAN.map((b, i) => <SelectItem key={i+1} value={String(i+1)}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Tahun Mulai</Label>
+                  <Input
+                    id="gen-tahun-mulai"
+                    type="number"
+                    value={generateForm.tahun_mulai}
+                    onChange={(e) => setGenerateForm({ ...generateForm, tahun_mulai: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Bulan Selesai</Label>
+                  <Select
+                    value={String(generateForm.bulan_selesai)}
+                    onValueChange={(v) => setGenerateForm({ ...generateForm, bulan_selesai: Number(v) })}
+                  >
+                    <SelectTrigger id="gen-bulan-selesai"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BULAN.map((b, i) => <SelectItem key={i+1} value={String(i+1)}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Tahun Selesai</Label>
+                  <Input
+                    id="gen-tahun-selesai"
+                    type="number"
+                    value={generateForm.tahun_selesai}
+                    onChange={(e) => setGenerateForm({ ...generateForm, tahun_selesai: Number(e.target.value) })}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded p-2">
+                Contoh: Juli {generateForm.tahun_mulai} – {BULAN[generateForm.bulan_selesai - 1]} {generateForm.tahun_selesai}
+                &nbsp;= {Math.max(0, (generateForm.tahun_selesai - generateForm.tahun_mulai) * 12 + generateForm.bulan_selesai - generateForm.bulan_mulai + 1)} bulan
+              </p>
+            </div>
+
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setGenerateDialogOpen(false)}>Batal</Button>
+              <Button onClick={handleGenerate} disabled={generateLoading} className="bg-amber-500 hover:bg-amber-600 text-white" id="btn-confirm-generate">
+                {generateLoading ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : <Zap className="w-4 h-4 mr-2" />}
+                Generate Sekarang
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* --- GENERAL SETTINGS TAB --- */}
         <TabsContent value="general" className="mt-6">

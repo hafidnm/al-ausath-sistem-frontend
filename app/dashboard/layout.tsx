@@ -48,8 +48,8 @@ import {
   Receipt,
 } from "lucide-react"
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+const adminMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
   { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
   { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
   { icon: UserCheck, label: "Data Akun Santri", href: "/dashboard/akun-santri" },
@@ -70,10 +70,22 @@ const menuItems = [
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
   { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
   { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
-  { icon: UserCog, label: "Panel Guru", href: "/dashboard/guru-panel" },
-  { icon: User, label: "Panel Santri", href: "/dashboard/santri-panel" },
-  { icon: Shield, label: "Panel Admin", href: "/dashboard/admin-panel" },
   { icon: Settings, label: "Pengaturan", href: "/dashboard/pengaturan" },
+]
+
+const guruMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/guru-panel" },
+  { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
+  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/nilai" },
+  { icon: FileText, label: "Rapor", href: "/dashboard/rapor" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+]
+
+const santriMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
+  { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
+  { icon: FileText, label: "Rapor Digital", href: "/dashboard/rapor" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 
 export default function DashboardLayout({
@@ -85,6 +97,7 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true)
   const [user, setUser] = useState<any>(null)
+  const [role, setRole] = useState<string>("")
   const pathname = usePathname()
 
   useEffect(() => {
@@ -101,6 +114,7 @@ export default function DashboardLayout({
     }
 
     setUser(user.user)
+    setRole(user.role)
   }
 
   checkAuth()
@@ -183,7 +197,10 @@ export default function DashboardLayout({
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {menuItems.map((item) => {
+            {(role === 'petugas' 
+               ? (user?.peran_akun === 'Petugas Admin' ? adminMenuItems : guruMenuItems)
+               : santriMenuItems
+             ).map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
@@ -252,7 +269,7 @@ export default function DashboardLayout({
               )}
               <div>
                 <h2 className="font-semibold text-foreground">
-                  {menuItems.find((item) => item.href === pathname)?.label || "Dashboard"}
+                  {[...adminMenuItems, ...guruMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
                 </h2>
                 <p className="text-xs text-muted-foreground">Tahun Ajaran 2024/2025 - Semester Ganjil</p>
               </div>

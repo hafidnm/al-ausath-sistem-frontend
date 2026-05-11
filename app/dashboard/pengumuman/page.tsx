@@ -39,6 +39,7 @@ import {
   type PengumumanKategori,
   type PengumumanListQuery,
 } from "@/lib/services/pengumuman.service"
+import { authService } from "@/lib/services/auth.service"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,18 @@ export default function PengumumanPage() {
   const [searchQ, setSearchQ] = useState("")
   const [filterKategori, setFilterKategori] = useState("all")
   const [filterAktif, setFilterAktif] = useState("all")
+
+  const [role, setRole] = useState<string>("")
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const data = await authService.me()
+      if (data) setRole(data.role)
+    }
+    checkAuth()
+  }, [])
+
+  const isSantri = role === 'santri'
 
   const fetchList = useCallback(async (query?: PengumumanListQuery) => {
     setLoading(true)
@@ -214,16 +227,18 @@ export default function PengumumanPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Megaphone className="w-6 h-6 text-primary" />
-            Manajemen Pengumuman
+            {isSantri ? "Informasi & Pengumuman" : "Manajemen Pengumuman"}
           </h1>
           <p className="text-muted-foreground">
-            Kelola pengumuman yang tampil di halaman landing website
+            {isSantri ? "Daftar pengumuman terbaru untuk seluruh santri" : "Kelola pengumuman yang tampil di halaman landing website"}
           </p>
         </div>
-        <Button onClick={openAdd} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Tambah Pengumuman
-        </Button>
+        {!isSantri && (
+          <Button onClick={openAdd} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Tambah Pengumuman
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -248,15 +263,17 @@ export default function PengumumanPage() {
         </Card>
       </div>
 
-      {/* Info */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardContent className="p-4">
-          <p className="text-sm text-foreground">
-            💡 <strong>Tip:</strong> Pengumuman <strong>Aktif</strong> otomatis tampil di halaman landing.
-            Atur <strong>Tanggal Selesai</strong> untuk pengumuman berkala, atau gunakan <strong>Pin</strong> untuk mengutamakan pengumuman penting.
-          </p>
-        </CardContent>
-      </Card>
+      {/* Info (Admin Only) */}
+      {!isSantri && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="p-4">
+            <p className="text-sm text-foreground">
+              💡 <strong>Tip:</strong> Pengumuman <strong>Aktif</strong> otomatis tampil di halaman landing.
+              Atur <strong>Tanggal Selesai</strong> untuk pengumuman berkala, atau gunakan <strong>Pin</strong> untuk mengutamakan pengumuman penting.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filter Bar */}
       <Card className="border-border/50">
@@ -331,8 +348,8 @@ export default function PengumumanPage() {
                     <TableHead>Kategori</TableHead>
                     <TableHead>Berakhir</TableHead>
                     <TableHead>Lampiran</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Aksi</TableHead>
+                    {!isSantri && <TableHead>Status</TableHead>}
+                    {!isSantri && <TableHead className="text-right">Aksi</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -352,51 +369,55 @@ export default function PengumumanPage() {
                           {KATEGORI_OPTIONS.find((k) => k.value === p.kategori)?.label ?? p.kategori}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {p.tanggal_selesai ? formatDate(p.tanggal_selesai) : "Tidak terbatas"}
-                      </TableCell>
-                      <TableCell>
-                        {p.lampiran_url ? (
-                          <a
-                            href={p.lampiran_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                          >
-                            <Paperclip className="w-3 h-3" />
-                            {p.lampiran_nama_asli || "Lihat"}
-                          </a>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">-</span>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {p.tanggal_selesai ? formatDate(p.tanggal_selesai) : "Tidak terbatas"}
+                        </TableCell>
+                        <TableCell>
+                          {p.lampiran_url ? (
+                            <a
+                              href={p.lampiran_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <Paperclip className="w-3 h-3" />
+                              {p.lampiran_nama_asli || "Lihat"}
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </TableCell>
+                        {!isSantri && (
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={p.is_aktif}
+                                onCheckedChange={() => void handleToggleAktif(p)}
+                              />
+                              <span className={`text-xs ${p.is_aktif ? "text-primary" : "text-muted-foreground"}`}>
+                                {p.is_aktif ? "Aktif" : "Nonaktif"}
+                              </span>
+                            </div>
+                          </TableCell>
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={p.is_aktif}
-                            onCheckedChange={() => void handleToggleAktif(p)}
-                          />
-                          <span className={`text-xs ${p.is_aktif ? "text-primary" : "text-muted-foreground"}`}>
-                            {p.is_aktif ? "Aktif" : "Nonaktif"}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => void handleDelete(p)}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
+                        {!isSantri && (
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(p)}>
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => void handleDelete(p)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
+                      </TableRow>
                   ))}
                 </TableBody>
               </Table>
