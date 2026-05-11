@@ -1,4 +1,4 @@
-import api from "../axios"
+import api, { getCsrfToken } from "../axios"
 
 export interface GenerateRangkingKelasPayload {
   kode_kelas: string
@@ -45,18 +45,25 @@ const normalizeRow = (raw: any): RangkingKelasRow => ({
 
 export const rangkingKelasService = {
   async generate(payload: GenerateRangkingKelasPayload): Promise<GenerateRangkingKelasResponse> {
-    const response = await api.post("/akademik/rangking-kelas/generate", payload)
-    const data = response.data?.data ?? response.data ?? {}
+    try {
+      await getCsrfToken()
 
-    const ranking = Array.isArray(data?.ranking) ? data.ranking.map(normalizeRow) : []
+      const response = await api.post("/akademik/rangking-kelas/generate", payload)
+      const data = response.data?.data ?? response.data ?? {}
 
-    return {
-      kode_kelas: toText(data?.kode_kelas || payload.kode_kelas),
-      tahun_ajaran: toText(data?.tahun_ajaran || payload.tahun_ajaran),
-      semester: toNumber(data?.semester, payload.semester),
-      total_siswa: toNumber(data?.total_siswa, ranking.length),
-      generated_at: data?.generated_at ? toText(data.generated_at) : undefined,
-      ranking,
+      const ranking = Array.isArray(data?.ranking) ? data.ranking.map(normalizeRow) : []
+
+      return {
+        kode_kelas: toText(data?.kode_kelas || payload.kode_kelas),
+        tahun_ajaran: toText(data?.tahun_ajaran || payload.tahun_ajaran),
+        semester: toNumber(data?.semester, payload.semester),
+        total_siswa: toNumber(data?.total_siswa, ranking.length),
+        generated_at: data?.generated_at ? toText(data.generated_at) : undefined,
+        ranking,
+      }
+    } catch (error: any) {
+      const msg = error?.response?.data?.message || error?.message || "Gagal generate ranking kelas"
+      throw new Error(msg)
     }
   },
 }

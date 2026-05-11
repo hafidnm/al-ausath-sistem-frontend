@@ -1,22 +1,9 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { useState } from "react"
 import { Badge } from "@/components/ui/badge"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,20 +14,32 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  Edit,
-  Trash2,
-  MoreHorizontal,
-} from "lucide-react"
-import { useState } from "react"
-import { sampleBobotData } from "../utils/constants"
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Edit, MoreHorizontal, Play, Trash2 } from "lucide-react"
+import { BobotNilaiItem } from "@/lib/services/bobot-nilai.service"
 
 interface BobotTableProps {
+  items: BobotNilaiItem[]
+  isLoading?: boolean
+  error?: string | null
   onEdit?: (id: number) => void
   onDelete?: (id: number) => void
-  onSetDefault?: () => void
+  onSetDefault?: (item: BobotNilaiItem) => void
 }
 
-export function BobotTable({ onEdit, onDelete, onSetDefault }: BobotTableProps) {
+export function BobotTable({ items, isLoading = false, error, onEdit, onDelete, onSetDefault }: BobotTableProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
 
@@ -59,16 +58,8 @@ export function BobotTable({ onEdit, onDelete, onSetDefault }: BobotTableProps) 
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg text-foreground">Daftar Bobot Nilai</CardTitle>
-              <CardDescription>Kelola bobot penilaian untuk tugas, ulangan, dan ujian akhir</CardDescription>
+              <CardDescription>Kelola bobot penilaian per tahun ajaran dan semester</CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              className="bg-transparent"
-              onClick={onSetDefault}
-            >
-              Set Default (20-30-50)
-            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -77,70 +68,109 @@ export function BobotTable({ onEdit, onDelete, onSetDefault }: BobotTableProps) 
               <TableHeader>
                 <TableRow className="bg-muted/50">
                   <TableHead>ID</TableHead>
-                  <TableHead className="text-center">Tugas (%)</TableHead>
-                  <TableHead className="text-center">Ulangan (%)</TableHead>
-                  <TableHead className="text-center">Ujian Akhir (%)</TableHead>
+                  <TableHead>Tahun Ajaran</TableHead>
+                  <TableHead className="text-center">Semester</TableHead>
+                  <TableHead className="text-center">Harian (%)</TableHead>
+                  <TableHead className="text-center">UTS (%)</TableHead>
+                  <TableHead className="text-center">UAS (%)</TableHead>
                   <TableHead className="text-center">Total (%)</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Dibuat</TableHead>
+                  <TableHead>Diperbarui</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sampleBobotData.map((item) => (
-                  <TableRow key={item.id} className="hover:bg-muted/30">
-                    <TableCell className="font-medium text-foreground">{item.id}</TableCell>
-                    <TableCell className="text-center">
-                      <span className="font-semibold text-primary">{item.tugas}%</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="font-semibold text-accent">{item.ulangan}%</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="font-semibold text-chart-4">{item.ujianAkhir}%</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <span className="font-bold text-foreground">100%</span>
-                    </TableCell>
-                    <TableCell>
-                      {item.aktif ? (
-                        <Badge className="bg-primary/10 text-primary border-0">Aktif</Badge>
-                      ) : (
-                        <Badge className="bg-muted text-muted-foreground border-0">Nonaktif</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{item.createdAt}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                          >
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onEdit?.(item.id)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => {
-                              setDeleteId(item.id)
-                              setIsDeleteOpen(true)
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Hapus
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                {isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
+                      Memuat data bobot...
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
+                {!isLoading && error && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-destructive py-10">
+                      {error}
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!isLoading && !error && items.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center text-muted-foreground py-10">
+                      Data bobot belum tersedia
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!isLoading && !error && items.map((item, index) => {
+                  const hasValidId = Number.isFinite(item.id) && item.id > 0
+                  const rowKey = hasValidId
+                    ? `bobot-${item.id}`
+                    : `bobot-fallback-${item.tahun_ajaran}-${item.semester}-${index}`
+                  const total = item.bobot_harian + item.bobot_uts + item.bobot_uas
+
+                  return (
+                    <TableRow key={rowKey} className="hover:bg-muted/30">
+                      <TableCell className="font-medium text-foreground">{hasValidId ? item.id : "-"}</TableCell>
+                      <TableCell>{item.tahun_ajaran || "-"}</TableCell>
+                      <TableCell className="text-center">{item.semester || "-"}</TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold text-primary">{item.bobot_harian}%</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold text-accent">{item.bobot_uts}%</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="font-semibold text-chart-4">{item.bobot_uas}%</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className={`font-bold ${total === 100 ? "text-foreground" : "text-destructive"}`}>{total}%</span>
+                      </TableCell>
+                      <TableCell>
+                        {item.is_default ? (
+                          <Badge className="bg-primary/10 text-primary border-0">Default</Badge>
+                        ) : (
+                          <Badge className="bg-muted text-muted-foreground border-0">Tersimpan</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{item.updated_at || item.created_at || "-"}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0"
+                              disabled={!hasValidId}
+                            >
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => hasValidId && onEdit?.(item.id)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => hasValidId && onSetDefault?.(item)}>
+                              <Play className="w-4 h-4 mr-2" />
+                              Set Default
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => {
+                                if (!hasValidId) return
+                                setDeleteId(item.id)
+                                setIsDeleteOpen(true)
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Hapus
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

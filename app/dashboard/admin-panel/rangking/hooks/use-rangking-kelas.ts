@@ -69,12 +69,19 @@ export function useRangkingKelas() {
 
     try {
       setIsGenerating(true)
-      const effectiveTahunAjaran = selectedClass?.tahunAjaran || tahunAjaran || defaultTahunAjaran
-      const response = await rangkingKelasService.generate({
-        kode_kelas: selectedClassCode,
+      const effectiveTahunAjaran = tahunAjaran?.trim() || selectedClass?.tahunAjaran || defaultTahunAjaran
+      const payload = {
+        kode_kelas: String(selectedClassCode).trim().toUpperCase(),
         tahun_ajaran: effectiveTahunAjaran,
         semester: Number(semester || "1"),
-      })
+      }
+
+      // Inform user that generate started
+      if (showSuccessToast) {
+        toast({ title: "Memulai generate", description: `Meng-generate ranking ${payload.kode_kelas}...` })
+      }
+
+      const response = await rangkingKelasService.generate(payload)
 
       const mappedRows: RankingItem[] = response.ranking.map((item) => ({
         rank: item.peringkat_kelas,
@@ -85,7 +92,11 @@ export function useRangkingKelas() {
       }))
 
       setRankedData(mappedRows)
-      if (showSuccessToast) {
+
+      if (!response.ranking || response.ranking.length === 0) {
+        // backend may return a message when no data available
+        toast({ title: "Tidak ada data", description: "Data raport untuk kelas dan semester ini belum tersedia.", variant: "destructive" })
+      } else if (showSuccessToast) {
         toast({
           title: "Generate berhasil",
           description: `Ranking kelas ${response.kode_kelas} berhasil diperbarui`,
@@ -115,15 +126,6 @@ export function useRangkingKelas() {
 
     await generateRanking(true)
   }, [generateRanking, selectedClassCode, toast])
-
-  useEffect(() => {
-    if (!selectedClassCode) {
-      setRankedData([])
-      return
-    }
-
-    void generateRanking(false)
-  }, [generateRanking, selectedClassCode])
 
   const averageScore = useMemo(() => {
     if (rankedData.length === 0) {

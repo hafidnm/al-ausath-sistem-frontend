@@ -13,7 +13,7 @@ export function BobotInfo() {
             <div>
               <p className="font-medium text-foreground mb-1">Informasi</p>
               <p className="text-sm text-muted-foreground">
-                Bobot nilai berlaku sama untuk semua mata pelajaran. Jangan lupa untuk set default bobot ke 20% tugas, 30% ulangan, dan 50% ujian akhir.
+                Bobot nilai disimpan per tahun ajaran dan semester. Gunakan set default untuk menyimpan konfigurasi 20% harian, 30% UTS, dan 50% UAS pada periode yang dipilih.
               </p>
             </div>
           </div>
