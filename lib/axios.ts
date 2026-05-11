@@ -154,16 +154,21 @@ function getCookieValue(name: string): string | null {
 export const getCsrfToken = async () => {
     try {
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
-        const baseUrl = apiUrl.replace(/\/api\/?$/, '');
+        let baseUrl = apiUrl.replace(/\/api\/?$/, '');
 
-        if (!baseUrl) {
-            throw new Error('NEXT_PUBLIC_API_URL belum diatur');
+        // Fallback to current origin when running in browser and NEXT_PUBLIC_API_URL is not set
+        if (!baseUrl || baseUrl.trim() === '') {
+            if (typeof window !== 'undefined' && window.location) {
+                baseUrl = window.location.origin
+            } else {
+                throw new Error('NEXT_PUBLIC_API_URL belum diatur');
+            }
         }
-        
+
         const response = await axios.get(`${baseUrl}/sanctum/csrf-cookie`, {
-            withCredentials: true
+            withCredentials: true,
         });
-        
+
         return response;
     } catch (error) {
         throw error;
