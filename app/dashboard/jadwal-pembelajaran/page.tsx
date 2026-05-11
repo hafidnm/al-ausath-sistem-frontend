@@ -107,6 +107,8 @@ interface KelasMapelOption extends OptionItem {
   kodeUnit: string
   namaUnit: string
   kelompokMapel: string
+  tahunAjaran: string
+  semester: string
 }
 
 const hariOptions: Array<{ value: HariValue; label: string }> = [
@@ -533,6 +535,8 @@ export default function JadwalPembelajaranPage() {
             kodeUnit: "",
             namaUnit: "",
             kelompokMapel: "",
+            tahunAjaran: toText(item.tahun_ajaran).trim(),
+            semester: item.semester != null ? String(toNumber(item.semester, 1)) : "",
           }))
           .filter((item) => item.value && item.kodeKelas && item.kodeMapel)
 
@@ -562,6 +566,8 @@ export default function JadwalPembelajaranPage() {
           kodeUnit: kelasUnitByKode.get(item.kodeKelas)?.kodeUnit || "",
           namaUnit: kelasUnitByKode.get(item.kodeKelas)?.namaUnit || "",
           kelompokMapel: kelompokByKodeMapel.get(item.kodeMapel) || "",
+          tahunAjaran: item.tahunAjaran,
+          semester: item.semester,
         }))
 
         const petugas = petugasResult.data
@@ -636,11 +642,15 @@ export default function JadwalPembelajaranPage() {
 
     setFormData((prev) => {
       const nextIdPetugas = selected.idPetugas ? String(selected.idPetugas) : "none"
+      const nextTahunAjaran = selected.tahunAjaran || prev.tahunAjaran
+      const nextSemester = (selected.semester as SemesterValue) || prev.semester
       if (
         prev.kodeKelas === selected.kodeKelas &&
         prev.kodeMapel === selected.kodeMapel &&
         prev.kelompokMapel === selected.kelompokMapel &&
-        prev.idPetugas === nextIdPetugas
+        prev.idPetugas === nextIdPetugas &&
+        prev.tahunAjaran === nextTahunAjaran &&
+        prev.semester === nextSemester
       ) {
         return prev
       }
@@ -651,6 +661,8 @@ export default function JadwalPembelajaranPage() {
         kodeMapel: selected.kodeMapel,
         kelompokMapel: selected.kelompokMapel,
         idPetugas: nextIdPetugas,
+        tahunAjaran: nextTahunAjaran,
+        semester: nextSemester,
       }
     })
   }, [isAddDialogOpen, formData.idKelasMapel, kelasMapelById])
@@ -663,11 +675,15 @@ export default function JadwalPembelajaranPage() {
 
     setEditingFormData((prev) => {
       const nextIdPetugas = selected.idPetugas ? String(selected.idPetugas) : "none"
+      const nextTahunAjaran = selected.tahunAjaran || prev.tahunAjaran
+      const nextSemester = (selected.semester as SemesterValue) || prev.semester
       if (
         prev.kodeKelas === selected.kodeKelas &&
         prev.kodeMapel === selected.kodeMapel &&
         prev.kelompokMapel === selected.kelompokMapel &&
-        prev.idPetugas === nextIdPetugas
+        prev.idPetugas === nextIdPetugas &&
+        prev.tahunAjaran === nextTahunAjaran &&
+        prev.semester === nextSemester
       ) {
         return prev
       }
@@ -678,6 +694,8 @@ export default function JadwalPembelajaranPage() {
         kodeMapel: selected.kodeMapel,
         kelompokMapel: selected.kelompokMapel,
         idPetugas: nextIdPetugas,
+        tahunAjaran: nextTahunAjaran,
+        semester: nextSemester,
       }
     })
   }, [isEditDialogOpen, editingFormData.idKelasMapel, kelasMapelById])
@@ -1014,30 +1032,21 @@ export default function JadwalPembelajaranPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                   <div className="space-y-2">
                     <Label>Tahun Ajaran</Label>
-                    <Select value={formData.tahunAjaran} onValueChange={(value) => setFormData((prev) => ({ ...prev, tahunAjaran: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih tahun" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tahunOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={formData.tahunAjaran || ""}
+                      readOnly
+                      placeholder={formData.idKelasMapel ? "Tidak tersedia" : "Pilih kelas mapel dahulu"}
+                      className="bg-muted/50 cursor-not-allowed"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Semester</Label>
-                    <Select value={formData.semester} onValueChange={(value) => setFormData((prev) => ({ ...prev, semester: value as SemesterValue }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih semester" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1</SelectItem>
-                        <SelectItem value="2">2</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={formData.semester || ""}
+                      readOnly
+                      placeholder={formData.idKelasMapel ? "Tidak tersedia" : "Pilih kelas mapel dahulu"}
+                      className="bg-muted/50 cursor-not-allowed"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Hari</Label>
@@ -1494,28 +1503,21 @@ export default function JadwalPembelajaranPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="space-y-2">
                 <Label>Tahun Ajaran</Label>
-                <Select value={editingFormData.tahunAjaran} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, tahunAjaran: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tahun" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tahunOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={editingFormData.tahunAjaran || ""}
+                  readOnly
+                  placeholder={editingFormData.idKelasMapel ? "Tidak tersedia" : "Pilih kelas mapel dahulu"}
+                  className="bg-muted/50 cursor-not-allowed"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Semester</Label>
-                <Select value={editingFormData.semester} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, semester: value as SemesterValue }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih semester" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1</SelectItem>
-                    <SelectItem value="2">2</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={editingFormData.semester || ""}
+                  readOnly
+                  placeholder={editingFormData.idKelasMapel ? "Tidak tersedia" : "Pilih kelas mapel dahulu"}
+                  className="bg-muted/50 cursor-not-allowed"
+                />
               </div>
               <div className="space-y-2">
                 <Label>Hari</Label>
