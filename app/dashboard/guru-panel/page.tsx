@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
+import { santriService } from "@/lib/services/santri.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajaran.service"
@@ -63,6 +64,9 @@ type JadwalItem = {
   id_jadwal: number
   id_petugas_hadir?: number
   id_petugas_pengganti?: number | null
+  kode_kelas?: string
+  kode_unit?: string
+  nama_unit?: string
   ruangan?: string
   tanggal?: string
   waktu_mulai?: string | null
@@ -194,6 +198,17 @@ const toArray = (value: unknown): any[] => {
   return []
 }
 
+const uniqueOptions = (items: Array<{ value: string; label: string }>) => {
+  const seen = new Set<string>()
+  return items.filter((item) => {
+    if (!item.value || seen.has(item.value)) return false
+    seen.add(item.value)
+    return true
+  })
+}
+
+const normalizeUnitCode = (value: unknown): string => String(value || "").trim().toUpperCase()
+
 const mapSesiToJadwal = (item: any): JadwalItem => {
   const jadwal = item?.jadwal ?? {}
   const kelasMapel = jadwal?.kelasMapel ?? jadwal?.kelas_mapel ?? {}
@@ -209,6 +224,7 @@ const mapSesiToJadwal = (item: any): JadwalItem => {
     id_jadwal: normalizeNumber(item?.id_jadwal ?? jadwal?.id_jadwal ?? 0),
     id_petugas_hadir: normalizeNumber(item?.id_petugas_hadir ?? 0),
     id_petugas_pengganti: item?.id_petugas_pengganti ?? null,
+    kode_kelas: kelas?.kode_kelas ?? kelasMapel?.kode_kelas ?? item?.kode_kelas ?? undefined,
     tanggal: item?.tanggal,
     waktu_mulai: item?.waktu_mulai ?? null,
     waktu_selesai: item?.waktu_selesai ?? null,
@@ -219,6 +235,8 @@ const mapSesiToJadwal = (item: any): JadwalItem => {
     jenjang: kelas?.jenjang ?? "-",
     hari: jadwal?.hari ?? "-",
     jam,
+    kode_unit: normalizeUnitCode(kelas?.kode_unit ?? kelasMapel?.kode_unit ?? jadwal?.kode_unit ?? item?.kode_unit),
+    nama_unit: String(kelas?.nama_unit ?? kelasMapel?.nama_unit ?? jadwal?.nama_unit ?? item?.nama_unit ?? "").trim(),
     siswa: normalizeNumber(item?.absensi_santri_count ?? item?.total_santri ?? 0),
   }
 }
@@ -244,6 +262,7 @@ const mapJadwalToDisplay = (item: any): JadwalItem => {
     id_jadwal: normalizeNumber(item?.id_jadwal ?? item?.id ?? 0),
     id_petugas_hadir: normalizeNumber(item?.id_petugas ?? kelasMapel?.id_petugas ?? kelasMapel?.petugas?.id_petugas ?? 0),
     id_petugas_pengganti: null,
+    kode_kelas: kelas?.kode_kelas ?? kelasMapel?.kode_kelas ?? item?.kode_kelas ?? undefined,
     ruangan: item?.ruangan ?? item?.ruang ?? null,
     tanggal: undefined,
     waktu_mulai: jamMulai || null,
@@ -255,6 +274,8 @@ const mapJadwalToDisplay = (item: any): JadwalItem => {
     jenjang: kelas?.jenjang ?? "-",
     hari: String(item?.hari || "-").toUpperCase(),
     jam,
+    kode_unit: normalizeUnitCode(kelas?.kode_unit ?? kelasMapel?.kode_unit ?? item?.kode_unit),
+    nama_unit: String(kelas?.nama_unit ?? kelasMapel?.nama_unit ?? item?.nama_unit ?? "").trim(),
     siswa: 0,
     nama_petugas: petugas?.nama_lengkap ?? "-",
   }
@@ -313,6 +334,11 @@ export default function GuruPanelPage() {
   const [isGuruTidakHadirFlow, setIsGuruTidakHadirFlow] = useState(false)
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [isLoadingPetugas, setIsLoadingPetugas] = useState(false)
+  const [unitFilter, setUnitFilter] = useState("all")
+  const [kelasFilter, setKelasFilter] = useState("all")
+  const [mapelFilter, setMapelFilter] = useState("all")
+  const [petugasFilter, setPetugasFilter] = useState("all")
+  const [hariFilter, setHariFilter] = useState("all")
 
   const [santriList, setSantriList] = useState<SantriItem[]>([])
   const [attendanceData, setAttendanceData] = useState<Record<string, SantriStatus>>({})
@@ -348,6 +374,65 @@ export default function GuruPanelPage() {
     return map
   }, [petugasOptions])
 
+  const unitOptions = useMemo(() => {
+    return uniqueOptions(
+      jadwalMengajar
+        .map((jadwal) => ({
+          value: normalizeUnitCode(jadwal.kode_unit),
+          label: jadwal.nama_unit || normalizeUnitCode(jadwal.kode_unit) || "-",
+        }))
+        .filter((item) => item.value),
+    )
+  }, [jadwalMengajar])
+
+  const kelasOptions = useMemo(() => {
+    const source = jadwalMengajar.filter((jadwal) => unitFilter === "all" || jadwal.kode_unit === unitFilter)
+    return uniqueOptions(source.map((jadwal) => ({ value: jadwal.kelas, label: jadwal.kelas })))
+  }, [jadwalMengajar, unitFilter])
+
+  const mapelOptions = useMemo(() => {
+    const source = jadwalMengajar.filter(
+      (jadwal) => (unitFilter === "all" || jadwal.kode_unit === unitFilter) && (kelasFilter === "all" || jadwal.kelas === kelasFilter),
+    )
+    return uniqueOptions(source.map((jadwal) => ({ value: jadwal.mapel, label: jadwal.mapel })))
+  }, [jadwalMengajar, unitFilter, kelasFilter])
+
+  const petugasFilterOptions = useMemo(() => {
+    const source = jadwalMengajar.filter(
+      (jadwal) =>
+        (unitFilter === "all" || jadwal.kode_unit === unitFilter) &&
+        (kelasFilter === "all" || jadwal.kelas === kelasFilter) &&
+        (mapelFilter === "all" || jadwal.mapel === mapelFilter),
+    )
+
+    return uniqueOptions(
+      source
+        .map((jadwal) => ({
+          value: String(jadwal.id_petugas_hadir ?? ""),
+          label: jadwal.nama_petugas || (jadwal.id_petugas_hadir ? `ID ${jadwal.id_petugas_hadir}` : "-"),
+        }))
+        .filter((item) => item.value && item.value !== "0"),
+    )
+  }, [jadwalMengajar, unitFilter, kelasFilter, mapelFilter])
+
+  const filteredSortedJadwalMengajar = useMemo(() => {
+    const source = jadwalMengajar.filter((jadwal) => {
+      const unitMatch = unitFilter === "all" || jadwal.kode_unit === unitFilter
+      const kelasMatch = kelasFilter === "all" || jadwal.kelas === kelasFilter
+      const mapelMatch = mapelFilter === "all" || jadwal.mapel === mapelFilter
+      const petugasMatch = petugasFilter === "all" || String(jadwal.id_petugas_hadir ?? "") === petugasFilter
+      const hariMatch = hariFilter === "all" || String(jadwal.hari || "").toUpperCase() === hariFilter
+
+      return unitMatch && kelasMatch && mapelMatch && petugasMatch && hariMatch
+    })
+
+    return [...source].sort((a, b) => {
+      const dayDiff = getHariOrder(a.hari) - getHariOrder(b.hari)
+      if (dayDiff !== 0) return dayDiff
+      return String(a.jam || "").localeCompare(String(b.jam || ""))
+    })
+  }, [jadwalMengajar, unitFilter, kelasFilter, mapelFilter, petugasFilter, hariFilter])
+
   const todaySchedule = useMemo(() => {
     const today = jadwalMengajar.filter((j) => String(j.hari || "").toUpperCase() === dayName)
 
@@ -373,17 +458,25 @@ export default function GuruPanelPage() {
     })
   }, [aktivitasSesi, currentPetugasId, isAdminUser])
 
-  const sortedJadwalMengajar = useMemo(() => {
-    return [...jadwalMengajar].sort((a, b) => {
-      const dayDiff = getHariOrder(a.hari) - getHariOrder(b.hari)
-      if (dayDiff !== 0) return dayDiff
-      return String(a.jam || "").localeCompare(String(b.jam || ""))
-    })
-  }, [jadwalMengajar])
-
   const riwayatPresensi = useMemo(() => {
     return [...aktivitasSesi].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
   }, [aktivitasSesi])
+
+  // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
+  const todayDateStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const jadwalSelesaiHariIniSet = useMemo(() => {
+    const set = new Set<number>()
+    for (const sesi of aktivitasSesi) {
+      if (
+        String(sesi.status_sesi || "").toUpperCase() === "SELESAI" &&
+        String(sesi.tanggal || "").slice(0, 10) === todayDateStr &&
+        sesi.id_jadwal
+      ) {
+        set.add(Number(sesi.id_jadwal))
+      }
+    }
+    return set
+  }, [aktivitasSesi, todayDateStr])
 
   const completedCount = Object.keys(attendanceData).length
   const progressPercentage = santriList.length > 0 ? (completedCount / santriList.length) * 100 : 0
@@ -662,8 +755,7 @@ export default function GuruPanelPage() {
       toast({ title: "Berhasil", description: "Data sesi absensi berhasil diproses." })
 
       setTimeout(() => {
-        setIsDialogOpen(false)
-        setIsSubmitSuccess(false)
+        void closePresensiDialog(false)
       }, 1500)
 
       await loadJadwal()
@@ -693,6 +785,32 @@ export default function GuruPanelPage() {
     await handleSubmit()
   }
 
+  const handleBackButton = async () => {
+    if (step === 1) {
+      // At first step, close dialog (which will trigger cancel)
+      await closePresensiDialog(false)
+    } else if (step === 2) {
+      // Kembali dari step 2 ke step 1 → cancel sesi agar bisa input ulang dari awal
+      if (sesiAktifId) {
+        try {
+          await sesiAbsensiService.cancel(sesiAktifId, {
+            keterangan: "Dibatalkan untuk mengedit kehadiran guru",
+          })
+        } catch {
+          // Tetap lanjut kembali ke step 1 meski cancel gagal
+        }
+        setSesiAktifId(null)
+        setSantriList([])
+        setAttendanceData({})
+        setCurrentStudentIndex(0)
+      }
+      setStep(1)
+    } else {
+      // step 3+ → kembali satu step tanpa cancel, sesi tetap aktif
+      setStep(step - 1)
+    }
+  }
+
   const handleOpenRiwayatDetail = async (item: JadwalItem) => {
     try {
       const detail = await sesiAbsensiService.getById(item.id_sesi)
@@ -705,6 +823,51 @@ export default function GuruPanelPage() {
         variant: "destructive",
       })
     }
+  }
+
+  const closePresensiDialog = async (open: boolean) => {
+    if (open) {
+      setIsDialogOpen(true)
+      return
+    }
+
+    if (isSubmitting) return
+
+    if (sesiAktifId && !isSubmitSuccess) {
+      try {
+        await sesiAbsensiService.cancel(sesiAktifId, {
+          keterangan: "Dibatalkan sebelum absensi dikirim",
+        })
+        // Refresh data agar jadwal yang dibatalkan bisa digunakan kembali
+        await Promise.all([loadJadwal(), loadAktivitasSesi()])
+      } catch {
+        // Tetap tutup dialog agar user bisa mencoba lagi.
+        // Tetap coba refresh meskipun cancel gagal, supaya UI konsisten
+        void loadJadwal()
+        void loadAktivitasSesi()
+      }
+    }
+
+    setIsDialogOpen(false)
+    setIsSubmitSuccess(false)
+    setSesiAktifId(null)
+    setSelectedJadwal(null)
+    setGuruHadir("hadir")
+    setGuruPenggantiId("")
+    setAlasanTidakHadir("")
+    setIsGuruTidakHadirFlow(false)
+    setSantriList([])
+    setAttendanceData({})
+    setCurrentStudentIndex(0)
+    setStep(1)
+  }
+
+  const resetJadwalFilters = () => {
+    setUnitFilter("all")
+    setKelasFilter("all")
+    setMapelFilter("all")
+    setPetugasFilter("all")
+    setHariFilter("all")
   }
 
   const disabledNext =
@@ -806,50 +969,71 @@ export default function GuruPanelPage() {
                 <Clock className="w-5 h-5 text-primary" />
                 Sesi Hari Ini
               </CardTitle>
-              <CardDescription>Data dari endpoint jadwal pembelajaran (hari ini: {dayName})</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {loadingJadwal || isLoadingUser ? (
                 <p className="text-sm text-muted-foreground">Memuat data jadwal...</p>
               ) : todaySchedule.length > 0 ? (
-                todaySchedule.map((jadwal) => (
-                  <div
-                    key={jadwal.id_jadwal}
-                    className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-4 rounded-lg border border-border/50 bg-muted/20"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <BookOpen className="w-6 h-6 text-primary" />
+                todaySchedule.map((jadwal) => {
+                  const sudahSelesai = jadwalSelesaiHariIniSet.has(jadwal.id_jadwal)
+                  return (
+                    <div
+                      key={jadwal.id_jadwal}
+                      className={`flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 p-4 rounded-lg border transition-colors ${
+                        sudahSelesai
+                          ? "border-emerald-500/30 bg-emerald-500/8"
+                          : "border-border/50 bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                          sudahSelesai ? "bg-emerald-500/15" : "bg-primary/10"
+                        }`}>
+                          {sudahSelesai
+                            ? <CheckCircle className="w-6 h-6 text-emerald-600" />
+                            : <BookOpen className="w-6 h-6 text-primary" />}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-foreground">{jadwal.mapel}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {jadwal.kelas} ({jadwal.jenjang}) - {jadwal.siswa} santri
+                          </p>
+                          <p className={`text-xs font-medium mt-1 ${
+                            sudahSelesai ? "text-emerald-600" : "text-primary"
+                          }`}>
+                            {jadwal.hari || "-"} | {jadwal.jam}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ruangan: {jadwal.ruangan || "-"} | Petugas: {jadwal.nama_petugas || "-"}
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="font-semibold text-foreground">{jadwal.mapel}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {jadwal.kelas} ({jadwal.jenjang}) - {jadwal.siswa} santri
-                        </p>
-                        <p className="text-xs text-primary font-medium mt-1">
-                          {jadwal.hari || "-"} | {jadwal.jam}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Ruangan: {jadwal.ruangan || "-"} | Petugas: {jadwal.nama_petugas || "-"}
-                        </p>
+                      <div className="flex items-center gap-2">
+                        {sudahSelesai ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 border px-3 py-1.5 text-sm">
+                            <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                            Sudah Terisi
+                          </Badge>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              className="bg-transparent text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => handleOpenGuruTidakHadir(jadwal)}
+                            >
+                              <UserX className="w-4 h-4 mr-2" />
+                              Absen Guru Tidak Hadir
+                            </Button>
+                            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => handleOpenInput(jadwal)}>
+                              <UserCheck className="w-4 h-4 mr-2" />
+                              Input Presensi
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        className="bg-transparent text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => handleOpenGuruTidakHadir(jadwal)}
-                      >
-                        <UserX className="w-4 h-4 mr-2" />
-                        Absen Guru Tidak Hadir
-                      </Button>
-                      <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => handleOpenInput(jadwal)}>
-                        <UserCheck className="w-4 h-4 mr-2" />
-                        Input Presensi
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -865,47 +1049,65 @@ export default function GuruPanelPage() {
                 <UserCheck className="w-5 h-5 text-primary" />
                 Jadwal Dialihkan
               </CardTitle>
-              <CardDescription>
-                {isAdminUser
-                  ? "Daftar jadwal yang dialihkan ke guru pengganti (id_petugas_pengganti ≠ null)"
-                  : "Jadwal yang dialihkan ke Anda sebagai guru pengganti"}
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {jadwalDilimpahkan.length > 0 ? (
-                jadwalDilimpahkan.map((item) => (
-                  <div
-                    key={item.id_sesi}
-                    className="flex flex-col gap-3 rounded-lg border border-border/50 bg-muted/20 p-4 lg:flex-row lg:items-center lg:justify-between"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-500/10">
-                        <ArrowRight className="h-6 w-6 text-amber-600" />
-                      </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="font-semibold text-foreground">{item.mapel}</h4>
-                          <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700">
-                            Dilimpahkan
-                          </Badge>
+                jadwalDilimpahkan.map((item) => {
+                  const sudahSelesai = String(item.status_sesi || "").toUpperCase() === "SELESAI"
+                  return (
+                    <div
+                      key={item.id_sesi}
+                      className={`flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between transition-colors ${
+                        sudahSelesai
+                          ? "border-emerald-500/30 bg-emerald-500/8"
+                          : "border-border/50 bg-muted/20"
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${
+                          sudahSelesai ? "bg-emerald-500/15" : "bg-amber-500/10"
+                        }`}>
+                          {sudahSelesai
+                            ? <CheckCircle className="h-6 w-6 text-emerald-600" />
+                            : <ArrowRight className="h-6 w-6 text-amber-600" />}
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {item.kelas} ({item.jenjang}) - {item.hari || "-"} | {item.jam}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Petugas pengganti: {getPetugasLabel(item.id_petugas_pengganti)} | Ruangan: {item.ruangan || "-"}
-                        </p>
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-semibold text-foreground">{item.mapel}</h4>
+                            <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-700">
+                              Dilimpahkan
+                            </Badge>
+                            {sudahSelesai && (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 border">
+                                Selesai
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {item.kelas} ({item.jenjang}) - {item.hari || "-"} | {item.jam}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Petugas pengganti: {getPetugasLabel(item.id_petugas_pengganti)} | Ruangan: {item.ruangan || "-"}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {sudahSelesai ? (
+                          <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 border px-3 py-1.5 text-sm">
+                            <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                            Sudah Terisi
+                          </Badge>
+                        ) : (
+                          <Button variant="outline" className="bg-transparent" onClick={() => handleOpenInput(item)}>
+                            <UserCheck className="mr-2 h-4 w-4" />
+                            Input
+                          </Button>
+                        )}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" className="bg-transparent" onClick={() => handleOpenInput(item)}>
-                        <UserCheck className="mr-2 h-4 w-4" />
-                        Input
-                      </Button>
-                    </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="py-8 text-center text-muted-foreground">
                   <UserCheck className="mx-auto mb-2 h-12 w-12 opacity-50" />
@@ -918,10 +1120,110 @@ export default function GuruPanelPage() {
           <Card className="border-border/50">
             <CardHeader>
               <CardTitle className="text-lg text-foreground">Semua Jadwal</CardTitle>
-              <CardDescription>Endpoint: GET /api/akademik/jadwal-pembelajaran</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                <div className="space-y-2">
+                  <Label>Unit</Label>
+                  <Select value={unitFilter} onValueChange={setUnitFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Kelas</Label>
+                  <Select value={kelasFilter} onValueChange={setKelasFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {kelasOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Mapel</Label>
+                  <Select value={mapelFilter} onValueChange={setMapelFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua mapel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Mapel</SelectItem>
+                      {mapelOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Petugas</Label>
+                  <Select value={petugasFilter} onValueChange={setPetugasFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua petugas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Petugas</SelectItem>
+                      {petugasFilterOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Hari</Label>
+                  <Select value={hariFilter} onValueChange={setHariFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua hari" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Hari</SelectItem>
+                      {[
+                        "SENIN",
+                        "SELASA",
+                        "RABU",
+                        "KAMIS",
+                        "JUMAT",
+                        "SABTU",
+                        "MINGGU",
+                      ].map((day) => (
+                        <SelectItem key={day} value={day}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="flex justify-end">
+                <Button variant="outline" className="bg-transparent" onClick={resetJadwalFilters}>
+                  Reset Filter
+                </Button>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50">
@@ -936,36 +1238,63 @@ export default function GuruPanelPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {sortedJadwalMengajar.map((jadwal) => (
-                      <TableRow key={jadwal.id_jadwal} className="hover:bg-muted/30">
-                        <TableCell className="font-medium text-foreground">{jadwal.hari || "-"}</TableCell>
-                        <TableCell>{jadwal.mapel}</TableCell>
-                        <TableCell>{jadwal.kelas}</TableCell>
-                        <TableCell>{jadwal.ruangan || "-"}</TableCell>
-                        <TableCell>{jadwal.nama_petugas || "-"}</TableCell>
-                        <TableCell>{jadwal.jam}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-transparent">{jadwal.status_sesi || "-"}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="bg-transparent text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => handleOpenGuruTidakHadir(jadwal)}
-                            >
-                              <UserX className="w-4 h-4 mr-1" />
-                              Guru Tidak Hadir
-                            </Button>
-                            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => handleOpenInput(jadwal)}>
-                              <UserCheck className="w-4 h-4 mr-1" />
-                              Input
-                            </Button>
-                          </div>
+                    {filteredSortedJadwalMengajar.map((jadwal) => {
+                      const sudahSelesai = jadwalSelesaiHariIniSet.has(jadwal.id_jadwal)
+                      return (
+                        <TableRow
+                          key={jadwal.id_jadwal}
+                          className={sudahSelesai ? "bg-emerald-500/8 hover:bg-emerald-500/12" : "hover:bg-muted/30"}
+                        >
+                          <TableCell className="font-medium text-foreground">{jadwal.hari || "-"}</TableCell>
+                          <TableCell>{jadwal.mapel}</TableCell>
+                          <TableCell>{jadwal.kelas}</TableCell>
+                          <TableCell>{jadwal.ruangan || "-"}</TableCell>
+                          <TableCell>{jadwal.nama_petugas || "-"}</TableCell>
+                          <TableCell>{jadwal.jam}</TableCell>
+                          <TableCell>
+                            {sudahSelesai ? (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 border">
+                                <CheckCircle className="w-3 h-3 mr-1" />
+                                Selesai Hari Ini
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-transparent">{jadwal.status_sesi || "-"}</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {sudahSelesai ? (
+                              <Badge className="bg-emerald-500/15 text-emerald-700 border-emerald-500/30 border px-3 py-1">
+                                <CheckCircle className="w-3.5 h-3.5 mr-1.5" />
+                                Sudah Terisi
+                              </Badge>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="bg-transparent text-destructive border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                                  onClick={() => handleOpenGuruTidakHadir(jadwal)}
+                                >
+                                  <UserX className="w-4 h-4 mr-1" />
+                                  Guru Tidak Hadir
+                                </Button>
+                                <Button variant="outline" size="sm" className="bg-transparent" onClick={() => handleOpenInput(jadwal)}>
+                                  <UserCheck className="w-4 h-4 mr-1" />
+                                  Input
+                                </Button>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                    {filteredSortedJadwalMengajar.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          Data jadwal tidak ditemukan.
                         </TableCell>
                       </TableRow>
-                    ))}
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -977,7 +1306,6 @@ export default function GuruPanelPage() {
           <Card className="border-border/50">
             <CardHeader>
               <CardTitle className="text-lg text-foreground">Riwayat dan Rekap Absensi</CardTitle>
-              <CardDescription>Sesuai endpoint rekap santri/kelas/petugas</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Tabs value={rekapTab} onValueChange={setRekapTab} className="space-y-4">
@@ -1154,7 +1482,7 @@ export default function GuruPanelPage() {
         </TabsContent>
       </Tabs>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={closePresensiDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           {isSubmitSuccess ? (
             <div className="flex flex-col items-center justify-center py-12">
@@ -1198,9 +1526,6 @@ export default function GuruPanelPage() {
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-base text-foreground">Kehadiran Guru</CardTitle>
-                    <CardDescription>
-                      Status guru mengikuti kontrak endpoint mulai sesi dan set pengganti.
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <RadioGroup value={guruHadir} onValueChange={(v) => setGuruHadir(v as GuruStatus)} className="space-y-3">
@@ -1358,7 +1683,6 @@ export default function GuruPanelPage() {
                 <Card className="border-border/50">
                   <CardHeader>
                     <CardTitle className="text-base text-foreground">Ringkasan Presensi</CardTitle>
-                    <CardDescription>Disesuaikan dengan payload endpoint backend</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
@@ -1413,9 +1737,6 @@ export default function GuruPanelPage() {
                       <AlertCircle className="w-5 h-5 text-secondary-foreground mt-0.5" />
                       <div>
                         <p className="font-medium text-secondary-foreground">Catatan</p>
-                        <p className="text-sm text-muted-foreground">
-                          Backend akan mencatat status guru lewat endpoint mulai/set-pengganti, lalu absensi santri lewat endpoint absensi-santri.
-                        </p>
                       </div>
                     </div>
                   </CardContent>
@@ -1423,13 +1744,13 @@ export default function GuruPanelPage() {
               )}
 
               <DialogFooter className="gap-2">
-                {step > 1 && (
-                  <Button variant="outline" className="bg-transparent" onClick={() => setStep(step - 1)} disabled={isSubmitting}>
+                {step >= 1 && (
+                  <Button variant="outline" className="bg-transparent" onClick={handleBackButton} disabled={isSubmitting}>
                     Kembali
                   </Button>
                 )}
                 <Button className="bg-primary text-primary-foreground" onClick={handlePrimaryAction} disabled={disabledNext}>
-                  {isSubmitting ? "Memproses..." : step < summaryStep ? "Lanjutkan" : "Kirim ke Backend"}
+                  {isSubmitting ? "Memproses..." : step < summaryStep ? "Lanjutkan" : "Kirim"}
                   {!isSubmitting && step < summaryStep && <ArrowRight className="w-4 h-4 ml-2" />}
                   {!isSubmitting && step === summaryStep && <Send className="w-4 h-4 ml-2" />}
                 </Button>
@@ -1443,7 +1764,6 @@ export default function GuruPanelPage() {
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Detail Riwayat Sesi</DialogTitle>
-            <DialogDescription>Endpoint: GET /api/akademik/sesi-absensi/{'{id}'}</DialogDescription>
           </DialogHeader>
 
           {selectedRiwayat && (

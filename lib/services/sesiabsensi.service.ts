@@ -77,6 +77,10 @@ export interface SelesaiSesiPayload {
   keterangan?: string
 }
 
+export interface CancelSesiPayload {
+  keterangan?: string
+}
+
 const SESI_ABSENSI_BASE_PATH = "/akademik/sesi-absensi"
 
 const extractList = (payload: unknown): SesiAbsensiApiItem[] => {
@@ -127,6 +131,11 @@ export const sesiAbsensiService = {
 
   async selesai(id: number, payload?: SelesaiSesiPayload) {
     const response = await api.post<{ data?: unknown }>(`${SESI_ABSENSI_BASE_PATH}/${id}/selesai`, payload)
+    return response.data
+  },
+
+  async cancel(id: number, payload?: CancelSesiPayload) {
+    const response = await api.post<{ data?: unknown }>(`${SESI_ABSENSI_BASE_PATH}/${id}/cancel`, payload)
     return response.data
   },
 
