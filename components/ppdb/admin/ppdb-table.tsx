@@ -37,6 +37,7 @@ import {
   FileCheck,
   XCircle,
   Loader2,
+  Wallet,
 } from "lucide-react"
 import type { PpdbDetail } from "@/types/ppdb/admin"
 
@@ -53,8 +54,10 @@ interface PpdbTableProps {
   onStatusChange: (val: string) => void
   onProgramChange: (val: string) => void
   onDetail: (item: PpdbDetail) => void
-  onVerifikasi: (item: PpdbDetail, status: "Diterima" | "Ditolak") => void
+  onVerifikasi: (item: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => void
   onDelete: (item: PpdbDetail) => void
+  onCreateTagihan: (item: PpdbDetail) => void
+  tagihanLoading: boolean
 }
 
 const formatDate = (value: string) => {
@@ -107,6 +110,8 @@ export function PpdbTable({
   onDetail,
   onVerifikasi,
   onDelete,
+  onCreateTagihan,
+  tagihanLoading,
 }: PpdbTableProps) {
   const filtered = data.filter((p) => {
     const kw = searchQuery.toLowerCase()
@@ -237,12 +242,28 @@ export function PpdbTable({
                                 Terima Santri
                               </DropdownMenuItem>
                               <DropdownMenuItem
+                                className="text-secondary-foreground"
+                                onClick={() => onVerifikasi(p, "Menunggu")}
+                                disabled={verificationLoading}
+                              >
+                                <MoreHorizontal className="w-4 h-4 mr-2" />
+                                Ubah ke Menunggu
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
                                 className="text-destructive focus:text-destructive"
                                 onClick={() => onVerifikasi(p, "Ditolak")}
                                 disabled={verificationLoading}
                               >
                                 <XCircle className="w-4 h-4 mr-2" />
                                 Tolak
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => onCreateTagihan(p)}
+                                disabled={tagihanLoading}
+                              >
+                                <Wallet className="w-4 h-4 mr-2" />
+                                Buat Tagihan PPDB
                               </DropdownMenuItem>
                             </>
                           )}

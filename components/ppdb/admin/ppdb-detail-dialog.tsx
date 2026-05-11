@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -37,6 +37,7 @@ interface PpdbDetailDialogProps {
   tesConfig: TesConfigState | null
   isTesResultSaving: boolean
   onTesResultSave: (payload: UpdateTestResultRequest) => void | Promise<void>
+  onUploadFile?: (jenisBerkas: string, file: File) => Promise<void>
 }
 
 const formatDateTime = (value: string) => {
@@ -71,43 +72,80 @@ const getDocumentUrl = (path: string | null | undefined): string | null => {
   return `${base}/storage/${path.replace(/^\//, '')}`
 }
 
-function DocLink({ label, path }: { label: string; path?: string | null }) {
+function DocLink({
+  label,
+  path,
+  uploadType,
+  onUpload,
+}: {
+  label: string
+  path?: string | null
+  uploadType?: string
+  onUpload?: (jenisBerkas: string, file: File) => Promise<void>
+}) {
   const url = getDocumentUrl(path)
-  if (!url) return (
-    <div className="space-y-1">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground italic">Belum diupload</p>
-    </div>
-  )
-  const isPdf = url.toLowerCase().includes('.pdf')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !uploadType || !onUpload) return
+    try {
+      await onUpload(uploadType, file)
+    } catch {
+      // error handled upstream
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
+
   return (
     <div className="space-y-2">
       <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="flex gap-2">
-        <a href={url} target="_blank" rel="noreferrer"
-          className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-          <ExternalLink className="w-3 h-3" />
-          Preview
-        </a>
-        <a href={url} download
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
-          <FileDown className="w-3 h-3" />
-          Download
-        </a>
-      </div>
-      {isPdf && (
-        <iframe
-          src={url}
-          className="w-full h-40 rounded border border-border/50"
-          title={label}
-        />
+      {url ? (
+        <>
+          <div className="flex gap-2">
+            <a href={url} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+              <ExternalLink className="w-3 h-3" />
+              Preview
+            </a>
+            <a href={url} download
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
+              <FileDown className="w-3 h-3" />
+              Download
+            </a>
+          </div>
+          {url.toLowerCase().includes('.pdf') ? (
+            <iframe src={url} className="w-full h-40 rounded border border-border/50" title={label} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt={label}
+              className="max-h-32 rounded border border-border/50 object-cover"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          )}
+        </>
+      ) : (
+        <p className="text-xs text-muted-foreground italic">Belum diupload</p>
       )}
-      {!isPdf && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={label}
-          className="max-h-32 rounded border border-border/50 object-cover"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
+      {uploadType && onUpload && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*,.pdf"
+            className="hidden"
+            onChange={(e) => void handleFileChange(e)}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs h-7"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            {url ? "Ganti File" : "Upload File"}
+          </Button>
+        </>
       )}
     </div>
   )
@@ -131,6 +169,7 @@ export function PpdbDetailDialog({
   tesConfig,
   isTesResultSaving,
   onTesResultSave,
+  onUploadFile,
 }: PpdbDetailDialogProps) {
   const [nilaiTesInput, setNilaiTesInput] = useState("")
   const [statusTesInput, setStatusTesInput] = useState("")
@@ -231,10 +270,10 @@ export function PpdbDetailDialog({
               <div className="sm:col-span-2 space-y-3">
                 <p className="text-sm font-medium text-foreground">Dokumen Berkas</p>
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <DocLink label="Akta Kelahiran" path={pendaftar.fileAktaPath} />
-                  <DocLink label="Kartu Keluarga (KK)" path={pendaftar.fileKkPath} />
-                  <DocLink label="Surat Rekomendasi" path={pendaftar.fileSuratRekomendasiPath} />
-                  <DocLink label="Surat Pernyataan" path={pendaftar.suratPernyataanFilePath} />
+                    <DocLink label="Akta Kelahiran" path={pendaftar.fileAktaPath} uploadType="akta" onUpload={onUploadFile} />
+                    <DocLink label="Kartu Keluarga (KK)" path={pendaftar.fileKkPath} uploadType="kk" onUpload={onUploadFile} />
+                    <DocLink label="Surat Rekomendasi" path={pendaftar.fileSuratRekomendasiPath} uploadType="rekomendasi" onUpload={onUploadFile} />
+                    <DocLink label="Surat Pernyataan" path={pendaftar.suratPernyataanFilePath} uploadType="surat_pernyataan" onUpload={onUploadFile} />
                 </div>
               </div>
 

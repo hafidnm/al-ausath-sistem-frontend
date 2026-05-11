@@ -161,7 +161,7 @@ export interface UpdateTesKonfigurasiJenjangRequest {
 }
 
 export interface UpdateVerificationRequest {
-  status: 'Terverifikasi' | 'Ditolak' | 'Diterima';
+  status: 'Terverifikasi' | 'Ditolak' | 'Diterima' | 'Menunggu';
   keterangan?: string;
   idPetugas?: string;
   tanggalVerif?: string;

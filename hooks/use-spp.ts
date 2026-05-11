@@ -2,8 +2,11 @@ import { useCallback, useState } from 'react';
 import {
   CreateSppPaymentRequest,
   CreateSppSettingRequest,
+  SppGolongan,
   SppPayment,
+  SppPaymentQuery,
   SppSetting,
+  SppSettingQuery,
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
   UpdateSppSettingRequest,
@@ -18,30 +21,37 @@ export interface UseSppReturn {
   success: boolean;
 }
 
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
 export function useSppPayments() {
-  const query = useCallback(async () => {
-    const response = await sppService.getPayments();
+  const query = useCallback(async (params?: SppPaymentQuery) => {
+    const response = await sppService.getPayments(params);
     return response.data;
   }, []);
 
   const { data, setData, loading, error, run } = useAsyncQuery(query, [] as SppPayment[], {
-    fallbackError: 'Failed to fetch SPP payments',
+    fallbackError: 'Gagal memuat pembayaran SPP',
     logLabel: 'Error fetching SPP payments:',
   });
 
-  const fetchPayments = useCallback(async () => {
-    await run();
-  }, [run]);
+  const fetchPayments = useCallback(
+    async (params?: SppPaymentQuery) => run(params),
+    [run],
+  );
 
   return { data, setData, loading, error, fetchPayments };
 }
 
 export function useSppPaymentDetail(id?: string) {
   const query = useCallback((targetId: string) => sppService.getPaymentDetail(targetId), []);
-  const { data, loading, error, setError, run } = useAsyncQuery(query, null as SppPayment | null, {
-    fallbackError: 'Failed to fetch payment detail',
-    logLabel: 'Error fetching payment detail:',
-  });
+  const { data, loading, error, setError, run } = useAsyncQuery(
+    query,
+    null as SppPayment | null,
+    {
+      fallbackError: 'Gagal memuat detail pembayaran',
+      logLabel: 'Error fetching payment detail:',
+    },
+  );
 
   const fetchPaymentDetail = useCallback(
     async (targetId?: string) => {
@@ -50,7 +60,6 @@ export function useSppPaymentDetail(id?: string) {
         setError('ID pembayaran tidak ditemukan');
         return;
       }
-
       await run(idToFetch);
     },
     [id, run, setError],
@@ -62,11 +71,14 @@ export function useSppPaymentDetail(id?: string) {
 export function useCreateSppPayment() {
   const { loading, error, success, mutate } = useAsyncMutation(
     sppService.createPayment,
-    'Failed to create payment',
+    'Gagal mencatat pembayaran',
     'Error creating payment:',
   );
 
-  const createPayment = useCallback(async (payload: CreateSppPaymentRequest) => mutate(payload), [mutate]);
+  const createPayment = useCallback(
+    async (payload: CreateSppPaymentRequest) => mutate(payload),
+    [mutate],
+  );
 
   return { loading, error, success, createPayment };
 }
@@ -78,7 +90,7 @@ export function useUpdateSppPayment() {
   );
   const { loading, error, success, mutate } = useAsyncMutation(
     mutation,
-    'Failed to update payment',
+    'Gagal memperbarui pembayaran',
     'Error updating payment:',
   );
 
@@ -97,11 +109,14 @@ export function useVerifySppPayment() {
   );
   const { loading, error, success, mutate } = useAsyncMutation(
     mutation,
-    'Failed to verify payment',
+    'Gagal memverifikasi pembayaran',
     'Error verifying payment:',
   );
 
-  const verifyPayment = useCallback(async (id: string, payload?: VerifySppPaymentRequest) => mutate(id, payload), [mutate]);
+  const verifyPayment = useCallback(
+    async (id: string, payload?: VerifySppPaymentRequest) => mutate(id, payload),
+    [mutate],
+  );
 
   return { loading, error, success, verifyPayment };
 }
@@ -109,7 +124,7 @@ export function useVerifySppPayment() {
 export function useDeleteSppPayment() {
   const { loading, error, success, mutate } = useAsyncMutation(
     sppService.deletePayment,
-    'Failed to delete payment',
+    'Gagal menghapus pembayaran',
     'Error deleting payment:',
   );
 
@@ -123,41 +138,47 @@ export function useSppTunggakanSummary() {
     sppService.getTunggakanSummary,
     null as SppTunggakanSummary | null,
     {
-      fallbackError: 'Failed to fetch tunggakan summary',
+      fallbackError: 'Gagal memuat ringkasan tunggakan',
       logLabel: 'Error fetching tunggakan summary:',
     },
   );
 
-  const fetchSummary = useCallback(async () => {
-    await run();
-  }, [run]);
+  const fetchSummary = useCallback(async () => run(), [run]);
 
   return { data, loading, error, fetchSummary };
 }
 
+// ─── Settings ─────────────────────────────────────────────────────────────────
+
 export function useSppSettings() {
-  const query = useCallback(async () => {
-    const response = await sppService.getSettings();
+  const query = useCallback(async (params?: SppSettingQuery) => {
+    const response = await sppService.getSettings(params);
     return response.data;
   }, []);
+
   const { data, setData, loading, error, run } = useAsyncQuery(query, [] as SppSetting[], {
-    fallbackError: 'Failed to fetch SPP settings',
+    fallbackError: 'Gagal memuat setting SPP',
     logLabel: 'Error fetching SPP settings:',
   });
 
-  const fetchSettings = useCallback(async () => {
-    await run();
-  }, [run]);
+  const fetchSettings = useCallback(
+    async (params?: SppSettingQuery) => run(params),
+    [run],
+  );
 
   return { data, setData, loading, error, fetchSettings };
 }
 
 export function useSppSettingDetail(id?: string) {
   const query = useCallback((targetId: string) => sppService.getSettingDetail(targetId), []);
-  const { data, loading, error, setError, run } = useAsyncQuery(query, null as SppSetting | null, {
-    fallbackError: 'Failed to fetch setting detail',
-    logLabel: 'Error fetching setting detail:',
-  });
+  const { data, loading, error, setError, run } = useAsyncQuery(
+    query,
+    null as SppSetting | null,
+    {
+      fallbackError: 'Gagal memuat detail setting',
+      logLabel: 'Error fetching setting detail:',
+    },
+  );
 
   const fetchSettingDetail = useCallback(
     async (targetId?: string) => {
@@ -166,7 +187,6 @@ export function useSppSettingDetail(id?: string) {
         setError('ID setting tidak ditemukan');
         return;
       }
-
       await run(idToFetch);
     },
     [id, run, setError],
@@ -178,11 +198,14 @@ export function useSppSettingDetail(id?: string) {
 export function useCreateSppSetting() {
   const { loading, error, success, mutate } = useAsyncMutation(
     sppService.createSetting,
-    'Failed to create SPP setting',
+    'Gagal membuat setting SPP',
     'Error creating SPP setting:',
   );
 
-  const createSetting = useCallback(async (payload: CreateSppSettingRequest) => mutate(payload), [mutate]);
+  const createSetting = useCallback(
+    async (payload: CreateSppSettingRequest) => mutate(payload),
+    [mutate],
+  );
 
   return { loading, error, success, createSetting };
 }
@@ -194,7 +217,7 @@ export function useUpdateSppSetting() {
   );
   const { loading, error, success, mutate } = useAsyncMutation(
     mutation,
-    'Failed to update SPP setting',
+    'Gagal memperbarui setting SPP',
     'Error updating SPP setting:',
   );
 
@@ -209,7 +232,7 @@ export function useUpdateSppSetting() {
 export function useDeleteSppSetting() {
   const { loading, error, success, mutate } = useAsyncMutation(
     sppService.deleteSetting,
-    'Failed to delete SPP setting',
+    'Gagal menghapus setting SPP',
     'Error deleting SPP setting:',
   );
 
@@ -217,3 +240,36 @@ export function useDeleteSppSetting() {
 
   return { loading, error, success, deleteSetting };
 }
+
+// ─── Golongan ─────────────────────────────────────────────────────────────────
+
+export function useSppGolongan() {
+  const query = useCallback(async () => {
+    const response = await sppService.getGolongan();
+    return response.data;
+  }, []);
+
+  const { data, loading, error, run } = useAsyncQuery(query, [] as SppGolongan[], {
+    fallbackError: 'Gagal memuat golongan SPP',
+    logLabel: 'Error fetching SPP golongan:',
+  });
+
+  const fetchGolongan = useCallback(async () => run(), [run]);
+
+  return { data, loading, error, fetchGolongan };
+}
+
+// Re-export types so callers don't need to import from two places
+export type {
+  CreateSppPaymentRequest,
+  CreateSppSettingRequest,
+  SppGolongan,
+  SppPayment,
+  SppPaymentQuery,
+  SppSetting,
+  SppSettingQuery,
+  SppTunggakanSummary,
+  UpdateSppPaymentRequest,
+  UpdateSppSettingRequest,
+  VerifySppPaymentRequest,
+};

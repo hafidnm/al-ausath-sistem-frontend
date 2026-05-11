@@ -35,6 +35,11 @@ export default function PpdbPengumumanPage() {
       router.replace('/ppdb/tes');
       return;
     }
+
+    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/pembayaran');
+      return;
+    }
   }, [data, router]);
 
   if (loading && !data) {

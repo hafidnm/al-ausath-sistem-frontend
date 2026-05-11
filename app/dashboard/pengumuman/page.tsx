@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-import { Plus, Edit2, Trash2, Loader2, Megaphone, Pin, Eye, EyeOff } from "lucide-react"
+import { Plus, Edit2, Trash2, Loader2, Megaphone, Pin, Search, Filter, Paperclip, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,39 +32,34 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import api from "@/lib/axios"
+import {
+  pengumumanService,
+  type CreatePengumumanRequest,
+  type Pengumuman,
+  type PengumumanKategori,
+  type PengumumanListQuery,
+} from "@/lib/services/pengumuman.service"
 
-interface Pengumuman {
-  id: number
-  judul: string
-  konten: string
-  kategori: string
-  tanggal_mulai: string | null
-  tanggal_selesai: string | null
-  is_aktif: boolean
-  is_pinned: boolean
-  urutan: number
-  created_at: string
-  updated_at: string
-}
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-const emptyForm = {
-  judul: "",
-  konten: "",
-  kategori: "umum",
-  tanggal_mulai: "",
-  tanggal_selesai: "",
-  is_aktif: true,
-  is_pinned: false,
-  urutan: 0,
-}
-
-const KATEGORI_OPTIONS = [
+const KATEGORI_OPTIONS: { value: PengumumanKategori | string; label: string }[] = [
   { value: "umum", label: "Umum" },
   { value: "ppdb", label: "PPDB" },
   { value: "akademik", label: "Akademik" },
   { value: "kegiatan", label: "Kegiatan" },
 ]
+
+const emptyForm: CreatePengumumanRequest = {
+  judul: "",
+  konten: "",
+  kategori: "umum",
+  is_aktif: true,
+  is_pinned: false,
+  urutan: 0,
+  tanggal_selesai: null,
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const getKategoriBadge = (kategori: string) => {
   const colors: Record<string, string> = {
@@ -73,16 +68,22 @@ const getKategoriBadge = (kategori: string) => {
     kegiatan: "bg-purple-500/10 text-purple-600 border-0",
     umum: "bg-muted text-muted-foreground border-0",
   }
-  return colors[kategori] || colors.umum
+  return colors[kategori] ?? colors.umum
 }
 
 const formatDate = (value: string | null) => {
   if (!value) return "-"
-  return new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
+  return new Date(value).toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
 }
 
 const getErrorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PengumumanPage() {
   const [list, setList] = useState<Pengumuman[]>([])
@@ -90,14 +91,20 @@ export default function PengumumanPage() {
   const [saving, setSaving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [editTarget, setEditTarget] = useState<Pengumuman | null>(null)
-  const [form, setForm] = useState(emptyForm)
+  const [form, setForm] = useState<CreatePengumumanRequest>(emptyForm)
+  const [lampiranFile, setLampiranFile] = useState<File | null>(null)
+  const [hapusLampiran, setHapusLampiran] = useState(false)
 
-  const fetchList = useCallback(async () => {
+  // Filters
+  const [searchQ, setSearchQ] = useState("")
+  const [filterKategori, setFilterKategori] = useState("all")
+  const [filterAktif, setFilterAktif] = useState("all")
+
+  const fetchList = useCallback(async (query?: PengumumanListQuery) => {
     setLoading(true)
     try {
-      const res = await api.get("/administrasi/pengumuman")
-      const data = res.data?.data ?? res.data ?? []
-      setList(Array.isArray(data) ? data : [])
+      const data = await pengumumanService.getList(query)
+      setList(data)
     } catch (err) {
       console.error("Gagal memuat pengumuman:", err)
     } finally {
@@ -109,9 +116,26 @@ export default function PengumumanPage() {
     void fetchList()
   }, [fetchList])
 
+  const handleSearch = () => {
+    const query: PengumumanListQuery = {}
+    if (searchQ.trim()) query.q = searchQ.trim()
+    if (filterKategori !== "all") query.kategori = filterKategori as PengumumanKategori
+    if (filterAktif !== "all") query.is_aktif = filterAktif === "aktif"
+    void fetchList(query)
+  }
+
+  const handleResetFilter = () => {
+    setSearchQ("")
+    setFilterKategori("all")
+    setFilterAktif("all")
+    void fetchList()
+  }
+
   const openAdd = () => {
     setEditTarget(null)
     setForm(emptyForm)
+    setLampiranFile(null)
+    setHapusLampiran(false)
     setIsOpen(true)
   }
 
@@ -120,13 +144,14 @@ export default function PengumumanPage() {
     setForm({
       judul: p.judul,
       konten: p.konten,
-      kategori: p.kategori || "umum",
-      tanggal_mulai: p.tanggal_mulai ?? "",
-      tanggal_selesai: p.tanggal_selesai ?? "",
+      kategori: p.kategori,
       is_aktif: p.is_aktif,
       is_pinned: p.is_pinned,
       urutan: p.urutan,
+      tanggal_selesai: p.tanggal_selesai,
     })
+    setLampiranFile(null)
+    setHapusLampiran(false)
     setIsOpen(true)
   }
 
@@ -137,18 +162,21 @@ export default function PengumumanPage() {
     }
     setSaving(true)
     try {
-      const payload = {
+      const payload: CreatePengumumanRequest = {
         ...form,
-        tanggal_mulai: form.tanggal_mulai || null,
-        tanggal_selesai: form.tanggal_selesai || null,
         urutan: Number(form.urutan),
+        tanggal_selesai: form.tanggal_selesai || null,
+        lampiran: lampiranFile,
+        hapus_lampiran: hapusLampiran,
       }
       if (editTarget) {
-        await api.put(`/administrasi/pengumuman/${editTarget.id}`, payload)
+        await pengumumanService.update(editTarget.id, payload)
       } else {
-        await api.post("/administrasi/pengumuman", payload)
+        await pengumumanService.create(payload)
       }
       setIsOpen(false)
+      setLampiranFile(null)
+      setHapusLampiran(false)
       await fetchList()
     } catch (err) {
       alert(getErrorMessage(err, "Gagal menyimpan pengumuman"))
@@ -160,7 +188,7 @@ export default function PengumumanPage() {
   const handleDelete = async (p: Pengumuman) => {
     if (!confirm(`Hapus pengumuman "${p.judul}"?`)) return
     try {
-      await api.delete(`/administrasi/pengumuman/${p.id}`)
+      await pengumumanService.delete(p.id)
       await fetchList()
     } catch (err) {
       alert(getErrorMessage(err, "Gagal menghapus pengumuman"))
@@ -169,12 +197,15 @@ export default function PengumumanPage() {
 
   const handleToggleAktif = async (p: Pengumuman) => {
     try {
-      await api.put(`/administrasi/pengumuman/${p.id}`, { is_aktif: !p.is_aktif })
+      await pengumumanService.update(p.id, { is_aktif: !p.is_aktif })
       await fetchList()
     } catch (err) {
       alert(getErrorMessage(err, "Gagal mengubah status pengumuman"))
     }
   }
+
+  const totalAktif = list.filter((p) => p.is_aktif).length
+  const totalPinned = list.filter((p) => p.is_pinned).length
 
   return (
     <div className="space-y-6">
@@ -185,7 +216,9 @@ export default function PengumumanPage() {
             <Megaphone className="w-6 h-6 text-primary" />
             Manajemen Pengumuman
           </h1>
-          <p className="text-muted-foreground">Kelola pengumuman yang ditampilkan di halaman landing website</p>
+          <p className="text-muted-foreground">
+            Kelola pengumuman yang tampil di halaman landing website
+          </p>
         </div>
         <Button onClick={openAdd} className="gap-2">
           <Plus className="w-4 h-4" />
@@ -193,13 +226,80 @@ export default function PengumumanPage() {
         </Button>
       </div>
 
-      {/* Info Card */}
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="border-border/50">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold">{list.length}</p>
+            <p className="text-xs text-muted-foreground">Total</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold text-primary">{totalAktif}</p>
+            <p className="text-xs text-muted-foreground">Aktif</p>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 text-center">
+            <p className="text-2xl font-bold">{totalPinned}</p>
+            <p className="text-xs text-muted-foreground">Pinned</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Info */}
       <Card className="border-primary/20 bg-primary/5">
         <CardContent className="p-4">
           <p className="text-sm text-foreground">
-            💡 <strong>Tip:</strong> Pengumuman yang <strong>Aktif</strong> akan otomatis tampil di halaman landing website.
-            Atur tanggal mulai/selesai untuk pengumuman berkala, atau gunakan <strong>Pin</strong> untuk mengutamakan pengumuman penting.
+            💡 <strong>Tip:</strong> Pengumuman <strong>Aktif</strong> otomatis tampil di halaman landing.
+            Atur <strong>Tanggal Selesai</strong> untuk pengumuman berkala, atau gunakan <strong>Pin</strong> untuk mengutamakan pengumuman penting.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* Filter Bar */}
+      <Card className="border-border/50">
+        <CardContent className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="search-pengumuman"
+                placeholder="Cari judul pengumuman..."
+                value={searchQ}
+                onChange={(e) => setSearchQ(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+                className="pl-9"
+              />
+            </div>
+            <Select value={filterKategori} onValueChange={setFilterKategori}>
+              <SelectTrigger className="w-full sm:w-[150px]">
+                <Filter className="w-4 h-4 mr-2" />
+                <SelectValue placeholder="Kategori" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Kategori</SelectItem>
+                {KATEGORI_OPTIONS.map((k) => (
+                  <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterAktif} onValueChange={setFilterAktif}>
+              <SelectTrigger className="w-full sm:w-[130px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="aktif">Aktif</SelectItem>
+                <SelectItem value="nonaktif">Nonaktif</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2">
+              <Button onClick={handleSearch} size="sm">Cari</Button>
+              <Button onClick={handleResetFilter} variant="outline" size="sm">Reset</Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -208,7 +308,7 @@ export default function PengumumanPage() {
         <CardHeader>
           <CardTitle>Daftar Pengumuman</CardTitle>
           <CardDescription>
-            Total {list.length} pengumuman • {list.filter(p => p.is_aktif).length} aktif
+            Total {list.length} pengumuman • {totalAktif} aktif • {totalPinned} pinned
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -229,7 +329,8 @@ export default function PengumumanPage() {
                   <TableRow>
                     <TableHead>Judul</TableHead>
                     <TableHead>Kategori</TableHead>
-                    <TableHead>Periode</TableHead>
+                    <TableHead>Berakhir</TableHead>
+                    <TableHead>Lampiran</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Aksi</TableHead>
                   </TableRow>
@@ -248,13 +349,26 @@ export default function PengumumanPage() {
                       </TableCell>
                       <TableCell>
                         <Badge className={getKategoriBadge(p.kategori)}>
-                          {KATEGORI_OPTIONS.find(k => k.value === p.kategori)?.label || p.kategori}
+                          {KATEGORI_OPTIONS.find((k) => k.value === p.kategori)?.label ?? p.kategori}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {p.tanggal_mulai || p.tanggal_selesai
-                          ? `${formatDate(p.tanggal_mulai)} – ${formatDate(p.tanggal_selesai)}`
-                          : "Tidak terbatas"}
+                        {p.tanggal_selesai ? formatDate(p.tanggal_selesai) : "Tidak terbatas"}
+                      </TableCell>
+                      <TableCell>
+                        {p.lampiran_url ? (
+                          <a
+                            href={p.lampiran_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            {p.lampiran_nama_asli || "Lihat"}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -297,7 +411,9 @@ export default function PengumumanPage() {
           <DialogHeader>
             <DialogTitle>{editTarget ? "Edit Pengumuman" : "Tambah Pengumuman"}</DialogTitle>
             <DialogDescription>
-              {editTarget ? "Perbarui pengumuman yang sudah ada." : "Buat pengumuman baru untuk ditampilkan di landing page."}
+              {editTarget
+                ? "Perbarui pengumuman yang sudah ada."
+                : "Buat pengumuman baru untuk ditampilkan di landing page."}
             </DialogDescription>
           </DialogHeader>
 
@@ -305,17 +421,19 @@ export default function PengumumanPage() {
             <div className="space-y-2">
               <Label>Judul Pengumuman <span className="text-destructive">*</span></Label>
               <Input
+                id="form-judul"
                 value={form.judul}
-                onChange={(e) => setForm(prev => ({ ...prev, judul: e.target.value }))}
-                placeholder="Contoh: Pengumuman PPDB 2024/2025 Telah Dibuka"
+                onChange={(e) => setForm((prev) => ({ ...prev, judul: e.target.value }))}
+                placeholder="Contoh: Pengumuman PPDB 2026/2027 Telah Dibuka"
               />
             </div>
 
             <div className="space-y-2">
               <Label>Konten / Isi Pengumuman <span className="text-destructive">*</span></Label>
               <Textarea
+                id="form-konten"
                 value={form.konten}
-                onChange={(e) => setForm(prev => ({ ...prev, konten: e.target.value }))}
+                onChange={(e) => setForm((prev) => ({ ...prev, konten: e.target.value }))}
                 placeholder="Tulis isi pengumuman di sini..."
                 className="min-h-[120px]"
               />
@@ -326,47 +444,80 @@ export default function PengumumanPage() {
                 <Label>Kategori</Label>
                 <Select
                   value={form.kategori}
-                  onValueChange={(v) => setForm(prev => ({ ...prev, kategori: v }))}
+                  onValueChange={(v) => setForm((prev) => ({ ...prev, kategori: v }))}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="form-kategori">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {KATEGORI_OPTIONS.map(k => (
+                    {KATEGORI_OPTIONS.map((k) => (
                       <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Urutan</Label>
+                <Label>Urutan Tampil</Label>
                 <Input
+                  id="form-urutan"
                   type="number"
                   min={0}
                   value={form.urutan}
-                  onChange={(e) => setForm(prev => ({ ...prev, urutan: Number(e.target.value) }))}
+                  onChange={(e) => setForm((prev) => ({ ...prev, urutan: Number(e.target.value) }))}
                   placeholder="0"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Tanggal Mulai</Label>
-                <Input
-                  type="date"
-                  value={form.tanggal_mulai}
-                  onChange={(e) => setForm(prev => ({ ...prev, tanggal_mulai: e.target.value }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Tanggal Selesai</Label>
-                <Input
-                  type="date"
-                  value={form.tanggal_selesai}
-                  onChange={(e) => setForm(prev => ({ ...prev, tanggal_selesai: e.target.value }))}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Tanggal Selesai</Label>
+              <Input
+                id="form-tanggal-selesai"
+                type="date"
+                value={form.tanggal_selesai ?? ""}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, tanggal_selesai: e.target.value || null }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">Kosongkan jika pengumuman tidak memiliki batas waktu.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Lampiran (PDF/Gambar/Dokumen)</Label>
+              <Input
+                id="form-lampiran"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.ppt,.pptx"
+                onChange={(e) => setLampiranFile(e.target.files?.[0] || null)}
+              />
+              {lampiranFile ? (
+                <p className="text-xs text-muted-foreground">File baru: {lampiranFile.name}</p>
+              ) : editTarget?.lampiran_url ? (
+                <div className="flex items-center justify-between rounded-md border border-border p-2">
+                  <a
+                    href={editTarget.lampiran_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <Paperclip className="w-3 h-3" />
+                    {editTarget.lampiran_nama_asli || "Lampiran saat ini"}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => setHapusLampiran((prev) => !prev)}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    {hapusLampiran ? "Batal hapus" : "Hapus lampiran"}
+                  </Button>
+                </div>
+              ) : null}
+              {hapusLampiran && (
+                <p className="text-xs text-destructive">Lampiran akan dihapus saat disimpan.</p>
+              )}
             </div>
 
             <div className="flex items-center justify-between rounded-lg border border-border p-3">
@@ -375,8 +526,9 @@ export default function PengumumanPage() {
                 <p className="text-xs text-muted-foreground">Tampilkan di halaman landing</p>
               </div>
               <Switch
+                id="form-is-aktif"
                 checked={form.is_aktif}
-                onCheckedChange={(v) => setForm(prev => ({ ...prev, is_aktif: v }))}
+                onCheckedChange={(v) => setForm((prev) => ({ ...prev, is_aktif: v }))}
               />
             </div>
 
@@ -389,15 +541,16 @@ export default function PengumumanPage() {
                 </div>
               </div>
               <Switch
+                id="form-is-pinned"
                 checked={form.is_pinned}
-                onCheckedChange={(v) => setForm(prev => ({ ...prev, is_pinned: v }))}
+                onCheckedChange={(v) => setForm((prev) => ({ ...prev, is_pinned: v }))}
               />
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsOpen(false)}>Batal</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={() => { void handleSave() }} disabled={saving}>
               {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               {editTarget ? "Simpan Perubahan" : "Buat Pengumuman"}
             </Button>
