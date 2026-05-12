@@ -41,6 +41,7 @@ import {
   XCircle,
   Moon,
 } from "lucide-react"
+import { authService } from "@/lib/services/auth.service"
 
 const raporData = [
   {
@@ -119,11 +120,29 @@ const nilaiDetail = [
 ]
 
 export default function RaporPage() {
+  const [user, setUser] = useState<any>(null)
+  const [role, setRole] = useState<string>("")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedJenjang, setSelectedJenjang] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("all")
 
+  useEffect(() => {
+    const checkAuth = async () => {
+      const data = await authService.me()
+      if (data) {
+        setUser(data.user)
+        setRole(data.role)
+      }
+    }
+    checkAuth()
+  }, [])
+
+  const isSantri = role === 'santri'
+
   const filteredData = raporData.filter((rapor) => {
+    if (isSantri) {
+      return rapor.nis === user?.nomor_induk
+    }
     const matchesSearch =
       rapor.santri.toLowerCase().includes(searchQuery.toLowerCase()) ||
       rapor.nis.includes(searchQuery)
@@ -165,19 +184,23 @@ export default function RaporPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Rapor Santri</h1>
-          <p className="text-muted-foreground">Kelola dan cetak rapor digital</p>
+          <h1 className="text-2xl font-bold text-foreground">Rapor Digital</h1>
+          <p className="text-muted-foreground">
+            {isSantri ? "Lihat dan unduh laporan hasil belajar Anda" : "Kelola dan cetak rapor digital santri"}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export Semua
-          </Button>
-          <Button size="sm" className="bg-primary text-primary-foreground">
-            <Printer className="w-4 h-4 mr-2" />
-            Cetak Batch
-          </Button>
-        </div>
+        {!isSantri && (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <Download className="w-4 h-4 mr-2" />
+              Export Semua
+            </Button>
+            <Button size="sm" className="bg-primary text-primary-foreground">
+              <Printer className="w-4 h-4 mr-2" />
+              Cetak Batch
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stats */}

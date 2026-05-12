@@ -29,12 +29,12 @@ export function useMasterData() {
         ]);
 
         setUnits(u.data.map(i => ({ 
-          value: i.id_unit, 
-          label: i.nama_unit,
-          code: i.kode_unit 
+          value: i.id_unit ?? 0, 
+          label: i.nama_unit ?? '',
+          code: i.kode_unit ?? '' 
         })));
-        setKelas(k.data.map(i => ({ value: i.kode_kelas, label: i.nama_kelas })));
-        setTahunAjaran(t.data.map(i => ({ value: i.nama_tahun, label: i.nama_tahun })));
+        setKelas(k.data.map(i => ({ value: i.kode_kelas ?? '', label: i.nama_kelas ?? '' })));
+        setTahunAjaran(t.data.map(i => ({ value: i.nama_tahun ?? '', label: i.nama_tahun ?? '' })));
         
         // Handle categories if coming from options endpoint or directly
         if (Array.isArray(c)) {
