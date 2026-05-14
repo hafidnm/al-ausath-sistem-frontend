@@ -550,6 +550,7 @@ export default function AdminPanelRaporPage() {
           selectedIdentity={selectedIdentity}
           getIdentity={getRaporIdentity}
           onSelect={loadReportDetail}
+          onRefresh={fetchReports}
         />
 
         <div className="space-y-6">
