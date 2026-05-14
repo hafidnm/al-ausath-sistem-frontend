@@ -443,12 +443,14 @@ export default function GuruPanelPage() {
     return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentPetugasId))
   }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser])
 
-  const jadwalDilimpahkan = useMemo(() => {
-    const delegated = aktivitasSesi.filter((item) => Number(item.id_petugas_pengganti || 0) > 0)
+  const todayDateStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
-    const visible = !currentPetugasId || isAdminUser
-      ? delegated
-      : delegated.filter((item) => Number(item.id_petugas_pengganti) === Number(currentPetugasId))
+  const jadwalDilimpahkan = useMemo(() => {
+    if (!currentPetugasId) return []
+
+    const visible = aktivitasSesi.filter(
+      (item) => Number(item.id_petugas_pengganti) === Number(currentPetugasId) && String(item.tanggal || "").slice(0, 10) === todayDateStr
+    )
 
     return [...visible].sort((a, b) => {
       // Sort terbaru dulu (created_at descending)
@@ -456,14 +458,14 @@ export default function GuruPanelPage() {
       const timeB = new Date(String(b.tanggal || "") + " " + String(b.waktu_mulai || "")).getTime()
       return timeB - timeA
     })
-  }, [aktivitasSesi, currentPetugasId, isAdminUser])
+  }, [aktivitasSesi, currentPetugasId, todayDateStr])
 
   const riwayatPresensi = useMemo(() => {
     return [...aktivitasSesi].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
   }, [aktivitasSesi])
 
   // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
-  const todayDateStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+
   const jadwalSelesaiHariIniSet = useMemo(() => {
     const set = new Set<number>()
     for (const sesi of aktivitasSesi) {
@@ -755,7 +757,18 @@ export default function GuruPanelPage() {
       toast({ title: "Berhasil", description: "Data sesi absensi berhasil diproses." })
 
       setTimeout(() => {
-        void closePresensiDialog(false)
+        setIsDialogOpen(false)
+        setIsSubmitSuccess(false)
+        setSesiAktifId(null)
+        setSelectedJadwal(null)
+        setGuruHadir("hadir")
+        setGuruPenggantiId("")
+        setAlasanTidakHadir("")
+        setIsGuruTidakHadirFlow(false)
+        setSantriList([])
+        setAttendanceData({})
+        setCurrentStudentIndex(0)
+        setStep(1)
       }, 1500)
 
       await loadJadwal()
@@ -891,64 +904,7 @@ export default function GuruPanelPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Sesi</p>
-                <p className="text-xl font-bold text-foreground">{jadwalMengajar.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-accent/20 flex items-center justify-center">
-                <Users className="w-5 h-5 text-accent" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Santri Tercatat</p>
-                <p className="text-xl font-bold text-foreground">
-                  {jadwalMengajar.reduce((sum, item) => sum + (item.siswa || 0), 0)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-chart-3/20 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-chart-4" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Sesi Hari Ini</p>
-                <p className="text-xl font-bold text-foreground">{todaySchedule.length}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-                <CheckCircle className="w-5 h-5 text-secondary-foreground" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Selesai</p>
-                <p className="text-xl font-bold text-foreground">
-                  {aktivitasSesi.filter((j) => String(j.status_sesi || "").toUpperCase() === "SELESAI").length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+
 
       <Tabs defaultValue="jadwal" className="space-y-4">
         <TabsList className="bg-muted/50">
@@ -1341,8 +1297,8 @@ export default function GuruPanelPage() {
                             <TableCell>
                               <Badge variant="outline" className="bg-transparent">{item.status_sesi || "-"}</Badge>
                             </TableCell>
-                            <TableCell>{item.id_petugas_hadir || "-"}</TableCell>
-                            <TableCell>{item.id_petugas_pengganti || "-"}</TableCell>
+                            <TableCell>{item.id_petugas_hadir ? petugasLabelById.get(Number(item.id_petugas_hadir)) || `ID: ${item.id_petugas_hadir}` : "-"}</TableCell>
+                            <TableCell>{item.id_petugas_pengganti ? petugasLabelById.get(Number(item.id_petugas_pengganti)) || `ID: ${item.id_petugas_pengganti}` : "-"}</TableCell>
                             <TableCell className="text-right">
                               <Button variant="outline" size="sm" className="bg-transparent" onClick={() => handleOpenRiwayatDetail(item)}>
                                 <Eye className="w-4 h-4 mr-1" />
@@ -1709,24 +1665,45 @@ export default function GuruPanelPage() {
                     </div>
 
                     {!isGuruTidakHadirFlow ? (
-                      <div className="grid grid-cols-4 gap-4">
-                        <div className="text-center p-4 bg-primary/10 rounded-lg">
-                          <p className="text-2xl font-bold text-primary">{Object.values(attendanceData).filter((v) => v === "hadir").length}</p>
-                          <p className="text-sm text-muted-foreground">Hadir</p>
+                      <>
+                        <div className="grid grid-cols-4 gap-4">
+                          <div className="text-center p-4 bg-primary/10 rounded-lg">
+                            <p className="text-2xl font-bold text-primary">{Object.values(attendanceData).filter((v) => v === "hadir").length}</p>
+                            <p className="text-sm text-muted-foreground">Hadir</p>
+                          </div>
+                          <div className="text-center p-4 bg-chart-3/20 rounded-lg">
+                            <p className="text-2xl font-bold text-chart-4">{Object.values(attendanceData).filter((v) => v === "sakit").length}</p>
+                            <p className="text-sm text-muted-foreground">Sakit</p>
+                          </div>
+                          <div className="text-center p-4 bg-accent/20 rounded-lg">
+                            <p className="text-2xl font-bold text-accent">{Object.values(attendanceData).filter((v) => v === "izin").length}</p>
+                            <p className="text-sm text-muted-foreground">Izin</p>
+                          </div>
+                          <div className="text-center p-4 bg-destructive/10 rounded-lg">
+                            <p className="text-2xl font-bold text-destructive">{Object.values(attendanceData).filter((v) => v === "alfa").length}</p>
+                            <p className="text-sm text-muted-foreground">Alfa</p>
+                          </div>
                         </div>
-                        <div className="text-center p-4 bg-chart-3/20 rounded-lg">
-                          <p className="text-2xl font-bold text-chart-4">{Object.values(attendanceData).filter((v) => v === "sakit").length}</p>
-                          <p className="text-sm text-muted-foreground">Sakit</p>
-                        </div>
-                        <div className="text-center p-4 bg-accent/20 rounded-lg">
-                          <p className="text-2xl font-bold text-accent">{Object.values(attendanceData).filter((v) => v === "izin").length}</p>
-                          <p className="text-sm text-muted-foreground">Izin</p>
-                        </div>
-                        <div className="text-center p-4 bg-destructive/10 rounded-lg">
-                          <p className="text-2xl font-bold text-destructive">{Object.values(attendanceData).filter((v) => v === "alfa").length}</p>
-                          <p className="text-sm text-muted-foreground">Alfa</p>
-                        </div>
-                      </div>
+
+                        {(() => {
+                          const unfilledCount = santriList.length - Object.keys(attendanceData).length;
+                          if (unfilledCount > 0) {
+                            return (
+                              <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg flex gap-3">
+                                <AlertCircle className="w-5 h-5 text-destructive shrink-0 mt-0.5" />
+                                <div>
+                                  <h4 className="text-sm font-semibold text-destructive">Perhatian: {unfilledCount} Santri Belum Diabsen</h4>
+                                  <p className="text-sm text-destructive/90 mt-1">
+                                    Santri yang belum dipilih status kehadirannya akan otomatis dicatat sebagai <strong>ALFA</strong>. Pastikan Anda sudah mengecek semua santri sebelum mengirim presensi.
+                                  </p>
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null;
+                        })()}
+                      </>
+
                     ) : (
                       <div className="p-4 bg-destructive/5 border border-destructive/20 rounded-lg">
                         <p className="text-sm text-foreground">Mode guru tidak hadir aktif: sesi akan menunggu pengganti dan input santri dilewati.</p>

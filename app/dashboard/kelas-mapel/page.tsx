@@ -70,6 +70,7 @@ interface KelasOption {
   value: string
   label: string
   kodeUnit: string
+  tahunAjaran: string
 }
 
 interface TahunAjaranOption {
@@ -96,7 +97,7 @@ interface MapelOption {
 const defaultFormState: KelasMapelFormData = {
   kodeKelas: "",
   kodeMapel: "",
-  idPetugas: "none",
+  idPetugas: "",
   tahunAjaran: "",
   semester: "1",
   bukuAcuan: "",
@@ -214,7 +215,8 @@ export default function MapelPage() {
 
   const formMapelByUnit = useMemo(() => {
     if (formUnitFilter === "all") return mapelOptions
-    return mapelOptions.filter((option) => option.kodeUnit === formUnitFilter)
+    // Mapel dengan kodeUnit kosong (lintas unit) selalu ditampilkan
+    return mapelOptions.filter((option) => !option.kodeUnit || option.kodeUnit === formUnitFilter)
   }, [mapelOptions, formUnitFilter])
 
   const editKelasByUnit = useMemo(() => {
@@ -224,7 +226,8 @@ export default function MapelPage() {
 
   const editMapelByUnit = useMemo(() => {
     if (editUnitFilter === "all") return mapelOptions
-    return mapelOptions.filter((option) => option.kodeUnit === editUnitFilter)
+    // Mapel dengan kodeUnit kosong (lintas unit) selalu ditampilkan
+    return mapelOptions.filter((option) => !option.kodeUnit || option.kodeUnit === editUnitFilter)
   }, [mapelOptions, editUnitFilter])
 
   const kelasUnitMap = useMemo(() => {
@@ -232,6 +235,15 @@ export default function MapelPage() {
     for (const option of kelasOptions) {
       if (!option.value) continue
       map.set(option.value, option.kodeUnit)
+    }
+    return map
+  }, [kelasOptions])
+
+  const kelasTahunMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const option of kelasOptions) {
+      if (!option.value) continue
+      map.set(option.value, option.tahunAjaran)
     }
     return map
   }, [kelasOptions])
@@ -312,8 +324,11 @@ export default function MapelPage() {
         for (const item of kelasResult.data) {
           const kode = toText(item.kode_kelas).trim()
           const kodeUnit = toText(item.kode_unit || item.unit?.kode_unit).trim().toUpperCase()
+          const tahunAjaran = toText(
+            item.tahun_ajaran ?? item.tahun_ajaran_relasi?.kode_tahun ?? item.tahunAjaranRelasi?.kode_tahun,
+          ).trim()
           if (!kode) continue
-          kelas.push({ value: kode, label: toText(item.nama_kelas).trim() || kode, kodeUnit })
+          kelas.push({ value: kode, label: toText(item.nama_kelas).trim() || kode, kodeUnit, tahunAjaran })
 
           if (kodeUnit && !unitSeen.has(kodeUnit)) {
             unitSeen.add(kodeUnit)
@@ -382,7 +397,7 @@ export default function MapelPage() {
   useEffect(() => {
     if (!formData.kodeKelas) return
     if (!formKelasByUnit.some((option) => option.value === formData.kodeKelas)) {
-      setFormData((prev) => ({ ...prev, kodeKelas: "" }))
+      setFormData((prev) => ({ ...prev, kodeKelas: "", tahunAjaran: "" }))
     }
   }, [formData.kodeKelas, formKelasByUnit])
 
@@ -393,10 +408,20 @@ export default function MapelPage() {
     }
   }, [formData.kodeMapel, formMapelByUnit])
 
+  // Auto-fill tahun ajaran dari kelas yang dipilih (form tambah)
+  useEffect(() => {
+    if (!formData.kodeKelas) {
+      setFormData((prev) => (prev.tahunAjaran === "" ? prev : { ...prev, tahunAjaran: "" }))
+      return
+    }
+    const tahun = kelasTahunMap.get(formData.kodeKelas) || ""
+    setFormData((prev) => (prev.tahunAjaran === tahun ? prev : { ...prev, tahunAjaran: tahun }))
+  }, [formData.kodeKelas, kelasTahunMap])
+
   useEffect(() => {
     if (!editingFormData.kodeKelas) return
     if (!editKelasByUnit.some((option) => option.value === editingFormData.kodeKelas)) {
-      setEditingFormData((prev) => ({ ...prev, kodeKelas: "" }))
+      setEditingFormData((prev) => ({ ...prev, kodeKelas: "", tahunAjaran: "" }))
     }
   }, [editingFormData.kodeKelas, editKelasByUnit])
 
@@ -406,6 +431,13 @@ export default function MapelPage() {
       setEditingFormData((prev) => ({ ...prev, kodeMapel: "" }))
     }
   }, [editingFormData.kodeMapel, editMapelByUnit])
+
+  // Auto-fill tahun ajaran dari kelas yang dipilih (form edit)
+  useEffect(() => {
+    if (!isEditDialogOpen || !editingFormData.kodeKelas) return
+    const tahun = kelasTahunMap.get(editingFormData.kodeKelas) || ""
+    setEditingFormData((prev) => (prev.tahunAjaran === tahun ? prev : { ...prev, tahunAjaran: tahun }))
+  }, [isEditDialogOpen, editingFormData.kodeKelas, kelasTahunMap])
 
   const resetFilter = () => {
     setKeyword("")
@@ -447,7 +479,7 @@ export default function MapelPage() {
     setEditingFormData({
       kodeKelas: target.kodeKelas,
       kodeMapel: target.kodeMapel,
-      idPetugas: target.idPetugas ? String(target.idPetugas) : "none",
+      idPetugas: target.idPetugas ? String(target.idPetugas) : "",
       tahunAjaran: target.tahunAjaran,
       semester: target.semester === 2 ? "2" : "1",
       bukuAcuan: target.bukuAcuan,
@@ -459,10 +491,10 @@ export default function MapelPage() {
 
   const handleCreate = () => {
     const run = async () => {
-      if (!formData.kodeKelas || !formData.kodeMapel.trim() || !formData.tahunAjaran) {
+      if (!formData.kodeKelas || !formData.kodeMapel.trim() || !formData.tahunAjaran || !formData.idPetugas || formData.idPetugas === "none") {
         toast({
           title: "Validasi",
-          description: "Kode kelas, kode mapel, dan tahun ajaran wajib diisi.",
+          description: "Kode kelas, kode mapel, tahun ajaran, dan petugas wajib diisi.",
           variant: "destructive",
         })
         return
@@ -506,10 +538,10 @@ export default function MapelPage() {
   const handleUpdate = () => {
     const run = async () => {
       if (!editingId) return
-      if (!editingFormData.kodeKelas || !editingFormData.kodeMapel.trim() || !editingFormData.tahunAjaran) {
+      if (!editingFormData.kodeKelas || !editingFormData.kodeMapel.trim() || !editingFormData.tahunAjaran || !editingFormData.idPetugas || editingFormData.idPetugas === "none") {
         toast({
           title: "Validasi",
-          description: "Kode kelas, kode mapel, dan tahun ajaran wajib diisi.",
+          description: "Kode kelas, kode mapel, tahun ajaran, dan petugas wajib diisi.",
           variant: "destructive",
         })
         return
@@ -731,7 +763,9 @@ export default function MapelPage() {
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>Petugas</Label>
+                    <Label>
+                      Petugas <span className="text-destructive">*</span>
+                    </Label>
                     <Select
                       value={formData.idPetugas}
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, idPetugas: value }))}
@@ -740,7 +774,6 @@ export default function MapelPage() {
                         <SelectValue placeholder="Pilih petugas" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Tanpa Petugas</SelectItem>
                         {petugasOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
@@ -763,21 +796,15 @@ export default function MapelPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label>Tahun Ajaran</Label>
-                    <Select
-                      value={formData.tahunAjaran}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, tahunAjaran: value }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih tahun ajaran" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tahunOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={formData.tahunAjaran || ""}
+                      readOnly
+                      placeholder={formData.kodeKelas ? "Tidak tersedia" : "Pilih kelas dahulu"}
+                      className="bg-muted/50 cursor-not-allowed"
+                    />
+                    {formData.kodeKelas && !formData.tahunAjaran && (
+                      <p className="text-xs text-amber-600">Tahun ajaran tidak ditemukan untuk kelas ini.</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label>Semester</Label>
@@ -1244,16 +1271,17 @@ export default function MapelPage() {
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
-                <Label>Petugas</Label>
+                <Label>
+                  Petugas <span className="text-destructive">*</span>
+                </Label>
                 <Select
                   value={editingFormData.idPetugas}
                   onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, idPetugas: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih petugas" />
+                    <SelectValue placeholder="Pilih petugas (wajib)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Tanpa Petugas</SelectItem>
                     {petugasOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -1275,21 +1303,15 @@ export default function MapelPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="space-y-2">
                 <Label>Tahun Ajaran</Label>
-                <Select
-                  value={editingFormData.tahunAjaran}
-                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, tahunAjaran: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih tahun ajaran" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {tahunOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={editingFormData.tahunAjaran || ""}
+                  readOnly
+                  placeholder={editingFormData.kodeKelas ? "Tidak tersedia" : "Pilih kelas dahulu"}
+                  className="bg-muted/50 cursor-not-allowed"
+                />
+                {editingFormData.kodeKelas && !editingFormData.tahunAjaran && (
+                  <p className="text-xs text-amber-600">Tahun ajaran tidak ditemukan untuk kelas ini.</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Semester</Label>

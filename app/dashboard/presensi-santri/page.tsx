@@ -1,530 +1,509 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  UserCheck,
-  UserX,
-  Clock,
-  AlertCircle,
-  Search,
-  Filter,
-  Calendar,
-  Download,
-  MoreHorizontal,
-  CheckCircle,
-  XCircle,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { toast } from "@/components/ui/use-toast"
+import { Search, Download, Calendar, History, FileSpreadsheet, FileIcon as FilePdf, Eye, Check, CheckCircle, Clock } from "lucide-react"
+import { sesiAbsensiService, SesiAbsensiApiItem } from "@/lib/services/sesiabsensi.service"
 
-// Sample data
-const attendanceStats = [
-  { label: "Hadir", count: 1150, percentage: 92, icon: UserCheck, color: "bg-primary/10 text-primary" },
-  { label: "Sakit", count: 45, percentage: 4, icon: AlertCircle, color: "bg-chart-3/20 text-chart-3" },
-  { label: "Izin", count: 32, percentage: 3, icon: Clock, color: "bg-accent/20 text-accent" },
-  { label: "Alpha", count: 20, percentage: 1, icon: UserX, color: "bg-destructive/10 text-destructive" },
-]
-
-const kelasOptions = [
-  { value: "all", label: "Semua Kelas" },
-  { value: "7a", label: "Kelas 7A" },
-  { value: "7b", label: "Kelas 7B" },
-  { value: "8a", label: "Kelas 8A" },
-  { value: "8b", label: "Kelas 8B" },
-  { value: "9a", label: "Kelas 9A" },
-  { value: "9b", label: "Kelas 9B" },
-]
-
-const mapelOptions = [
-  { value: "all", label: "Semua Mapel" },
-  { value: "quran", label: "Tahfidz Al-Quran" },
-  { value: "fiqih", label: "Fiqih" },
-  { value: "hadits", label: "Hadits" },
-  { value: "arab", label: "Bahasa Arab" },
-  { value: "math", label: "Matematika" },
-  { value: "ipa", label: "IPA" },
-]
-
-const jenjangOptions = [
-  { value: "all", label: "Semua Jenjang" },
-  { value: "paud", label: "PAUD" },
-  { value: "tk", label: "TK" },
-  { value: "sd", label: "SD" },
-  { value: "smp", label: "SMP" },
-  { value: "sma", label: "SMA" },
-]
-
-const santriAttendance = [
-  { id: 1, nis: "2024001", name: "Ahmad Fauzi", kelas: "9A", jenjang: "SMP", mapel: "Tahfidz Al-Quran", tanggal: "30 Jan 2025", status: "hadir", jam: "07:15", guru: "Ustadz Ahmad" },
-  { id: 2, nis: "2024002", name: "Siti Aisyah", kelas: "9A", jenjang: "SMP", mapel: "Tahfidz Al-Quran", tanggal: "30 Jan 2025", status: "hadir", jam: "07:10", guru: "Ustadz Ahmad" },
-  { id: 3, nis: "2024003", name: "Muhammad Rizki", kelas: "9A", jenjang: "SMP", mapel: "Tahfidz Al-Quran", tanggal: "30 Jan 2025", status: "sakit", jam: "-", guru: "Ustadz Ahmad" },
-  { id: 4, nis: "2024004", name: "Fatimah Zahra", kelas: "9A", jenjang: "SMP", mapel: "Fiqih", tanggal: "30 Jan 2025", status: "izin", jam: "-", guru: "Ustadzah Fatimah" },
-  { id: 5, nis: "2024005", name: "Ibrahim Hasan", kelas: "8A", jenjang: "SMP", mapel: "Bahasa Arab", tanggal: "30 Jan 2025", status: "hadir", jam: "07:20", guru: "Ustadz Ibrahim" },
-  { id: 6, nis: "2024006", name: "Khadijah Amina", kelas: "8A", jenjang: "SMP", mapel: "Bahasa Arab", tanggal: "30 Jan 2025", status: "alpha", jam: "-", guru: "Ustadz Ibrahim" },
-  { id: 7, nis: "2024007", name: "Umar Abdullah", kelas: "7A", jenjang: "SMP", mapel: "Hadits", tanggal: "30 Jan 2025", status: "hadir", jam: "07:05", guru: "Ustadz Umar" },
-  { id: 8, nis: "2024008", name: "Zainab Putri", kelas: "7A", jenjang: "SMP", mapel: "Hadits", tanggal: "30 Jan 2025", status: "hadir", jam: "07:08", guru: "Ustadz Umar" },
-  { id: 9, nis: "2024009", name: "Yusuf Hidayat", kelas: "12A", jenjang: "SMA", mapel: "Matematika", tanggal: "30 Jan 2025", status: "hadir", jam: "07:12", guru: "Pak Budi" },
-  { id: 10, nis: "2024010", name: "Maryam Salma", kelas: "12A", jenjang: "SMA", mapel: "Matematika", tanggal: "30 Jan 2025", status: "sakit", jam: "-", guru: "Pak Budi" },
-]
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "hadir":
-      return <Badge className="bg-primary/10 text-primary border-0">Hadir</Badge>
-    case "sakit":
-      return <Badge className="bg-chart-3/20 text-chart-4 border-0">Sakit</Badge>
-    case "izin":
-      return <Badge className="bg-accent/20 text-accent border-0">Izin</Badge>
-    case "alpha":
-      return <Badge className="bg-destructive/10 text-destructive border-0">Alpha</Badge>
-    default:
-      return <Badge variant="outline">-</Badge>
-  }
+interface RekapSantriRow {
+  nomor_induk: string
+  nama_lengkap_santri: string
+  kode_kelas: string
+  nama_kelas: string
+  total_pertemuan: number
+  jumlah_hadir: number
+  jumlah_izin: number
+  jumlah_sakit: number
+  jumlah_alfa: number
+  persentase_kehadiran: number
 }
 
-const getInitials = (name: string) => {
-  return name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase()
-}
+type SantriStatus = "hadir" | "izin" | "sakit" | "alfa"
 
 export default function PresensiSantriPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedMapel, setSelectedMapel] = useState("all")
-  const [selectedJenjang, setSelectedJenjang] = useState("all")
-  const [selectedDate, setSelectedDate] = useState("2025-01-30")
-  const [isInputDialogOpen, setIsInputDialogOpen] = useState(false)
-  const [selectedSantri, setSelectedSantri] = useState<typeof santriAttendance[0] | null>(null)
-
-  const filteredData = santriAttendance.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         item.nis.includes(searchQuery)
-    const matchesKelas = selectedKelas === "all" || item.kelas.toLowerCase().replace(" ", "") === selectedKelas
-    const matchesMapel = selectedMapel === "all" || item.mapel.toLowerCase().includes(selectedMapel)
-    const matchesJenjang = selectedJenjang === "all" || item.jenjang.toLowerCase() === selectedJenjang
-    return matchesSearch && matchesKelas && matchesMapel && matchesJenjang
+  const [activeTab, setActiveTab] = useState("rekap")
+  
+  // States for Rekap
+  const [rekapRows, setRekapRows] = useState<RekapSantriRow[]>([])
+  const [rekapLoading, setRekapLoading] = useState(false)
+  const [filterRekap, setFilterRekap] = useState({
+    tanggal_mulai: "",
+    tanggal_selesai: "",
+    q: "",
+    kode_kelas: "",
   })
+
+  // States for Riwayat Sesi
+  const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
+  const [sesiLoading, setSesiLoading] = useState(false)
+  const [filterSesi, setFilterSesi] = useState({
+    tanggal: "",
+    status_sesi: "SELESAI",
+    q: "",
+  })
+
+  // States for Edit Absensi Santri (Admin)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedSesi, setSelectedSesi] = useState<SesiAbsensiApiItem | null>(null)
+  const [santriList, setSantriList] = useState<any[]>([])
+  const [attendanceData, setAttendanceData] = useState<Record<string, SantriStatus>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
+
+  // Initialization
+  useEffect(() => {
+    loadRekap()
+    loadRiwayatSesi()
+  }, [])
+
+  const loadRekap = async () => {
+    setRekapLoading(true)
+    try {
+      const response = await sesiAbsensiService.rekapSantri({
+        ...filterRekap,
+        per_page: 100
+      })
+      setRekapRows(response?.data || [])
+    } catch (error: any) {
+      toast({
+        title: "Gagal memuat rekap",
+        description: error?.response?.data?.message || "Terjadi kesalahan.",
+        variant: "destructive",
+      })
+    } finally {
+      setRekapLoading(false)
+    }
+  }
+
+  const loadRiwayatSesi = async () => {
+    setSesiLoading(true)
+    try {
+      const response = await sesiAbsensiService.getAll({
+        ...filterSesi,
+        per_page: 100
+      })
+      setSesiRows(response as SesiAbsensiApiItem[])
+    } catch (error: any) {
+      toast({
+        title: "Gagal memuat riwayat",
+        description: error?.response?.data?.message || "Terjadi kesalahan.",
+        variant: "destructive",
+      })
+    } finally {
+      setSesiLoading(false)
+    }
+  }
+
+  const handleApplyFilterRekap = () => {
+    loadRekap()
+  }
+
+  const handleApplyFilterSesi = () => {
+    loadRiwayatSesi()
+  }
+
+  const handleExport = (format: 'pdf' | 'excel') => {
+    const url = sesiAbsensiService.getExportSantriUrl(format, filterRekap)
+    window.open(url, '_blank')
+  }
+
+  const openEditModal = async (sesi: SesiAbsensiApiItem) => {
+    setSelectedSesi(sesi)
+    setIsEditModalOpen(true)
+    setIsLoadingSantri(true)
+    
+    try {
+      // Get detailed session info including santri
+      const detail = await sesiAbsensiService.getById(sesi.id_sesi || sesi.id || 0)
+      if (detail && detail.absensi_santri) {
+        setSantriList(detail.absensi_santri)
+        
+        // Populate initial attendance data
+        const initialData: Record<string, SantriStatus> = {}
+        detail.absensi_santri.forEach((s: any) => {
+          if (s.status_kehadiran) {
+            initialData[s.nomor_induk] = s.status_kehadiran.toLowerCase() as SantriStatus
+          }
+        })
+        setAttendanceData(initialData)
+      } else {
+        setSantriList([])
+      }
+    } catch (error: any) {
+      toast({
+        title: "Gagal memuat detail sesi",
+        description: error?.response?.data?.message || "Terjadi kesalahan.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoadingSantri(false)
+    }
+  }
+
+  const handleSaveEdit = async () => {
+    if (!selectedSesi?.id_sesi) return
+
+    setIsSubmitting(true)
+    try {
+      const payload = {
+        absensi: Object.entries(attendanceData).map(([nomor_induk, status]) => ({
+          nomor_induk,
+          status_kehadiran: status.toUpperCase() as "HADIR" | "IZIN" | "SAKIT" | "ALFA",
+        }))
+      }
+
+      await sesiAbsensiService.adminUpsertAbsensiSantri(selectedSesi.id_sesi, payload)
+      
+      toast({
+        title: "Berhasil",
+        description: "Data absensi santri berhasil diperbarui.",
+      })
+      
+      setIsEditModalOpen(false)
+      loadRekap() // refresh rekap data since attendance might have changed
+    } catch (error: any) {
+      toast({
+        title: "Gagal menyimpan",
+        description: error?.response?.data?.message || "Terjadi kesalahan.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteSesi = async (idSesi: number) => {
+    if (!confirm("Apakah Anda yakin ingin membatalkan (menghapus) semua absensi pada sesi ini?")) return
+    
+    // In our backend design, we don't have an endpoint to delete an entire session easily,
+    // but we can "Cancel" it using the teacher endpoint, or the admin can manage it.
+    // Since the instruction didn't specify a delete *session* endpoint, we'll just allow editing.
+    toast({
+      title: "Info",
+      description: "Untuk mengubah absensi, silakan klik tombol Edit.",
+    })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const s = status?.toUpperCase()
+    if (s === "HADIR") return <Badge className="bg-primary/10 text-primary border-0">Hadir</Badge>
+    if (s === "SAKIT") return <Badge className="bg-chart-3/20 text-chart-4 border-0">Sakit</Badge>
+    if (s === "IZIN") return <Badge className="bg-accent/20 text-accent border-0">Izin</Badge>
+    if (s === "ALFA") return <Badge className="bg-destructive/10 text-destructive border-0">Alfa</Badge>
+    if (s === "SELESAI") return <Badge className="bg-emerald-500/15 text-emerald-700 border-0">Selesai</Badge>
+    if (s === "BATAL") return <Badge className="bg-destructive/10 text-destructive border-0">Batal</Badge>
+    return <Badge variant="outline">{status}</Badge>
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Presensi Santri</h1>
-          <p className="text-muted-foreground">Kelola kehadiran santri per mata pelajaran</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" className="bg-transparent">
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Dialog open={isInputDialogOpen} onOpenChange={setIsInputDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary text-primary-foreground hover:bg-primary/90">
-                <UserCheck className="w-4 h-4 mr-2" />
-                Input Presensi
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Input Presensi Santri</DialogTitle>
-                <DialogDescription>
-                  Pilih kelas dan mata pelajaran untuk input presensi
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="input-tanggal">Tanggal</Label>
-                    <Input id="input-tanggal" type="date" defaultValue="2025-01-30" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="input-jam">Jam Pelajaran</Label>
-                    <Select defaultValue="1">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih jam" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Jam ke-1 (07:00 - 07:45)</SelectItem>
-                        <SelectItem value="2">Jam ke-2 (07:45 - 08:30)</SelectItem>
-                        <SelectItem value="3">Jam ke-3 (08:30 - 09:15)</SelectItem>
-                        <SelectItem value="4">Jam ke-4 (09:30 - 10:15)</SelectItem>
-                        <SelectItem value="5">Jam ke-5 (10:15 - 11:00)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="input-jenjang">Jenjang</Label>
-                    <Select defaultValue="smp">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih jenjang" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="paud">PAUD</SelectItem>
-                        <SelectItem value="tk">TK</SelectItem>
-                        <SelectItem value="sd">SD</SelectItem>
-                        <SelectItem value="smp">SMP</SelectItem>
-                        <SelectItem value="sma">SMA</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="input-kelas">Kelas</Label>
-                    <Select defaultValue="9a">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih kelas" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="7a">Kelas 7A</SelectItem>
-                        <SelectItem value="7b">Kelas 7B</SelectItem>
-                        <SelectItem value="8a">Kelas 8A</SelectItem>
-                        <SelectItem value="8b">Kelas 8B</SelectItem>
-                        <SelectItem value="9a">Kelas 9A</SelectItem>
-                        <SelectItem value="9b">Kelas 9B</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="input-mapel">Mata Pelajaran</Label>
-                  <Select defaultValue="quran">
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih mata pelajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="quran">Tahfidz Al-Quran</SelectItem>
-                      <SelectItem value="fiqih">Fiqih</SelectItem>
-                      <SelectItem value="hadits">Hadits</SelectItem>
-                      <SelectItem value="arab">Bahasa Arab</SelectItem>
-                      <SelectItem value="math">Matematika</SelectItem>
-                      <SelectItem value="ipa">IPA</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Mini attendance input table */}
-                <div className="border rounded-lg overflow-hidden mt-2">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="w-12">No</TableHead>
-                        <TableHead>Nama Santri</TableHead>
-                        <TableHead className="text-center w-20">Hadir</TableHead>
-                        <TableHead className="text-center w-20">Sakit</TableHead>
-                        <TableHead className="text-center w-20">Izin</TableHead>
-                        <TableHead className="text-center w-20">Alpha</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {[
-                        { no: 1, name: "Ahmad Fauzi" },
-                        { no: 2, name: "Siti Aisyah" },
-                        { no: 3, name: "Muhammad Rizki" },
-                      ].map((s) => (
-                        <TableRow key={s.no}>
-                          <TableCell className="text-muted-foreground">{s.no}</TableCell>
-                          <TableCell className="font-medium text-foreground">{s.name}</TableCell>
-                          <TableCell className="text-center">
-                            <input type="radio" name={`status-${s.no}`} defaultChecked className="w-4 h-4 accent-primary" />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <input type="radio" name={`status-${s.no}`} className="w-4 h-4 accent-chart-3" />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <input type="radio" name={`status-${s.no}`} className="w-4 h-4 accent-accent" />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <input type="radio" name={`status-${s.no}`} className="w-4 h-4 accent-destructive" />
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" className="bg-transparent" onClick={() => setIsInputDialogOpen(false)}>
-                  Batal
-                </Button>
-                <Button className="bg-primary text-primary-foreground" onClick={() => setIsInputDialogOpen(false)}>
-                  Simpan Presensi
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <h1 className="text-2xl font-bold text-foreground">Kelola Presensi Santri</h1>
+          <p className="text-muted-foreground">Admin panel untuk melihat rekapitulasi dan mengelola absensi santri.</p>
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {attendanceStats.map((stat) => (
-          <Card key={stat.label} className="border-border/50">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className="text-2xl font-bold text-foreground mt-1">{stat.count}</p>
-                </div>
-                <div className={`w-10 h-10 rounded-lg ${stat.color} flex items-center justify-center`}>
-                  <stat.icon className="w-5 h-5" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <TabsList className="bg-muted/50">
+          <TabsTrigger value="rekap" className="data-[state=active]:bg-card">
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Rekap Santri
+          </TabsTrigger>
+          <TabsTrigger value="riwayat" className="data-[state=active]:bg-card">
+            <History className="w-4 h-4 mr-2" />
+            Riwayat Sesi (Edit)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="rekap" className="space-y-4">
+          <Card className="border-border/50">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <CardTitle className="text-lg">Rekap Kehadiran Santri</CardTitle>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input
+                    type="date"
+                    value={filterRekap.tanggal_mulai}
+                    onChange={(e) => setFilterRekap({ ...filterRekap, tanggal_mulai: e.target.value })}
+                    className="w-36"
+                  />
+                  <span className="text-muted-foreground">-</span>
+                  <Input
+                    type="date"
+                    value={filterRekap.tanggal_selesai}
+                    onChange={(e) => setFilterRekap({ ...filterRekap, tanggal_selesai: e.target.value })}
+                    className="w-36"
+                  />
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Cari NIS/Nama..."
+                      className="pl-9 w-40"
+                      value={filterRekap.q}
+                      onChange={(e) => setFilterRekap({ ...filterRekap, q: e.target.value })}
+                    />
+                  </div>
+                  <Input
+                    type="text"
+                    placeholder="Kode Kelas (Unit/Kelas)"
+                    className="w-44"
+                    value={filterRekap.kode_kelas}
+                    onChange={(e) => setFilterRekap({ ...filterRekap, kode_kelas: e.target.value })}
+                  />
+                  <Button variant="secondary" onClick={handleApplyFilterRekap}>Filter</Button>
+                  
+                  <div className="flex items-center gap-2 border-l pl-2 ml-2">
+                    <Button variant="outline" className="gap-2" onClick={() => handleExport('excel')}>
+                      <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Excel
+                    </Button>
+                    <Button variant="outline" className="gap-2" onClick={() => handleExport('pdf')}>
+                      <FilePdf className="w-4 h-4 text-destructive" /> PDF
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="mt-3">
-                <div className="h-2 bg-muted rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full ${stat.label === "Hadir" ? "bg-primary" : stat.label === "Sakit" ? "bg-chart-3" : stat.label === "Izin" ? "bg-accent" : "bg-destructive"}`}
-                    style={{ width: `${stat.percentage}%` }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">{stat.percentage}% dari total</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead>NIS</TableHead>
+                      <TableHead>Nama Santri</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead className="text-center">Total</TableHead>
+                      <TableHead className="text-center">Hadir</TableHead>
+                      <TableHead className="text-center">Izin</TableHead>
+                      <TableHead className="text-center">Sakit</TableHead>
+                      <TableHead className="text-center">Alfa</TableHead>
+                      <TableHead className="text-right">% Kehadiran</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {rekapLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Memuat data rekap...</TableCell>
+                      </TableRow>
+                    ) : rekapRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Tidak ada data rekap ditemukan.</TableCell>
+                      </TableRow>
+                    ) : (
+                      rekapRows.map((row) => (
+                        <TableRow key={row.nomor_induk} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">{row.nomor_induk}</TableCell>
+                          <TableCell>{row.nama_lengkap_santri}</TableCell>
+                          <TableCell>{row.kode_kelas} {row.nama_kelas ? `(${row.nama_kelas})` : ''}</TableCell>
+                          <TableCell className="text-center">{row.total_pertemuan}</TableCell>
+                          <TableCell className="text-center text-emerald-600 font-medium">{row.jumlah_hadir}</TableCell>
+                          <TableCell className="text-center">{row.jumlah_izin}</TableCell>
+                          <TableCell className="text-center">{row.jumlah_sakit}</TableCell>
+                          <TableCell className="text-center text-destructive font-medium">{row.jumlah_alfa}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="outline" className={row.persentase_kehadiran >= 80 ? 'text-emerald-600 border-emerald-200' : 'text-destructive border-destructive/30'}>
+                              {row.persentase_kehadiran}%
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </TabsContent>
 
-      {/* Filters */}
-      <Card className="border-border/50">
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Cari nama atau NIS santri..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-muted-foreground" />
-                <Input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-40"
-                />
+        <TabsContent value="riwayat" className="space-y-4">
+          <Card className="border-border/50">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg">Riwayat Sesi Absensi</CardTitle>
+                  <CardDescription>Klik Edit untuk mengubah kehadiran santri pada sesi yang sudah selesai.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={filterSesi.tanggal}
+                    onChange={(e) => setFilterSesi({ ...filterSesi, tanggal: e.target.value })}
+                    className="w-40"
+                  />
+                  <Select value={filterSesi.status_sesi} onValueChange={(val) => setFilterSesi({ ...filterSesi, status_sesi: val })}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Status</SelectItem>
+                      <SelectItem value="SELESAI">Selesai</SelectItem>
+                      <SelectItem value="BATAL">Batal</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      type="text"
+                      placeholder="Cari Mapel/Kelas..."
+                      className="pl-9 w-40"
+                      value={filterSesi.q}
+                      onChange={(e) => setFilterSesi({ ...filterSesi, q: e.target.value })}
+                    />
+                  </div>
+                  <Button variant="secondary" onClick={handleApplyFilterSesi}>Tampilkan</Button>
+                </div>
               </div>
-              <Select value={selectedJenjang} onValueChange={setSelectedJenjang}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Jenjang" />
-                </SelectTrigger>
-                <SelectContent>
-                  {jenjangOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedKelas} onValueChange={setSelectedKelas}>
-                <SelectTrigger className="w-36">
-                  <SelectValue placeholder="Kelas" />
-                </SelectTrigger>
-                <SelectContent>
-                  {kelasOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedMapel} onValueChange={setSelectedMapel}>
-                <SelectTrigger className="w-44">
-                  <SelectValue placeholder="Mata Pelajaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  {mapelOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead>ID Sesi</TableHead>
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Mapel</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead>Status Sesi</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sesiLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Memuat riwayat sesi...</TableCell>
+                      </TableRow>
+                    ) : sesiRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Tidak ada sesi ditemukan.</TableCell>
+                      </TableRow>
+                    ) : (
+                      sesiRows.map((sesi) => (
+                        <TableRow key={sesi.id_sesi || sesi.id} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">#{sesi.id_sesi || sesi.id}</TableCell>
+                          <TableCell>{sesi.tanggal} <span className="text-xs text-muted-foreground ml-1">({sesi.hari})</span></TableCell>
+                          <TableCell>{sesi.mapel || sesi.mata_pelajaran || (sesi.jadwal as any)?.kelas_mapel?.mata_pelajaran?.nama_mapel || (sesi.jadwal as any)?.kelasMapel?.mataPelajaran?.nama_mapel || "-"}</TableCell>
+                          <TableCell>{sesi.kelas || sesi.kode_kelas || (sesi.jadwal as any)?.kelas_mapel?.kelas?.nama_kelas || (sesi.jadwal as any)?.kelasMapel?.kelas?.nama_kelas || "-"}</TableCell>
+                          <TableCell>{getStatusBadge(sesi.status_sesi || "")}</TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-primary hover:text-primary hover:bg-primary/10 bg-transparent border-primary/20"
+                              onClick={() => openEditModal(sesi)}
+                            >
+                              Edit Absensi Santri
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Attendance Table */}
-      <Card className="border-border/50">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-lg text-foreground">Data Presensi Santri</CardTitle>
-              <CardDescription>Menampilkan {filteredData.length} data presensi</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="w-12">No</TableHead>
-                  <TableHead>Santri</TableHead>
-                  <TableHead>Kelas</TableHead>
-                  <TableHead>Mata Pelajaran</TableHead>
-                  <TableHead>Tanggal</TableHead>
-                  <TableHead>Jam Masuk</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Guru</TableHead>
-                  <TableHead className="w-12" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.map((item, index) => (
-                  <TableRow key={item.id} className="hover:bg-muted/30">
-                    <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                            {getInitials(item.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="font-medium text-foreground">{item.name}</p>
-                          <p className="text-xs text-muted-foreground">{item.nis}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-foreground">{item.kelas}</p>
-                        <p className="text-xs text-muted-foreground">{item.jenjang}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-foreground">{item.mapel}</TableCell>
-                    <TableCell className="text-muted-foreground">{item.tanggal}</TableCell>
-                    <TableCell className="text-muted-foreground">{item.jam}</TableCell>
-                    <TableCell>{getStatusBadge(item.status)}</TableCell>
-                    <TableCell className="text-muted-foreground">{item.guru}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedSantri(item)}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            Detail
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <CheckCircle className="w-4 h-4 mr-2" />
-                            Edit Status
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          <div className="flex items-center justify-between px-4 py-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">
-              Menampilkan 1-{filteredData.length} dari {filteredData.length} data
-            </p>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" className="h-8 w-8 bg-transparent" disabled>
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 w-8 bg-primary text-primary-foreground border-primary">
-                1
-              </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8 bg-transparent" disabled>
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Detail Dialog */}
-      <Dialog open={!!selectedSantri} onOpenChange={() => setSelectedSantri(null)}>
-        <DialogContent>
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Detail Presensi</DialogTitle>
+            <DialogTitle>Edit Absensi Santri</DialogTitle>
+            <DialogDescription>
+              Ubah data kehadiran santri untuk Sesi #{selectedSesi?.id_sesi} - {selectedSesi?.mapel} ({selectedSesi?.kelas})
+            </DialogDescription>
           </DialogHeader>
-          {selectedSantri && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="w-16 h-16">
-                  <AvatarFallback className="bg-primary/10 text-primary text-lg">
-                    {getInitials(selectedSantri.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold text-lg text-foreground">{selectedSantri.name}</h3>
-                  <p className="text-muted-foreground">NIS: {selectedSantri.nis}</p>
-                </div>
+
+          <div className="flex-1 overflow-y-auto py-4">
+            {isLoadingSantri ? (
+              <div className="flex items-center justify-center py-12">
+                <Clock className="w-8 h-8 animate-spin text-muted-foreground" />
               </div>
-              <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
-                <div>
-                  <p className="text-sm text-muted-foreground">Kelas</p>
-                  <p className="font-medium text-foreground">{selectedSantri.kelas} - {selectedSantri.jenjang}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Mata Pelajaran</p>
-                  <p className="font-medium text-foreground">{selectedSantri.mapel}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Tanggal</p>
-                  <p className="font-medium text-foreground">{selectedSantri.tanggal}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Jam Masuk</p>
-                  <p className="font-medium text-foreground">{selectedSantri.jam}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  {getStatusBadge(selectedSantri.status)}
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Guru Pengampu</p>
-                  <p className="font-medium text-foreground">{selectedSantri.guru}</p>
-                </div>
-              </div>
-            </div>
-          )}
+            ) : santriList.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Tidak ada data santri untuk sesi ini.</p>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>NIS</TableHead>
+                    <TableHead>Nama Santri</TableHead>
+                    <TableHead>Hadir</TableHead>
+                    <TableHead>Sakit</TableHead>
+                    <TableHead>Izin</TableHead>
+                    <TableHead>Alfa</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {santriList.map((s) => {
+                    const status = attendanceData[s.nomor_induk] || "alfa"
+                    return (
+                      <TableRow key={s.nomor_induk}>
+                        <TableCell className="text-muted-foreground">{s.nomor_induk}</TableCell>
+                        <TableCell className="font-medium">{s.santri?.nama_lengkap_santri || s.nomor_induk}</TableCell>
+                        <TableCell>
+                          <input 
+                            type="radio" 
+                            name={`status-${s.nomor_induk}`} 
+                            checked={status === "hadir"}
+                            onChange={() => setAttendanceData(prev => ({...prev, [s.nomor_induk]: "hadir"}))}
+                            className="w-4 h-4 accent-primary cursor-pointer" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <input 
+                            type="radio" 
+                            name={`status-${s.nomor_induk}`} 
+                            checked={status === "sakit"}
+                            onChange={() => setAttendanceData(prev => ({...prev, [s.nomor_induk]: "sakit"}))}
+                            className="w-4 h-4 accent-chart-3 cursor-pointer" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <input 
+                            type="radio" 
+                            name={`status-${s.nomor_induk}`} 
+                            checked={status === "izin"}
+                            onChange={() => setAttendanceData(prev => ({...prev, [s.nomor_induk]: "izin"}))}
+                            className="w-4 h-4 accent-accent cursor-pointer" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <input 
+                            type="radio" 
+                            name={`status-${s.nomor_induk}`} 
+                            checked={status === "alfa"}
+                            onChange={() => setAttendanceData(prev => ({...prev, [s.nomor_induk]: "alfa"}))}
+                            className="w-4 h-4 accent-destructive cursor-pointer" 
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 pt-4 border-t">
+            <Button variant="outline" className="bg-transparent" onClick={() => setIsEditModalOpen(false)}>
+              Batal
+            </Button>
+            <Button className="bg-primary text-primary-foreground" onClick={handleSaveEdit} disabled={isSubmitting || isLoadingSantri}>
+              {isSubmitting ? "Menyimpan..." : "Simpan Perubahan"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

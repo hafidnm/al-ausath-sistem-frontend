@@ -81,6 +81,31 @@ export interface CancelSesiPayload {
   keterangan?: string
 }
 
+export interface AdminBukaSesiPayload {
+  id_jadwal: number
+  tanggal?: string
+  id_petugas_hadir?: number
+  status_kehadiran?: "HADIR" | "IZIN" | "SAKIT"
+  menit_terlambat?: number
+  catat_absensi_pengajar?: boolean
+  keterangan?: string
+}
+
+export interface AdminUpsertAbsensiPengajarPayload {
+  id_petugas: number
+  status_kehadiran: "HADIR" | "IZIN" | "SAKIT"
+  menit_terlambat?: number
+  keterangan?: string
+}
+
+export interface AdminUpsertAbsensiSantriPayload {
+  absensi: Array<{
+    nomor_induk: string
+    status_kehadiran: "HADIR" | "IZIN" | "SAKIT" | "ALFA"
+    keterangan?: string
+  }>
+}
+
 const SESI_ABSENSI_BASE_PATH = "/akademik/sesi-absensi"
 
 const extractList = (payload: unknown): SesiAbsensiApiItem[] => {
@@ -152,5 +177,53 @@ export const sesiAbsensiService = {
   async rekapPetugas(params?: Record<string, string | number | boolean>) {
     const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/rekap/petugas`, { params })
     return response.data
+  },
+
+  // --- Admin Endpoints ---
+
+  async adminBukaSesi(payload: AdminBukaSesiPayload) {
+    const response = await api.post<{ data?: SesiAbsensiApiItem }>(`/akademik/admin/buka-sesi`, payload)
+    return response.data
+  },
+
+  async adminUpsertAbsensiPengajar(idSesi: number, payload: AdminUpsertAbsensiPengajarPayload) {
+    const response = await api.put<{ data?: unknown }>(`${SESI_ABSENSI_BASE_PATH}/${idSesi}/admin/absensi-petugas`, payload)
+    return response.data
+  },
+
+  async adminDeleteAbsensiPengajar(idSesi: number, idPetugas: number) {
+    const response = await api.delete(`${SESI_ABSENSI_BASE_PATH}/${idSesi}/admin/absensi-petugas`, {
+      data: { id_petugas: idPetugas }
+    })
+    return response.data
+  },
+
+  async adminUpsertAbsensiSantri(idSesi: number, payload: AdminUpsertAbsensiSantriPayload) {
+    const response = await api.put<{ data?: unknown }>(`${SESI_ABSENSI_BASE_PATH}/${idSesi}/admin/absensi-santri`, payload)
+    return response.data
+  },
+
+  async adminDeleteAbsensiSantri(idSesi: number, nomorInduk: string) {
+    const response = await api.delete(`${SESI_ABSENSI_BASE_PATH}/${idSesi}/admin/absensi-santri`, {
+      data: { nomor_induk: nomorInduk }
+    })
+    return response.data
+  },
+
+  // --- Export URL Helpers ---
+
+  getExportSantriUrl(format: 'pdf' | 'excel', params?: Record<string, string>) {
+    const query = new URLSearchParams({ format, ...params }).toString()
+    return `${api.defaults.baseURL}${SESI_ABSENSI_BASE_PATH}/rekap/santri/export?${query}`
+  },
+
+  getExportKelasUrl(format: 'pdf' | 'excel', params?: Record<string, string>) {
+    const query = new URLSearchParams({ format, ...params }).toString()
+    return `${api.defaults.baseURL}${SESI_ABSENSI_BASE_PATH}/rekap/kelas/export?${query}`
+  },
+
+  getExportPetugasUrl(format: 'pdf' | 'excel', params?: Record<string, string>) {
+    const query = new URLSearchParams({ format, ...params }).toString()
+    return `${api.defaults.baseURL}${SESI_ABSENSI_BASE_PATH}/rekap/petugas/export?${query}`
   },
 }

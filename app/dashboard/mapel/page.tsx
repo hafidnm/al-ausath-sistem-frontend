@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
@@ -323,10 +323,10 @@ export default function MapelPage() {
 
   const handleCreate = () => {
     const run = async () => {
-      if (!formData.kodeMapel.trim() || !formData.namaMapel.trim()) {
+      if (!formData.kodeMapel.trim() || !formData.namaMapel.trim() || !formData.kodeUnit) {
         toast({
           title: "Validasi",
-          description: "Kode mapel dan nama mapel wajib diisi.",
+          description: "Kode mapel, nama mapel, dan kode unit wajib diisi.",
           variant: "destructive",
         })
         return
@@ -372,10 +372,10 @@ export default function MapelPage() {
   const handleUpdate = () => {
     const run = async () => {
       if (!editingId) return
-      if (!editingFormData.kodeMapel.trim() || !editingFormData.namaMapel.trim()) {
+      if (!editingFormData.kodeMapel.trim() || !editingFormData.namaMapel.trim() || !editingFormData.kodeUnit) {
         toast({
           title: "Validasi",
-          description: "Kode mapel dan nama mapel wajib diisi.",
+          description: "Kode mapel, nama mapel, dan kode unit wajib diisi.",
           variant: "destructive",
         })
         return
@@ -573,16 +573,17 @@ export default function MapelPage() {
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-2">
-                    <Label>Kode Unit</Label>
+                    <Label>
+                      Kode Unit <span className="text-destructive">*</span>
+                    </Label>
                     <Select
-                      value={formData.kodeUnit || "none"}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value === "none" ? null : value }))}
+                      value={formData.kodeUnit || ""}
+                      onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value || null }))}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Pilih unit" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Tanpa Unit</SelectItem>
                         {unitOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.value} - {option.label}
@@ -969,21 +970,22 @@ export default function MapelPage() {
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <div className="space-y-2">
-                <Label>Kode Unit</Label>
+                <Label>
+                  Kode Unit <span className="text-destructive">*</span>
+                </Label>
                 <Select
-                  value={editingFormData.kodeUnit || "none"}
+                  value={editingFormData.kodeUnit || ""}
                   onValueChange={(value) =>
                     setEditingFormData((prev) => ({
                       ...prev,
-                      kodeUnit: value === "none" ? null : value,
+                      kodeUnit: value || null,
                     }))
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih unit" />
+                    <SelectValue placeholder="Pilih unit (wajib)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Tanpa Unit</SelectItem>
                     {unitOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.value} - {option.label}
