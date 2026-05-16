@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Eye, Trash2 } from "lucide-react"
+import { Eye, Trash2, Pencil } from "lucide-react"
 import { NilaiMapelItem } from "@/lib/services/nilai-mapel.service"
 
 interface NilaiMapelTableProps {
@@ -29,10 +29,11 @@ interface NilaiMapelTableProps {
   isLoading?: boolean
   error?: string
   onDetail?: (item: NilaiMapelItem) => void
+  onEdit?: (item: NilaiMapelItem) => void
   onDelete?: (id: number) => void
 }
 
-export function NilaiMapelTable({ items, isLoading = false, error, onDetail, onDelete }: NilaiMapelTableProps) {
+export function NilaiMapelTable({ items, isLoading = false, error, onDetail, onEdit, onDelete }: NilaiMapelTableProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
 
@@ -124,6 +125,16 @@ export function NilaiMapelTable({ items, isLoading = false, error, onDetail, onD
                           >
                             <Eye className="w-4 h-4 mr-2" />
                             Detail
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="bg-transparent"
+                            disabled={!hasValidId}
+                            onClick={() => onEdit?.(item)}
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
                           </Button>
                           <Button
                             variant="outline"

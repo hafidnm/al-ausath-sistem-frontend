@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation"
 import { NilaiMapelFilters } from "./components/nilai-mapel-filters"
 import { NilaiMapelHeader } from "./components/nilai-mapel-header"
 import { NilaiMapelTable } from "./components/nilai-mapel-table"
-import { NilaiMapelItem, nilaiMapelService } from "@/lib/services/nilai-mapel.service"
+import { NilaiMapelEditDialog } from "./components/nilai-mapel-edit-dialog"
+import { NilaiMapelItem, nilaiMapelService, UpsertNilaiMapelPayload } from "@/lib/services/nilai-mapel.service"
 
 export default function NilaiMapelPage() {
   const router = useRouter()
@@ -18,6 +19,9 @@ export default function NilaiMapelPage() {
   const [items, setItems] = useState<NilaiMapelItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [editItem, setEditItem] = useState<NilaiMapelItem | null>(null)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [isEditLoading, setIsEditLoading] = useState(false)
 
   const fetchNilaiMapel = useCallback(async () => {
     if (!nomorInduk.trim()) {
@@ -69,6 +73,38 @@ export default function NilaiMapelPage() {
     }
   }
 
+  const handleEdit = async (item: NilaiMapelItem) => {
+    try {
+      setError("")
+      setIsEditLoading(true)
+      // Fetch detail item untuk memastikan data tugas dan ulangan lengkap
+      const detailItem = await nilaiMapelService.getByKodeMapel(item.kode_mapel, {
+        nomor_induk: item.nomor_induk,
+        tahun_ajaran: item.tahun_ajaran,
+        semester: String(item.semester),
+      })
+      setEditItem(detailItem)
+      setIsEditOpen(true)
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal memuat detail nilai mapel untuk edit")
+    } finally {
+      setIsEditLoading(false)
+    }
+  }
+
+  const handleEditSubmit = async (payload: UpsertNilaiMapelPayload) => {
+    if (!editItem) return
+
+    try {
+      setError("")
+      await nilaiMapelService.update(editItem.id, payload)
+      await fetchNilaiMapel()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal memperbarui nilai mapel")
+      throw err
+    }
+  }
+
   return (
     <div className="space-y-6">
       <NilaiMapelHeader
@@ -97,7 +133,16 @@ export default function NilaiMapelPage() {
         isLoading={isLoading}
         error={error}
         onDetail={handleDetail}
+        onEdit={handleEdit}
         onDelete={handleDelete}
+      />
+
+      <NilaiMapelEditDialog
+        item={editItem}
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        onSubmit={handleEditSubmit}
+        isLoading={isEditLoading}
       />
     </div>
   )
