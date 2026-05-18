@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { authService } from "@/lib/services/auth.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,6 +47,7 @@ import {
   Building2,
   Megaphone,
   Receipt,
+  Award,
 } from "lucide-react"
 
 const adminMenuItems = [
@@ -88,6 +90,7 @@ const guruMenuItems = [
 const santriMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/rapor" },
+  { icon: Award, label: "Nilai Mapel", href: "/dashboard/santri-panel/nilai-mapel" },
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/admin-panel/rapor" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
@@ -111,15 +114,15 @@ export default function DashboardLayout({
 
   useEffect(() => {
   const checkAuth = async () => {
-    const user = await authService.me()
+    const authData = await getCachedUser()
 
-    if (!user) {
+    if (!authData?.user) {
       window.location.replace("/login")
       return
     }
 
-    setUser(user.user)
-    setRole(user.role)
+    setUser(authData.user)
+    setRole(authData.role)
   }
 
   checkAuth()
