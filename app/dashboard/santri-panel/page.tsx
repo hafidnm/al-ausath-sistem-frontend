@@ -239,7 +239,7 @@ export default function SantriPanelPage() {
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer border-dashed border-primary/30" onClick={() => window.location.href='/dashboard/santri-panel/administrasi'}>
+        <Card className="border-border/50 bg-primary/5 hover:bg-primary/10 transition-colors border-dashed border-primary/30">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
