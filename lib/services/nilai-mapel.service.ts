@@ -256,6 +256,16 @@ export const nilaiMapelService = {
     return enrichNilaiMapelItem(normalizeNilaiMapelItem(raw))
   },
 
+  async update(id: number, payload: UpsertNilaiMapelPayload): Promise<NilaiMapelItem> {
+    const response = await api.put(`/akademik/nilai-mapel/${id}`, payload)
+    const rawData = response.data?.data ?? response.data
+    const raw = {
+      ...(rawData && typeof rawData === "object" ? rawData : {}),
+      perhitungan: response.data?.perhitungan ?? rawData?.perhitungan,
+    }
+    return enrichNilaiMapelItem(normalizeNilaiMapelItem(raw))
+  },
+
   async remove(id: number): Promise<void> {
     await api.delete(`/akademik/nilai-mapel/${id}`)
   },
