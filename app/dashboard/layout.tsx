@@ -63,7 +63,9 @@ const adminMenuItems = [
   { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
   { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
   { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/nilai" },
-  { icon: FileText, label: "Rapor", href: "/dashboard/rapor" },
+  { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
+  { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
+  { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
   { icon: TrendingUp, label: "Analitik", href: "/dashboard/analitik" },
   { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
@@ -76,14 +78,18 @@ const adminMenuItems = [
 const guruMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/guru-panel" },
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
-  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/nilai" },
-  { icon: FileText, label: "Rapor", href: "/dashboard/rapor" },
+  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/admin-panel/nilai-mapel" },
+  { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
+  { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
+  { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 
 const santriMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/rapor" },
+  { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
+  { icon: FileText, label: "Rapor Digital", href: "/dashboard/admin-panel/rapor" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 

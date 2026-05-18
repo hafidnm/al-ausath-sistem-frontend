@@ -1,6 +1,7 @@
 "use client"
 
-import { Eye, UserSearch } from "lucide-react"
+import { useState } from "react"
+import { Eye, UserSearch, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -15,6 +16,7 @@ interface RaporTableProps {
   selectedIdentity: string | null
   getIdentity: (item: RaporItem) => string
   onSelect: (item: RaporItem) => void
+  onRefresh?: () => Promise<void> | void
 }
 
 export function RaporTable({
@@ -25,12 +27,35 @@ export function RaporTable({
   selectedIdentity,
   getIdentity,
   onSelect,
+  onRefresh,
 }: RaporTableProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false)
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await onRefresh?.()
+    } finally {
+      setIsRefreshing(false)
+    }
+  }
+
   return (
     <Card className="border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg text-foreground">Daftar Rapor</CardTitle>
-        <CardDescription>Hasil pencarian laporan santri berdasarkan filter yang dipilih</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-lg text-foreground">Daftar Rapor</CardTitle>
+          <CardDescription>Hasil pencarian laporan santri berdasarkan filter yang dipilih</CardDescription>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="bg-transparent"
+          onClick={handleRefresh}
+          disabled={isRefreshing || isLoading}
+        >
+          <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+        </Button>
       </CardHeader>
       <CardContent className="p-0">
         <div className="overflow-x-auto">
