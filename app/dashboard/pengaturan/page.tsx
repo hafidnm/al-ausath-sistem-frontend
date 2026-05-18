@@ -185,7 +185,7 @@ export default function PengaturanPage() {
 
   const formatCurrency = (v: number) => 
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v)
-
+  
   return (
     <div className="container mx-auto py-6 space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-end border-b pb-6">

@@ -87,6 +87,7 @@ const guruMenuItems = [
 
 const santriMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
+  { icon: FileText, label: "Rapor Digital", href: "/dashboard/rapor" },
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/admin-panel/rapor" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
