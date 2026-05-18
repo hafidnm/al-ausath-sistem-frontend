@@ -17,6 +17,8 @@ import { Search, FileSpreadsheet, FileIcon as FilePdf, History, CheckCircle, Clo
 import { sesiAbsensiService, SesiAbsensiApiItem } from "@/lib/services/sesiabsensi.service"
 import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
+import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
+import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 
 interface RekapPetugasRow {
   id_petugas: number
@@ -50,6 +52,9 @@ export default function PresensiGuruPage() {
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
   const [sesiLoading, setSesiLoading] = useState(false)
+  const [selectedUnitSesi, setSelectedUnitSesi] = useState("ALL")
+  const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
+  const [kelasSesiOptions, setKelasSesiOptions] = useState<KelasItem[]>([])
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
     status_sesi: "SELESAI",
@@ -60,6 +65,7 @@ export default function PresensiGuruPage() {
   // Options
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [jadwalOptions, setJadwalOptions] = useState<JadwalOption[]>([])
+  const [unitOptions, setUnitOptions] = useState<DataUnitApiItem[]>([])
 
   // States for Edit Absensi Guru (Admin)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -91,9 +97,11 @@ export default function PresensiGuruPage() {
 
   const loadOptions = async () => {
     try {
-      const [petugasRes, jadwalRes] = await Promise.all([
+      const [petugasRes, jadwalRes, unitRes, kelasRes] = await Promise.all([
         dataPetugasService.getAll({ per_page: 300, status: "AKTIF" }),
-        dataJadwalPembelajaranService.getAll({ per_page: 300, status: "AKTIF" })
+        dataJadwalPembelajaranService.getAll({ per_page: 300, status: "AKTIF" }),
+        dataUnitService.getAll({ per_page: 100, status: "AKTIF" }),
+        kelasService.getAll({ per_page: "500", status: "AKTIF" })
       ])
       
       const mappedPetugas = (petugasRes.data || []).map((item: any) => ({
@@ -104,20 +112,33 @@ export default function PresensiGuruPage() {
 
       const mappedJadwal = (jadwalRes.data || []).map((item: any) => {
         const id = item.id_jadwal || item.id
-        const mapel = item.kelasMapel?.mataPelajaran?.nama_mapel || "-"
-        const kelas = item.kelasMapel?.kelas?.nama_kelas || "-"
+        const mapel = item.kelas_mapel?.mata_pelajaran?.nama_mapel || item.kelasMapel?.mataPelajaran?.nama_mapel || "-"
+        const kelas = item.kelas_mapel?.kelas?.nama_kelas || item.kelasMapel?.kelas?.nama_kelas || "-"
         const hari = item.hari || "-"
+        const guru = item.kelas_mapel?.petugas?.nama_lengkap || item.kelasMapel?.petugas?.nama_lengkap || "Tanpa Guru"
         return {
           id,
-          label: `ID: ${id} - ${mapel} (${kelas}) - ${hari} ${item.jam_mulai || ""}`,
+          label: `${mapel} (${kelas}) - ${hari} - ${guru}`,
           mapel,
           kelas,
           hari,
         }
       }).filter((i: any) => i.id)
       setJadwalOptions(mappedJadwal)
+      
+      setUnitOptions(unitRes.data || [])
+      setKelasSesiOptions(kelasRes || [])
     } catch (error) {
       console.error("Gagal memuat options", error)
+    }
+  }
+
+  const loadKelasSesiByUnit = async (kode_unit?: string) => {
+    try {
+      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
+      setKelasSesiOptions(kelasRes || [])
+    } catch (e) {
+      console.error("Gagal memuat kelas untuk riwayat sesi", e)
     }
   }
 
@@ -387,17 +408,52 @@ export default function PresensiGuruPage() {
         <TabsContent value="riwayat" className="space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex flex-col gap-4">
                 <div>
                   <CardTitle className="text-lg">Riwayat Sesi Absensi</CardTitle>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Select 
+                    value={selectedUnitSesi} 
+                    onValueChange={(val) => {
+                      setSelectedUnitSesi(val)
+                      setSelectedKelasSesi("ALL")
+                      loadKelasSesiByUnit(val === "ALL" ? undefined : val)
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Unit</SelectItem>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select 
+                    value={selectedKelasSesi} 
+                    onValueChange={(val) => setSelectedKelasSesi(val)}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Kelas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="ALL">Semua Kelas</SelectItem>
+                      {kelasSesiOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Input
                     type="date"
                     value={filterSesi.tanggal}
                     onChange={(e) => setFilterSesi({ ...filterSesi, tanggal: e.target.value })}
                     className="w-40"
                   />
+                  
                   <Select value={filterSesi.status_sesi} onValueChange={(val) => setFilterSesi({ ...filterSesi, status_sesi: val })}>
                     <SelectTrigger className="w-36">
                       <SelectValue placeholder="Status Sesi" />
@@ -408,16 +464,18 @@ export default function PresensiGuruPage() {
                       <SelectItem value="BATAL">Batal</SelectItem>
                     </SelectContent>
                   </Select>
+                  
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Cari Mapel/Kelas..."
+                      placeholder="Cari Mapel..."
                       className="pl-9 w-40"
                       value={filterSesi.q}
                       onChange={(e) => setFilterSesi({ ...filterSesi, q: e.target.value })}
                     />
                   </div>
+                  
                   <Select value={filterSesi.id_petugas_hadir} onValueChange={(val) => setFilterSesi({ ...filterSesi, id_petugas_hadir: val })}>
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Petugas" />
@@ -429,7 +487,8 @@ export default function PresensiGuruPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="secondary" onClick={loadRiwayatSesi}>Tampilkan</Button>
+                  
+                  <Button variant="secondary" onClick={loadRiwayatSesi}>Filter</Button>
                   
                   <div className="border-l pl-2 ml-2">
                     <Button onClick={openBukaSesiModal} className="bg-primary text-primary-foreground gap-2">
@@ -446,6 +505,7 @@ export default function PresensiGuruPage() {
                     <TableRow>
                       <TableHead>ID Sesi</TableHead>
                       <TableHead>Tanggal</TableHead>
+                      <TableHead>Hari</TableHead>
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Petugas Hadir</TableHead>
@@ -456,17 +516,18 @@ export default function PresensiGuruPage() {
                   <TableBody>
                     {sesiLoading ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Memuat riwayat sesi...</TableCell>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Memuat riwayat sesi...</TableCell>
                       </TableRow>
                     ) : sesiRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Tidak ada sesi ditemukan.</TableCell>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Tidak ada sesi ditemukan.</TableCell>
                       </TableRow>
                     ) : (
                       sesiRows.map((sesi) => (
                         <TableRow key={sesi.id_sesi || sesi.id} className="hover:bg-muted/30">
                           <TableCell className="font-medium">#{sesi.id_sesi || sesi.id}</TableCell>
-                          <TableCell>{sesi.tanggal} <span className="text-xs text-muted-foreground ml-1">({sesi.hari})</span></TableCell>
+                          <TableCell>{sesi.tanggal}</TableCell>
+                          <TableCell>{sesi.hari || (sesi.jadwal as any)?.hari || "-"}</TableCell>
                           <TableCell>{sesi.mapel || sesi.mata_pelajaran || (sesi.jadwal as any)?.kelas_mapel?.mata_pelajaran?.nama_mapel || (sesi.jadwal as any)?.kelasMapel?.mataPelajaran?.nama_mapel || "-"}</TableCell>
                           <TableCell>{sesi.kelas || sesi.kode_kelas || (sesi.jadwal as any)?.kelas_mapel?.kelas?.nama_kelas || (sesi.jadwal as any)?.kelasMapel?.kelas?.nama_kelas || "-"}</TableCell>
                           <TableCell>{
