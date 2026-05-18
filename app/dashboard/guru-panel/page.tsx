@@ -314,10 +314,7 @@ export default function GuruPanelPage() {
   const [currentUser, setCurrentUser] = useState<{ id: number; id_petugas?: number | null; nama_lengkap: string; peran_akun: string } | null>(null)
   const [isLoadingUser, setIsLoadingUser] = useState(false)
 
-  const [rekapTab, setRekapTab] = useState("riwayat")
   const [rekapLoading, setRekapLoading] = useState(false)
-  const [rekapSantriRows, setRekapSantriRows] = useState<RekapSantriRow[]>([])
-  const [rekapKelasRows, setRekapKelasRows] = useState<RekapKelasRow[]>([])
   const [rekapPetugasRows, setRekapPetugasRows] = useState<RekapPetugasRow[]>([])
 
   const [step, setStep] = useState(1)
@@ -346,6 +343,7 @@ export default function GuruPanelPage() {
 
   const [isRiwayatDetailOpen, setIsRiwayatDetailOpen] = useState(false)
   const [selectedRiwayat, setSelectedRiwayat] = useState<any | null>(null)
+  const [isRiwayatDetailLoading, setIsRiwayatDetailLoading] = useState(false)
 
   const dayName = useMemo(() => {
     const index = new Date().getDay()
@@ -461,8 +459,15 @@ export default function GuruPanelPage() {
   }, [aktivitasSesi, currentPetugasId, todayDateStr])
 
   const riwayatPresensi = useMemo(() => {
-    return [...aktivitasSesi].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
-  }, [aktivitasSesi])
+    const filtered = currentPetugasId
+      ? aktivitasSesi.filter(
+          (item) =>
+            Number(item.id_petugas_hadir) === Number(currentPetugasId) ||
+            Number(item.id_petugas_pengganti) === Number(currentPetugasId)
+        )
+      : aktivitasSesi
+    return [...filtered].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
+  }, [aktivitasSesi, currentPetugasId])
 
   // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
 
@@ -594,23 +599,16 @@ export default function GuruPanelPage() {
     }
   }
 
-  const loadRekap = async (tab: string) => {
-    if (tab === "riwayat") return
-
+  const loadRekap = async (idPetugas?: number | null) => {
     setRekapLoading(true)
     try {
-      if (tab === "santri") {
-        const result = await sesiAbsensiService.rekapSantri({ per_page: 20 })
-        setRekapSantriRows(toArray(result?.data) as RekapSantriRow[])
-      }
-      if (tab === "kelas") {
-        const result = await sesiAbsensiService.rekapKelas({ per_page: 20 })
-        setRekapKelasRows(toArray(result?.data) as RekapKelasRow[])
-      }
-      if (tab === "petugas") {
-        const result = await sesiAbsensiService.rekapPetugas({ per_page: 20 })
-        setRekapPetugasRows(toArray(result?.data) as RekapPetugasRow[])
-      }
+      const params: Record<string, string | number | boolean> = { per_page: 100 }
+      if (idPetugas) params.id_petugas = idPetugas
+      const result = await sesiAbsensiService.rekapPetugas(params)
+      const rows = toArray(result?.data) as RekapPetugasRow[]
+      // If filtered by id_petugas but API returns all, filter client-side
+      const filtered = idPetugas ? rows.filter((r) => Number(r.id_petugas) === Number(idPetugas)) : rows
+      setRekapPetugasRows(filtered)
     } catch (error: any) {
       toast({
         title: "Gagal memuat data rekap",
@@ -630,8 +628,10 @@ export default function GuruPanelPage() {
   }, [])
 
   useEffect(() => {
-    void loadRekap(rekapTab)
-  }, [rekapTab])
+    if (currentPetugasId) {
+      void loadRekap(currentPetugasId)
+    }
+  }, [currentPetugasId])
 
   const resetDialogState = () => {
     setStep(1)
@@ -825,16 +825,21 @@ export default function GuruPanelPage() {
   }
 
   const handleOpenRiwayatDetail = async (item: JadwalItem) => {
+    setSelectedRiwayat(null)
+    setIsRiwayatDetailOpen(true)
+    setIsRiwayatDetailLoading(true)
     try {
       const detail = await sesiAbsensiService.getById(item.id_sesi)
       setSelectedRiwayat(detail ?? item)
-      setIsRiwayatDetailOpen(true)
     } catch (error: any) {
       toast({
         title: "Gagal memuat detail",
         description: extractApiErrorMessage(error, "Detail riwayat belum bisa dibuka."),
         variant: "destructive",
       })
+      setIsRiwayatDetailOpen(false)
+    } finally {
+      setIsRiwayatDetailLoading(false)
     }
   }
 
@@ -1259,180 +1264,115 @@ export default function GuruPanelPage() {
         </TabsContent>
 
         <TabsContent value="riwayat" className="space-y-4">
+          {/* Rekap Kehadiran Saya */}
+          {rekapPetugasRows.length > 0 && (() => {
+            const rekap = rekapPetugasRows[0]
+            return (
+              <Card className="border-border/50">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-primary" />
+                    Rekap Kehadiran Saya
+                  </CardTitle>
+                  <CardDescription>Rekapitulasi kehadiran mengajar Anda secara keseluruhan</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {rekapLoading ? (
+                    <p className="text-sm text-muted-foreground">Memuat rekap...</p>
+                  ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                      <div className="rounded-lg border bg-muted/20 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Total Pertemuan</p>
+                        <p className="text-2xl font-bold text-foreground">{rekap.total_pertemuan}</p>
+                      </div>
+                      <div className="rounded-lg border bg-emerald-500/8 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Hadir</p>
+                        <p className="text-2xl font-bold text-emerald-600">{rekap.jumlah_hadir}</p>
+                      </div>
+                      <div className="rounded-lg border bg-blue-500/8 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Izin</p>
+                        <p className="text-2xl font-bold text-blue-500">{rekap.jumlah_izin}</p>
+                      </div>
+                      <div className="rounded-lg border bg-amber-500/8 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Sakit</p>
+                        <p className="text-2xl font-bold text-amber-500">{rekap.jumlah_sakit}</p>
+                      </div>
+                      <div className="rounded-lg border bg-muted/20 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Total Terlambat</p>
+                        <p className="text-2xl font-bold text-foreground">{rekap.total_menit_terlambat} <span className="text-sm font-normal">mnt</span></p>
+                      </div>
+                      <div className="rounded-lg border bg-muted/20 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Rata Terlambat</p>
+                        <p className="text-2xl font-bold text-foreground">{rekap.rata_menit_terlambat_hadir} <span className="text-sm font-normal">mnt</span></p>
+                      </div>
+                      <div className="rounded-lg border bg-primary/8 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">% Hadir</p>
+                        <p className="text-2xl font-bold text-primary">{rekap.persentase_kehadiran}%</p>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })()}
+
+          {/* Riwayat Sesi */}
           <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Riwayat dan Rekap Absensi</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                <History className="w-5 h-5 text-primary" />
+                Riwayat Sesi Saya
+              </CardTitle>
+              <CardDescription>Daftar sesi absensi yang pernah Anda ampu atau gantikan</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <Tabs value={rekapTab} onValueChange={setRekapTab} className="space-y-4">
-                <TabsList className="bg-muted/50">
-                  <TabsTrigger value="riwayat">Riwayat Sesi</TabsTrigger>
-                  <TabsTrigger value="santri">Rekap Santri</TabsTrigger>
-                  <TabsTrigger value="kelas">Rekap Kelas</TabsTrigger>
-                  <TabsTrigger value="petugas">Rekap Petugas</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="riwayat" className="space-y-3">
-                  <div className="overflow-x-auto border rounded-lg">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>Tanggal</TableHead>
-                          <TableHead>Hari</TableHead>
-                          <TableHead>Mapel</TableHead>
-                          <TableHead>Kelas</TableHead>
-                          <TableHead>Status Sesi</TableHead>
-                          <TableHead>Petugas Hadir</TableHead>
-                          <TableHead>Petugas Pengganti</TableHead>
-                          <TableHead className="text-right">Detail</TableHead>
+            <CardContent>
+              <div className="overflow-x-auto border rounded-lg">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead>Tanggal</TableHead>
+                      <TableHead>Hari</TableHead>
+                      <TableHead>Mapel</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead>Status Sesi</TableHead>
+                      <TableHead>Peran</TableHead>
+                      <TableHead className="text-right">Detail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {riwayatPresensi.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                          Belum ada riwayat sesi.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      riwayatPresensi.map((item) => (
+                        <TableRow key={item.id_sesi} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">{item.tanggal || "-"}</TableCell>
+                          <TableCell>{item.hari || "-"}</TableCell>
+                          <TableCell>{item.mapel}</TableCell>
+                          <TableCell>{item.kelas}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="bg-transparent">{item.status_sesi || "-"}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {Number(item.id_petugas_pengganti) === Number(currentPetugasId)
+                              ? <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30 border">Pengganti</Badge>
+                              : <Badge className="bg-primary/10 text-primary border-0">Pengajar</Badge>}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" size="sm" className="bg-transparent" onClick={() => handleOpenRiwayatDetail(item)}>
+                              <Eye className="w-4 h-4 mr-1" />
+                              Detail
+                            </Button>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {riwayatPresensi.map((item) => (
-                          <TableRow key={item.id_sesi} className="hover:bg-muted/30">
-                            <TableCell className="font-medium">{item.tanggal || "-"}</TableCell>
-                            <TableCell>{item.hari || "-"}</TableCell>
-                            <TableCell>{item.mapel}</TableCell>
-                            <TableCell>{item.kelas}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="bg-transparent">{item.status_sesi || "-"}</Badge>
-                            </TableCell>
-                            <TableCell>{item.id_petugas_hadir ? petugasLabelById.get(Number(item.id_petugas_hadir)) || `ID: ${item.id_petugas_hadir}` : "-"}</TableCell>
-                            <TableCell>{item.id_petugas_pengganti ? petugasLabelById.get(Number(item.id_petugas_pengganti)) || `ID: ${item.id_petugas_pengganti}` : "-"}</TableCell>
-                            <TableCell className="text-right">
-                              <Button variant="outline" size="sm" className="bg-transparent" onClick={() => handleOpenRiwayatDetail(item)}>
-                                <Eye className="w-4 h-4 mr-1" />
-                                Detail
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="santri">
-                  {rekapLoading ? (
-                    <p className="text-sm text-muted-foreground">Memuat rekap santri...</p>
-                  ) : (
-                    <div className="overflow-x-auto border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>NIS</TableHead>
-                            <TableHead>Nama</TableHead>
-                            <TableHead>Kelas</TableHead>
-                            <TableHead>Total</TableHead>
-                            <TableHead>Hadir</TableHead>
-                            <TableHead>Izin</TableHead>
-                            <TableHead>Sakit</TableHead>
-                            <TableHead>Alfa</TableHead>
-                            <TableHead>% Hadir</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rekapSantriRows.map((row) => (
-                            <TableRow key={row.nomor_induk}>
-                              <TableCell>{row.nomor_induk}</TableCell>
-                              <TableCell>{row.nama_lengkap_santri}</TableCell>
-                              <TableCell>{row.kode_kelas} {row.nama_kelas ? `(${row.nama_kelas})` : ""}</TableCell>
-                              <TableCell>{row.total_pertemuan}</TableCell>
-                              <TableCell>{row.jumlah_hadir}</TableCell>
-                              <TableCell>{row.jumlah_izin}</TableCell>
-                              <TableCell>{row.jumlah_sakit}</TableCell>
-                              <TableCell>{row.jumlah_alfa}</TableCell>
-                              <TableCell>{row.persentase_kehadiran}%</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="kelas">
-                  {rekapLoading ? (
-                    <p className="text-sm text-muted-foreground">Memuat rekap kelas...</p>
-                  ) : (
-                    <div className="overflow-x-auto border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>Kode Kelas</TableHead>
-                            <TableHead>Nama Kelas</TableHead>
-                            <TableHead>Total Sesi</TableHead>
-                            <TableHead>Total Entri</TableHead>
-                            <TableHead>Santri</TableHead>
-                            <TableHead>Hadir</TableHead>
-                            <TableHead>Izin</TableHead>
-                            <TableHead>Sakit</TableHead>
-                            <TableHead>Alfa</TableHead>
-                            <TableHead>% Hadir</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rekapKelasRows.map((row) => (
-                            <TableRow key={row.kode_kelas}>
-                              <TableCell>{row.kode_kelas}</TableCell>
-                              <TableCell>{row.nama_kelas || "-"}</TableCell>
-                              <TableCell>{row.total_sesi}</TableCell>
-                              <TableCell>{row.total_entri_absensi}</TableCell>
-                              <TableCell>{row.total_santri_tercatat}</TableCell>
-                              <TableCell>{row.jumlah_hadir}</TableCell>
-                              <TableCell>{row.jumlah_izin}</TableCell>
-                              <TableCell>{row.jumlah_sakit}</TableCell>
-                              <TableCell>{row.jumlah_alfa}</TableCell>
-                              <TableCell>{row.persentase_kehadiran}%</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="petugas">
-                  {rekapLoading ? (
-                    <p className="text-sm text-muted-foreground">Memuat rekap petugas...</p>
-                  ) : (
-                    <div className="overflow-x-auto border rounded-lg">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-muted/50">
-                            <TableHead>ID</TableHead>
-                            <TableHead>Nama</TableHead>
-                            <TableHead>Peran</TableHead>
-                            <TableHead>Total</TableHead>
-                            <TableHead>Hadir</TableHead>
-                            <TableHead>Izin</TableHead>
-                            <TableHead>Sakit</TableHead>
-                            <TableHead>Total Telat (menit)</TableHead>
-                            <TableHead>Rata Telat</TableHead>
-                            <TableHead>% Hadir</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rekapPetugasRows.map((row) => (
-                            <TableRow key={row.id_petugas}>
-                              <TableCell>{row.id_petugas}</TableCell>
-                              <TableCell>{row.nama_lengkap}</TableCell>
-                              <TableCell>{row.peran_akun}</TableCell>
-                              <TableCell>{row.total_pertemuan}</TableCell>
-                              <TableCell>{row.jumlah_hadir}</TableCell>
-                              <TableCell>{row.jumlah_izin}</TableCell>
-                              <TableCell>{row.jumlah_sakit}</TableCell>
-                              <TableCell>{row.total_menit_terlambat}</TableCell>
-                              <TableCell>{row.rata_menit_terlambat_hadir}</TableCell>
-                              <TableCell>{row.persentase_kehadiran}%</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -1738,66 +1678,205 @@ export default function GuruPanelPage() {
       </Dialog>
 
       <Dialog open={isRiwayatDetailOpen} onOpenChange={setIsRiwayatDetailOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detail Riwayat Sesi</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-5 h-5 text-primary" />
+              Detail Sesi Absensi
+            </DialogTitle>
           </DialogHeader>
 
-          {selectedRiwayat && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/30">
-                <div>
-                  <p className="text-xs text-muted-foreground">ID Sesi</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.id_sesi || "-"}</p>
+          {isRiwayatDetailLoading ? (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <Clock className="w-8 h-8 text-muted-foreground animate-spin" />
+              <p className="text-sm text-muted-foreground">Memuat detail sesi...</p>
+            </div>
+          ) : selectedRiwayat && (
+            <div className="space-y-5">
+
+              {/* Info Sesi */}
+              <div className="rounded-lg border border-border/60 overflow-hidden">
+                <div className="bg-muted/40 px-4 py-2 border-b border-border/50">
+                  <p className="text-sm font-semibold text-foreground">Informasi Sesi</p>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">ID Jadwal</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.id_jadwal || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">ID Petugas Hadir</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.id_petugas_hadir || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">ID Petugas Pengganti</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.id_petugas_pengganti || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Tanggal</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.tanggal || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Status Sesi</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.status_sesi || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Waktu Mulai</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.waktu_mulai || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Waktu Selesai</p>
-                  <p className="font-medium text-foreground">{selectedRiwayat.waktu_selesai || "-"}</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 p-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Mata Pelajaran</p>
+                    <p className="font-medium text-foreground">
+                      {selectedRiwayat.jadwal?.kelas_mapel?.mata_pelajaran?.nama_mapel
+                        ?? selectedRiwayat.jadwal?.kelasMapel?.mataPelajaran?.nama_mapel
+                        ?? "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Kelas</p>
+                    <p className="font-medium text-foreground">
+                      {selectedRiwayat.jadwal?.kelas_mapel?.kelas?.nama_kelas
+                        ?? selectedRiwayat.jadwal?.kelasMapel?.kelas?.nama_kelas
+                        ?? "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Tanggal</p>
+                    <p className="font-medium text-foreground">{selectedRiwayat.tanggal || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Hari</p>
+                    <p className="font-medium text-foreground">{selectedRiwayat.jadwal?.hari || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Waktu Mulai</p>
+                    <p className="font-medium text-foreground">{selectedRiwayat.waktu_mulai || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Waktu Selesai</p>
+                    <p className="font-medium text-foreground">{selectedRiwayat.waktu_selesai || "-"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status Sesi</p>
+                    <Badge variant="outline" className="bg-transparent mt-0.5">{selectedRiwayat.status_sesi || "-"}</Badge>
+                  </div>
+                  {selectedRiwayat.keterangan && (
+                    <div className="col-span-2">
+                      <p className="text-xs text-muted-foreground">Keterangan</p>
+                      <p className="text-sm text-foreground">{selectedRiwayat.keterangan}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="space-y-2 p-4 rounded-lg border border-border/60">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Is Validated</p>
-                  {getValidationBadge(selectedRiwayat.is_validated)}
+              {/* Absensi Pengajar */}
+              <div className="rounded-lg border border-border/60 overflow-hidden">
+                <div className="bg-muted/40 px-4 py-2 border-b border-border/50">
+                  <p className="text-sm font-semibold text-foreground">Kehadiran Pengajar</p>
                 </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Validated By</p>
-                  <p className="text-sm font-medium text-foreground">{selectedRiwayat.validated_by || "-"}</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Validated At</p>
-                  <p className="text-sm font-medium text-foreground">{selectedRiwayat.validated_at || "-"}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Keterangan</p>
-                  <p className="text-sm text-foreground mt-1">{selectedRiwayat.keterangan || "-"}</p>
+                <div className="divide-y divide-border/40">
+                  {(() => {
+                    const pengajarList = Array.isArray(selectedRiwayat.absensi_pengajar)
+                      ? selectedRiwayat.absensi_pengajar
+                      : []
+                    if (pengajarList.length === 0) {
+                      return (
+                        <div className="px-4 py-3 text-sm text-muted-foreground">Tidak ada data absensi pengajar.</div>
+                      )
+                    }
+                    return pengajarList.map((ap: any, idx: number) => {
+                      const namaPetugas = ap.petugas?.nama_lengkap
+                        ?? petugasLabelById.get(Number(ap.id_petugas))?.split(' (')[0]
+                        ?? `Petugas #${ap.id_petugas}`
+                      const isGuru = Number(ap.id_petugas) === Number(selectedRiwayat.id_petugas_hadir)
+                      const isPengganti = Number(ap.id_petugas) === Number(selectedRiwayat.id_petugas_pengganti)
+                      const status = String(ap.status_kehadiran || "").toUpperCase()
+                      return (
+                        <div key={idx} className="flex items-center justify-between px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                                {getInitials(namaPetugas)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium text-foreground">{namaPetugas}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {isGuru && <Badge className="bg-primary/10 text-primary border-0 text-xs py-0">Pengajar</Badge>}
+                                {isPengganti && <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30 border text-xs py-0">Pengganti</Badge>}
+                                {ap.menit_terlambat > 0 && (
+                                  <span className="text-xs text-muted-foreground">{ap.menit_terlambat} mnt terlambat</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Badge
+                            className={
+                              status === "HADIR" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 border" :
+                              status === "SAKIT" ? "bg-amber-500/10 text-amber-700 border-amber-500/30 border" :
+                              status === "IZIN" ? "bg-blue-500/10 text-blue-600 border-blue-500/30 border" :
+                              "bg-muted text-muted-foreground"
+                            }
+                          >
+                            {status || "-"}
+                          </Badge>
+                        </div>
+                      )
+                    })
+                  })()}
                 </div>
               </div>
+
+              {/* Absensi Santri */}
+              <div className="rounded-lg border border-border/60 overflow-hidden">
+                <div className="bg-muted/40 px-4 py-2 border-b border-border/50 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">Absensi Santri</p>
+                  {Array.isArray(selectedRiwayat.absensi_santri) && (
+                    <Badge variant="outline" className="text-xs">
+                      {selectedRiwayat.absensi_santri.length} santri
+                    </Badge>
+                  )}
+                </div>
+                {(() => {
+                  const santriAbsensi = Array.isArray(selectedRiwayat.absensi_santri)
+                    ? selectedRiwayat.absensi_santri
+                    : []
+                  if (santriAbsensi.length === 0) {
+                    return (
+                      <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        <Users className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                        Belum ada data absensi santri.
+                      </div>
+                    )
+                  }
+                  const countByStatus = santriAbsensi.reduce((acc: Record<string, number>, s: any) => {
+                    const st = String(s.status_kehadiran || "ALFA").toUpperCase()
+                    acc[st] = (acc[st] || 0) + 1
+                    return acc
+                  }, {})
+                  return (
+                    <>
+                      {/* Summary Pills */}
+                      <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-border/40">
+                        {Object.entries(countByStatus).map(([st, count]) => (
+                          <span key={st} className={
+                            `text-xs font-medium px-2 py-0.5 rounded-full border ${
+                              st === "HADIR" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30" :
+                              st === "SAKIT" ? "bg-amber-500/10 text-amber-700 border-amber-500/30" :
+                              st === "IZIN" ? "bg-blue-500/10 text-blue-600 border-blue-500/30" :
+                              "bg-destructive/10 text-destructive border-destructive/30"
+                            }`
+                          }>
+                            {st}: {count as number}
+                          </span>
+                        ))}
+                      </div>
+                      {/* Santri List */}
+                      <div className="divide-y divide-border/30 max-h-64 overflow-y-auto">
+                        {santriAbsensi.map((s: any, idx: number) => {
+                          const nama = s.santri?.nama_lengkap_santri ?? s.nama_lengkap_santri ?? s.nomor_induk
+                          const status = String(s.status_kehadiran || "ALFA").toUpperCase()
+                          return (
+                            <div key={idx} className="flex items-center justify-between px-4 py-2">
+                              <div>
+                                <p className="text-sm font-medium text-foreground">{nama}</p>
+                                <p className="text-xs text-muted-foreground">{s.nomor_induk}</p>
+                              </div>
+                              <Badge
+                                className={
+                                  status === "HADIR" ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30 border" :
+                                  status === "SAKIT" ? "bg-amber-500/10 text-amber-700 border-amber-500/30 border" :
+                                  status === "IZIN" ? "bg-blue-500/10 text-blue-600 border-blue-500/30 border" :
+                                  "bg-destructive/10 text-destructive border-destructive/30 border"
+                                }
+                              >
+                                {status}
+                              </Badge>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+
             </div>
           )}
         </DialogContent>

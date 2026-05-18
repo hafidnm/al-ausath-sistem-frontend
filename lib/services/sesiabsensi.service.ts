@@ -182,7 +182,7 @@ export const sesiAbsensiService = {
   // --- Admin Endpoints ---
 
   async adminBukaSesi(payload: AdminBukaSesiPayload) {
-    const response = await api.post<{ data?: SesiAbsensiApiItem }>(`/akademik/admin/buka-sesi`, payload)
+    const response = await api.post<{ data?: SesiAbsensiApiItem }>(`${SESI_ABSENSI_BASE_PATH}/admin/buka-sesi`, payload)
     return response.data
   },
 

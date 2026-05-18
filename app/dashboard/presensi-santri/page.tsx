@@ -14,6 +14,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
 import { Search, Download, Calendar, History, FileSpreadsheet, FileIcon as FilePdf, Eye, Check, CheckCircle, Clock } from "lucide-react"
 import { sesiAbsensiService, SesiAbsensiApiItem } from "@/lib/services/sesiabsensi.service"
+import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
+import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 
 interface RekapSantriRow {
   nomor_induk: string
@@ -43,9 +45,17 @@ export default function PresensiSantriPage() {
     kode_kelas: "",
   })
 
+  // Options
+  const [unitOptions, setUnitOptions] = useState<DataUnitApiItem[]>([])
+  const [kelasOptions, setKelasOptions] = useState<KelasItem[]>([])
+  const [selectedUnit, setSelectedUnit] = useState("ALL")
+
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
   const [sesiLoading, setSesiLoading] = useState(false)
+  const [selectedUnitSesi, setSelectedUnitSesi] = useState("ALL")
+  const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
+  const [kelasSesiOptions, setKelasSesiOptions] = useState<KelasItem[]>([])
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
     status_sesi: "SELESAI",
@@ -62,9 +72,41 @@ export default function PresensiSantriPage() {
 
   // Initialization
   useEffect(() => {
+    loadOptions()
     loadRekap()
     loadRiwayatSesi()
   }, [])
+
+  const loadOptions = async () => {
+    try {
+      const unitRes = await dataUnitService.getAll({ per_page: 100, status: "AKTIF" })
+      setUnitOptions(unitRes.data || [])
+      
+      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF" })
+      setKelasOptions(kelasRes || [])
+      setKelasSesiOptions(kelasRes || [])
+    } catch (e) {
+      console.error("Gagal memuat filter options", e)
+    }
+  }
+
+  const loadKelasByUnit = async (kode_unit?: string) => {
+    try {
+      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
+      setKelasOptions(kelasRes || [])
+    } catch (e) {
+      console.error("Gagal memuat kelas", e)
+    }
+  }
+
+  const loadKelasSesiByUnit = async (kode_unit?: string) => {
+    try {
+      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
+      setKelasSesiOptions(kelasRes || [])
+    } catch (e) {
+      console.error("Gagal memuat kelas untuk riwayat sesi", e)
+    }
+  }
 
   const loadRekap = async () => {
     setRekapLoading(true)
@@ -255,13 +297,39 @@ export default function PresensiSantriPage() {
                       onChange={(e) => setFilterRekap({ ...filterRekap, q: e.target.value })}
                     />
                   </div>
-                  <Input
-                    type="text"
-                    placeholder="Kode Kelas (Unit/Kelas)"
-                    className="w-44"
-                    value={filterRekap.kode_kelas}
-                    onChange={(e) => setFilterRekap({ ...filterRekap, kode_kelas: e.target.value })}
-                  />
+                  <Select 
+                    value={selectedUnit} 
+                    onValueChange={(val) => {
+                      setSelectedUnit(val)
+                      setFilterRekap({ ...filterRekap, kode_kelas: "" })
+                      loadKelasByUnit(val === "ALL" ? undefined : val)
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Unit</SelectItem>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select 
+                    value={filterRekap.kode_kelas || "ALL"} 
+                    onValueChange={(val) => setFilterRekap({ ...filterRekap, kode_kelas: val === "ALL" ? "" : val })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Kelas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="ALL">Semua Kelas</SelectItem>
+                      {kelasOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button variant="secondary" onClick={handleApplyFilterRekap}>Filter</Button>
                   
                   <div className="flex items-center gap-2 border-l pl-2 ml-2">
@@ -329,18 +397,53 @@ export default function PresensiSantriPage() {
         <TabsContent value="riwayat" className="space-y-4">
           <Card className="border-border/50">
             <CardHeader className="pb-3 border-b">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div className="flex flex-col gap-4">
                 <div>
                   <CardTitle className="text-lg">Riwayat Sesi Absensi</CardTitle>
                   <CardDescription>Klik Edit untuk mengubah kehadiran santri pada sesi yang sudah selesai.</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select 
+                    value={selectedUnitSesi} 
+                    onValueChange={(val) => {
+                      setSelectedUnitSesi(val)
+                      setSelectedKelasSesi("ALL")
+                      loadKelasSesiByUnit(val === "ALL" ? undefined : val)
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Unit</SelectItem>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select 
+                    value={selectedKelasSesi} 
+                    onValueChange={(val) => setSelectedKelasSesi(val)}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Kelas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="ALL">Semua Kelas</SelectItem>
+                      {kelasSesiOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Input
                     type="date"
                     value={filterSesi.tanggal}
                     onChange={(e) => setFilterSesi({ ...filterSesi, tanggal: e.target.value })}
                     className="w-40"
                   />
+                  
                   <Select value={filterSesi.status_sesi} onValueChange={(val) => setFilterSesi({ ...filterSesi, status_sesi: val })}>
                     <SelectTrigger className="w-36">
                       <SelectValue placeholder="Status" />
@@ -351,17 +454,19 @@ export default function PresensiSantriPage() {
                       <SelectItem value="BATAL">Batal</SelectItem>
                     </SelectContent>
                   </Select>
+                  
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                     <Input
                       type="text"
-                      placeholder="Cari Mapel/Kelas..."
+                      placeholder="Cari Mapel..."
                       className="pl-9 w-40"
                       value={filterSesi.q}
                       onChange={(e) => setFilterSesi({ ...filterSesi, q: e.target.value })}
                     />
                   </div>
-                  <Button variant="secondary" onClick={handleApplyFilterSesi}>Tampilkan</Button>
+                  
+                  <Button variant="secondary" onClick={handleApplyFilterSesi}>Filter</Button>
                 </div>
               </div>
             </CardHeader>
@@ -372,6 +477,7 @@ export default function PresensiSantriPage() {
                     <TableRow>
                       <TableHead>ID Sesi</TableHead>
                       <TableHead>Tanggal</TableHead>
+                      <TableHead>Hari</TableHead>
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Status Sesi</TableHead>
@@ -381,17 +487,18 @@ export default function PresensiSantriPage() {
                   <TableBody>
                     {sesiLoading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Memuat riwayat sesi...</TableCell>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Memuat riwayat sesi...</TableCell>
                       </TableRow>
                     ) : sesiRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Tidak ada sesi ditemukan.</TableCell>
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Tidak ada sesi ditemukan.</TableCell>
                       </TableRow>
                     ) : (
                       sesiRows.map((sesi) => (
                         <TableRow key={sesi.id_sesi || sesi.id} className="hover:bg-muted/30">
                           <TableCell className="font-medium">#{sesi.id_sesi || sesi.id}</TableCell>
-                          <TableCell>{sesi.tanggal} <span className="text-xs text-muted-foreground ml-1">({sesi.hari})</span></TableCell>
+                          <TableCell>{sesi.tanggal}</TableCell>
+                          <TableCell>{sesi.hari || (sesi.jadwal as any)?.hari || "-"}</TableCell>
                           <TableCell>{sesi.mapel || sesi.mata_pelajaran || (sesi.jadwal as any)?.kelas_mapel?.mata_pelajaran?.nama_mapel || (sesi.jadwal as any)?.kelasMapel?.mataPelajaran?.nama_mapel || "-"}</TableCell>
                           <TableCell>{sesi.kelas || sesi.kode_kelas || (sesi.jadwal as any)?.kelas_mapel?.kelas?.nama_kelas || (sesi.jadwal as any)?.kelasMapel?.kelas?.nama_kelas || "-"}</TableCell>
                           <TableCell>{getStatusBadge(sesi.status_sesi || "")}</TableCell>
