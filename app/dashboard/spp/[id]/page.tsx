@@ -257,7 +257,7 @@ export default function SppTagihanDetailPage() {
         description: "Pembayaran telah berhasil dicatat.",
       })
       setPayDialogOpen(false)
-      void fetchTagihanDetail(id)
+      if (id) void fetchTagihanDetail(id)
     } catch (err) {
       toast({
         title: "Gagal",

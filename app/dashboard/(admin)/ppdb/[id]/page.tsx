@@ -7,8 +7,11 @@ import { Loader2, ArrowLeft, FileDown, ExternalLink, Upload } from "lucide-react
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { usePpdbDetail } from "@/hooks/ppdb/admin"
+import { usePpdbDetail, useUpdatePpdbTestResult } from "@/hooks/ppdb/admin"
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
 import type { PpdbDetail } from "@/types/ppdb/admin"
 
@@ -44,6 +47,15 @@ const formatDateTime = (value: string) => {
   })
 }
 
+const formatDate = (value: string) => {
+  if (!value) return "-"
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+  return parsed.toLocaleDateString("id-ID", {
+    day: "2-digit", month: "long", year: "numeric",
+  })
+}
+
 export default function PpdbDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -54,6 +66,13 @@ export default function PpdbDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  const { updateTestResult, loading: testResultLoading } = useUpdatePpdbTestResult()
+  const [testForm, setTestForm] = useState({
+    nilai: "",
+    statusTes: "",
+    catatanTes: "",
+  })
+
   const fetchDetail = useCallback(async () => {
     if (!idParam) return
     
@@ -63,6 +82,11 @@ export default function PpdbDetailPage() {
     try {
       const res = await ppdbAdminApi.getDetail(idParam)
       setPendaftar(res as PpdbDetail)
+      setTestForm({
+        nilai: res.nilaiTes !== undefined ? String(res.nilaiTes) : "",
+        statusTes: res.statusTes || "",
+        catatanTes: res.catatanTes || "",
+      })
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Gagal memuat detail pendaftar'
       setError(msg)
@@ -79,6 +103,25 @@ export default function PpdbDetailPage() {
   useEffect(() => {
     void fetchDetail()
   }, [fetchDetail])
+
+  const handleSaveTestResult = async () => {
+    if (!pendaftar) return
+    try {
+      await updateTestResult(pendaftar.id, {
+        nilai: testForm.nilai ? Number(testForm.nilai) : undefined,
+        statusTes: testForm.statusTes,
+        catatan: testForm.catatanTes,
+      })
+      toast({ title: 'Tersimpan', description: 'Hasil tes berhasil disimpan' })
+      void fetchDetail()
+    } catch (err) {
+      toast({
+        title: 'Gagal',
+        description: err instanceof Error ? err.message : 'Gagal menyimpan hasil tes',
+        variant: 'destructive',
+      })
+    }
+  }
 
   if (loading) {
     return (
@@ -126,14 +169,14 @@ export default function PpdbDetailPage() {
                 Kembali
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold">{pendaftar.namaCalonSantri || pendaftar.namaCalon}</h1>
+            <h1 className="text-3xl font-bold">{pendaftar.name || '-'}</h1>
             <p className="text-muted-foreground">
-              No. Pendaftaran: {pendaftar.noPendaftaran || pendaftar.no_pendaftaran}
+              No. Pendaftaran: {pendaftar.noPendaftaran || '-'}
             </p>
           </div>
           <div className="space-y-2">
             <div>Status Verifikasi</div>
-            {getStatusBadge(pendaftar.statusVerifikasi || 'Menunggu')}
+            {getStatusBadge(pendaftar.status || 'Menunggu')}
           </div>
         </div>
 
@@ -146,15 +189,15 @@ export default function PpdbDetailPage() {
             <div className="space-y-4">
               <div>
                 <p className="text-sm text-muted-foreground">Nama Calon Santri</p>
-                <p className="font-medium">{pendaftar.namaCalonSantri || pendaftar.namaCalon || '-'}</p>
+                <p className="font-medium">{pendaftar.name || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">NIK</p>
-                <p className="font-medium">{pendaftar.nik || '-'}</p>
+                <p className="font-medium">{pendaftar.nikCalonSantri || '-'}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Tempat/Tanggal Lahir</p>
-                <p className="font-medium">{pendaftar.tempatLahir || '-'} / {pendaftar.tanggalLahir || '-'}</p>
+                <p className="font-medium">{pendaftar.tempatLahir || '-'} / {formatDate(pendaftar.tanggalLahir || '')}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Jenis Kelamin</p>
@@ -172,7 +215,7 @@ export default function PpdbDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Waktu Pendaftaran</p>
-                <p className="font-medium">{formatDateTime(pendaftar.createdAt || '')}</p>
+                <p className="font-medium">{formatDateTime(pendaftar.waktuPendaftaran || pendaftar.tanggalDaftar || '')}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">No. Pendaftaran Final</p>
@@ -199,7 +242,7 @@ export default function PpdbDetailPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">No HP Ayah</p>
-                <p className="font-medium">{pendaftar.noHpAyah || '-'}</p>
+                <p className="font-medium">{pendaftar.noHpCalon || '-'}</p>
               </div>
             </div>
             <div className="space-y-4">
@@ -243,10 +286,10 @@ export default function PpdbDetailPage() {
           <CardContent>
             <div className="grid md:grid-cols-2 gap-4">
               {[
-                { label: 'Akta Kelahiran', url: pendaftar.berkasAktaUrl, type: 'akta' },
-                { label: 'Kartu Keluarga (KK)', url: pendaftar.berkasKkUrl, type: 'kk' },
-                { label: 'Rekomendasi Ustadz', url: pendaftar.berkasRekomendasiUstadzUrl, type: 'rekomendasi' },
-                { label: 'Surat Pernyataan', url: pendaftar.berkasSuratPernyataanUrl, type: 'surat_pernyataan' },
+                { label: 'Akta Kelahiran', url: pendaftar.fileAktaPath, type: 'akta' },
+                { label: 'Kartu Keluarga (KK)', url: pendaftar.fileKkPath, type: 'kk' },
+                { label: 'Rekomendasi Ustadz', url: pendaftar.fileSuratRekomendasiPath, type: 'rekomendasi' },
+                { label: 'Surat Pernyataan', url: pendaftar.suratPernyataanFilePath, type: 'surat_pernyataan' },
               ].map((doc) => {
                 const documentUrl = getDocumentUrl(doc.url)
                 return (
@@ -299,23 +342,58 @@ export default function PpdbDetailPage() {
         </Card>
 
         {/* Test Results */}
-        {pendaftar.nilaiTes !== undefined && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Hasil Tes</CardTitle>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-sm text-muted-foreground">Nilai Tes</p>
-                <p className="text-2xl font-bold">{pendaftar.nilaiTes || '-'}</p>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Koreksi & Hasil Tes</CardTitle>
+            <CardDescription>Berikan penilaian hasil tes calon santri</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {pendaftar.soalJawab ? (
+              <div className="space-y-2">
+                <Label>Jawaban Santri</Label>
+                <div className="p-4 bg-muted/30 border border-border rounded-md text-sm whitespace-pre-wrap max-h-96 overflow-y-auto">
+                  {pendaftar.soalJawab}
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Status Tes</p>
-                <p className="font-medium">{pendaftar.statusTes || '-'}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">Santri belum mengirimkan jawaban tes.</p>
+            )}
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Nilai Tes (Angka)</Label>
+                <Input 
+                  type="number"
+                  placeholder="0 - 100" 
+                  value={testForm.nilai}
+                  onChange={(e) => setTestForm({...testForm, nilai: e.target.value})}
+                />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div className="space-y-2">
+                <Label>Status Kelulusan Tes</Label>
+                <Input 
+                  placeholder="Lulus / Tidak Lulus" 
+                  value={testForm.statusTes}
+                  onChange={(e) => setTestForm({...testForm, statusTes: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Catatan Admin (Opsional)</Label>
+              <Textarea 
+                placeholder="Tambahkan catatan koreksi..." 
+                value={testForm.catatanTes}
+                onChange={(e) => setTestForm({...testForm, catatanTes: e.target.value})}
+              />
+            </div>
+
+            <Button onClick={handleSaveTestResult} disabled={testResultLoading}>
+              {testResultLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              Simpan Hasil Tes
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -80,9 +80,7 @@ export function RecentAttendanceTab({ recentAttendance }: RecentAttendanceTabPro
                       {getStatusBadge(record.status)}
                     </div>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {record.jam !== "-" ? record.jam : "-"}
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{record.jam !== "-" ? record.jam : "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

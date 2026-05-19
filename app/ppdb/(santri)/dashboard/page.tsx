@@ -88,6 +88,7 @@ export default function PpdbDashboardPage() {
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState<Date | null>(null);
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSavingRef = useRef(false);
   const hasHydratedFromServerRef = useRef(false);
   const lastSavedSignatureRef = useRef('');
 
@@ -215,7 +216,7 @@ export default function PpdbDashboardPage() {
       && (
         data.step === 'menunggu-pengumuman'
         || (data.step === 'pengumuman' && data.statusVerifikasi !== 'diterima' && data.statusVerifikasi !== 'lulus' && data.statusVerifikasi !== 'accepted')
-        || (data.formCompleted && allDocsUploaded && data.step === 'menunggu-pengumuman')
+        || (data.formCompleted && allDocsUploaded && data.step === 'lengkapi-form')
       ),
     );
 
@@ -233,6 +234,11 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    if (isSavingRef.current) {
+      // Skip scheduling another autosave while a save is in progress
+      return;
+    }
+
     const hasPendingFiles = Boolean(
       files.dokumenAkta
       || files.dokumenKk
@@ -245,19 +251,27 @@ export default function PpdbDashboardPage() {
     autoSaveTimerRef.current = setTimeout(() => {
       void (async () => {
         setAutoSaveStatus('saving');
+        isSavingRef.current = true;
 
         try {
           await updateForm(buildPpdbUpdatePayload(form, files, data));
-          lastSavedSignatureRef.current = currentSignature;
-          setLastAutoSaveAt(new Date());
-          setAutoSaveStatus('saved');
 
           if (hasPendingFiles) {
+            // Fetch refreshed dashboard from server and compute canonical signature
+            const refreshed = await fetchDashboard();
+            const refreshedForm = refreshed ? mapDashboardToForm(refreshed) : form;
+            lastSavedSignatureRef.current = buildAutosaveSignature(refreshedForm, initialPpdbDashboardFiles);
             resetPendingFiles();
-            await fetchDashboard();
+          } else {
+            lastSavedSignatureRef.current = currentSignature;
           }
+
+          setLastAutoSaveAt(new Date());
+          setAutoSaveStatus('saved');
         } catch {
           setAutoSaveStatus('error');
+        } finally {
+          isSavingRef.current = false;
         }
       })();
     }, AUTO_SAVE_DELAY_MS);
@@ -304,6 +318,13 @@ export default function PpdbDashboardPage() {
     );
 
     clearAutoSaveTimer();
+    // prevent concurrent manual save while autosave is in progress
+    if (isSavingRef.current) {
+      toast({ title: 'Simpan sedang berjalan', description: 'Tunggu hingga proses simpan selesai.', variant: 'default' });
+      return;
+    }
+
+    isSavingRef.current = true;
     setAutoSaveStatus('saving');
 
     try {
@@ -372,6 +393,8 @@ export default function PpdbDashboardPage() {
         description: message,
         variant: 'destructive',
       });
+    } finally {
+      isSavingRef.current = false;
     }
   };
 

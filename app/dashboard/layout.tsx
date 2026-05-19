@@ -92,7 +92,7 @@ const santriMenuItems = [
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/santri-panel/rapor" },
   { icon: Award, label: "Nilai Mapel", href: "/dashboard/santri-panel/nilai-mapel" },
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
-  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/santri-panel/pengumuman" },
 ]
 
 export default function DashboardLayout({

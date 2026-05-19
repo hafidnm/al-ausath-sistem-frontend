@@ -1,15 +1,19 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { BookOpen, FileText, Award } from "lucide-react"
-import { StudentInfoHeader } from "./student-info-header"
-import { AttendanceSummaryCards } from "./attendance-summary-cards"
-import { AttendanceCharts } from "./attendance-charts"
-import { AttendanceBySubjectTab } from "./attendance-by-subject"
-import { RecentAttendanceTab } from "./recent-attendance"
-import { NilaiMapelList } from "./nilai-mapel-list"
-import { ParentInformationCard } from "./parent-info-card"
+import { Receipt, Wallet, Megaphone } from "lucide-react"
+import { StudentInfoHeader } from "../shared/student-info-header"
+import { AttendanceSummaryCards } from "../shared/attendance-summary-cards"
+import { AttendanceCharts } from "../shared/attendance-charts"
+import { AttendanceBySubjectTab } from "../shared/attendance-by-subject"
+import { RecentAttendanceTab } from "../shared/recent-attendance"
+import { NilaiMapelList } from "../shared/nilai-mapel-list"
+import { ParentInformationCard } from "../shared/parent-info-card"
 
 // Student data
 const santriInfo = {
@@ -120,6 +124,35 @@ export default function SantriPanelPage() {
           <RecentAttendanceTab recentAttendance={recentAttendance} />
         </TabsContent>
       </Tabs>
+
+      <Card className="border-border/50">
+        <CardHeader>
+          <CardTitle className="text-lg">Administrasi Santri</CardTitle>
+          <CardDescription>
+            Akses cepat untuk memantau tagihan, status pembayaran, dan pengumuman administrasi terbaru.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Button asChild variant="outline" className="justify-start">
+            <Link href="/dashboard/santri-panel/administrasi">
+              <Receipt className="mr-2 h-4 w-4" />
+              Lihat Tagihan
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="justify-start">
+            <Link href="/dashboard/santri-panel/administrasi">
+              <Wallet className="mr-2 h-4 w-4" />
+              Status Pembayaran
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="justify-start">
+            <Link href="/dashboard/santri-panel/pengumuman">
+              <Megaphone className="mr-2 h-4 w-4" />
+              Info Administrasi
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <ParentInformationCard />
     </div>

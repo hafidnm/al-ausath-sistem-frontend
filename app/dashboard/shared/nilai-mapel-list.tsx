@@ -109,21 +109,11 @@ export function NilaiMapelList({ tahunAjaran, semester }: NilaiMapelListProps) {
             <TableBody>
               {data.map((item, idx) => (
                 <TableRow key={idx} className="hover:bg-muted/30">
-                  <TableCell className="font-medium text-foreground">
-                    {item.mapel || item.kode_mapel}
-                  </TableCell>
-                  <TableCell className="text-right font-medium text-primary">
-                    {getValueDisplay(item.nilai_rapor_tampil)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {item.ujian_akhir > 0 ? item.ujian_akhir.toFixed(2) : "-"}
-                  </TableCell>
-                  <TableCell>
-                    {getStatusBadge(item.status_ketuntasan)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {item.keterangan || "-"}
-                  </TableCell>
+                  <TableCell className="font-medium text-foreground">{item.mapel || item.kode_mapel}</TableCell>
+                  <TableCell className="text-right font-medium text-primary">{getValueDisplay(item.nilai_rapor_tampil)}</TableCell>
+                  <TableCell className="text-right font-medium">{item.ujian_akhir > 0 ? item.ujian_akhir.toFixed(2) : "-"}</TableCell>
+                  <TableCell>{getStatusBadge(item.status_ketuntasan)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{item.keterangan || "-"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

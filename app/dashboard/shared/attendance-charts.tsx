@@ -40,7 +40,6 @@ export function AttendanceCharts({
 }: AttendanceChartsProps) {
   return (
     <div className="grid lg:grid-cols-3 gap-6">
-      {/* Monthly Chart */}
       <Card className="border-border/50 lg:col-span-2">
         <CardHeader>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -87,7 +86,6 @@ export function AttendanceCharts({
         </CardContent>
       </Card>
 
-      {/* Pie Chart */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="text-lg text-foreground">Distribusi Kehadiran</CardTitle>

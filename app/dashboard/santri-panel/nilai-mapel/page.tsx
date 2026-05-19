@@ -1,6 +1,6 @@
 "use client"
 
-import { NilaiMapelList } from "../nilai-mapel-list"
+import { NilaiMapelList } from "../../shared/nilai-mapel-list"
 
 export default function NilaiMapelPage() {
   return (

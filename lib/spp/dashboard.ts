@@ -108,7 +108,7 @@ export const mapPaymentToForm = (payment: SppPayment): PaymentFormState => ({
 
 /** Map setting for the edit form */
 export const mapSettingToForm = (setting: SppSetting): SettingFormState => ({
-  kodeKelas: setting.kodeKelas,
-  idGolonganSpp: setting.idGolonganSpp,
+  kodeKelas: setting.kodeKelas ?? "",
+  idGolonganSpp: setting.idGolonganSpp ?? "",
   nominal: setting.nominal.toString(),
 });

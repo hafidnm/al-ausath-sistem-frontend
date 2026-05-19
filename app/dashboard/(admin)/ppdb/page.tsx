@@ -317,7 +317,7 @@ export default function PpdbPage() {
         id: item.id_kelas ?? item.id ?? -1,
         kode_kelas: item.kode_kelas ?? "",
         nama_kelas: item.nama_kelas ?? "",
-        tahun_ajaran: item.tahun_ajaran ?? item.tahunAjaranRelasi?.tahun_ajaran ?? item.tahun_ajaran_relasi?.tahun_ajaran ?? "",
+        tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? (item.tahun_ajaran_relasi as any)?.tahun_ajaran ?? "",
       })).filter(item => item.kode_kelas)
       setKelasList(mappedList)
     } catch (err) {
