@@ -312,7 +312,7 @@ function VerifikasiPembayaranTab() {
       await ubahStatus(row.id, { status })
       toast({ title: "Status Diperbarui", description: `Status berhasil diubah ke ${status}.` })
       
-      if (status === "lunas" || status === "terverifikasi") {
+      if (status === "lunas") {
         const phone = row.noHp || "";
         const message = encodeURIComponent(`Assalamu'alaikum, pemberitahuan dari Ponpes Al-Ausath.\n\nPembayaran ${row.jenisTransaksi} atas nama *${row.namaLengkap}* telah *berhasil diverifikasi* (Lunas).\n\nTerima kasih.`);
         if (phone) {

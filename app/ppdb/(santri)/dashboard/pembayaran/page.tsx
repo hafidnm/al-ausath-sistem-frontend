@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info } from 'lucide-react';
+import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -91,6 +91,29 @@ export default function PpdbPembayaranPage() {
       });
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDownloadKwitansi = async () => {
+    if (!data?.pembayaranPpdb?.id_pembayaran) return;
+    try {
+      const response = await api.get(`/administrasi/spp/pembayaran/${data.pembayaranPpdb.id_pembayaran}/kwitansi`, {
+        responseType: 'blob',
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `Kwitansi-PPDB-${data.pembayaranPpdb.id_pembayaran}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      toast({
+        title: 'Gagal',
+        description: 'Kwitansi belum tersedia atau gagal diunduh',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -253,9 +276,15 @@ export default function PpdbPembayaranPage() {
                 <p className="font-semibold text-emerald-800">Pembayaran Selesai</p>
                 <p className="text-sm text-emerald-600">Terima kasih, Anda telah resmi menjadi santri.</p>
               </div>
-              <Button asChild variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100">
-                <Link href="/ppdb/dashboard">Lihat Dashboard</Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleDownloadKwitansi} variant="default" className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Download className="w-4 h-4 mr-2" />
+                  Kwitansi
+                </Button>
+                <Button asChild variant="outline" className="border-emerald-200 text-emerald-700 hover:bg-emerald-100">
+                  <Link href="/ppdb/dashboard">Dashboard</Link>
+                </Button>
+              </div>
             </CardFooter>
           )}
         </Card>

@@ -346,7 +346,14 @@ export const ppdbPortalApi = {
 
   async updateForm(payload: PpdbPortalFormRequest): Promise<unknown> {
     const containsFile = hasFilePayload(payload);
-    const requestConfig = containsFile ? { headers: { Accept: 'application/json' } } : undefined;
+    const requestConfig = containsFile
+      ? {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'multipart/form-data',
+          },
+        }
+      : undefined;
 
     const requestBody = containsFile
       ? (() => {
