@@ -1,4 +1,4 @@
-﻿import api, { getCsrfToken } from "../axios"
+import api, { getCsrfToken } from "../axios"
 
 export type BackendSantriStatus = "AKTIF" | "CUTI" | "LULUS" | "KELUAR"
 
@@ -394,6 +394,18 @@ export const dataSantriService = {
     await getCsrfToken()
 
     const response = await api.post<{ message: string; data: unknown }>(`${SANTRI_BASE_PATH}/pindah-kelas`, payload)
+    return response.data
+  },
+
+  async bulkLulus(ids: number[], tahun_lulus: number): Promise<{ message: string; data: { total_terupdate: number; tahun_lulus: number } }> {
+    await getCsrfToken()
+    const response = await api.post(`${SANTRI_BASE_PATH}/bulk-lulus`, { ids, tahun_lulus })
+    return response.data
+  },
+
+  async batalLulus(ids: number[]): Promise<{ message: string; data: { total_terupdate: number } }> {
+    await getCsrfToken()
+    const response = await api.post(`${SANTRI_BASE_PATH}/batal-lulus`, { ids })
     return response.data
   },
 

@@ -176,6 +176,8 @@ export default function AkunSantriPage() {
 
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ units: [], classes: [], years: [] })
   const rowsLimit = Number(rowsPerPage)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [isBulkActionLoading, setIsBulkActionLoading] = useState(false)
 
   const displayedRows = useMemo(() => {
     return rows.filter((row) => {
@@ -435,6 +437,34 @@ export default function AkunSantriPage() {
         description: getErrorMessage(error, "Akun santri gagal dihapus."),
         variant: "destructive",
       })
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) {
+      toast({ title: "Belum Ada Yang Dipilih", description: "Pilih minimal satu akun untuk dihapus.", variant: "destructive" })
+      return
+    }
+    const confirmed = window.confirm(`Hapus ${selectedIds.length} akun santri terpilih?`)
+    if (!confirmed) return
+    setIsBulkActionLoading(true)
+    try {
+      const results = await Promise.allSettled(selectedIds.map(id => dataAkunSantriService.remove(id)))
+      const success = results.filter(r => r.status === "fulfilled").length
+      const failed = results.length - success
+      toast({
+        title: success > 0 ? "Berhasil" : "Gagal",
+        description: failed > 0
+          ? `${success} akun berhasil dihapus, ${failed} gagal.`
+          : `${success} akun santri berhasil dihapus.`,
+        variant: success === 0 ? "destructive" : "default",
+      })
+      setSelectedIds([])
+      void fetchRows()
+    } catch (error) {
+      toast({ title: "Gagal", description: getErrorMessage(error, "Gagal menghapus akun santri."), variant: "destructive" })
+    } finally {
+      setIsBulkActionLoading(false)
     }
   }
 
@@ -768,11 +798,29 @@ export default function AkunSantriPage() {
 
       <Card className="border-border/50">
         <CardHeader className="pb-4">
-          <div className="flex items-center justify-end">
-            <Select value={rowsPerPage} onValueChange={setRowsPerPage}>
-              <SelectTrigger className="w-[90px]">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Select
+              defaultValue="aksi-massal"
+              onValueChange={(value) => {
+                if (value === "hapus") void handleBulkDelete()
+                if (value === "nonaktifkan") {
+                  // future: bulk nonaktif
+                }
+              }}
+            >
+              <SelectTrigger className="w-[170px]">
                 <SelectValue />
               </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="aksi-massal">Aksi Massal</SelectItem>
+                <SelectItem value="hapus" disabled={isBulkActionLoading}>
+                  <span className="flex items-center gap-2"><Trash2 className="h-4 w-4" />{isBulkActionLoading ? "Memproses..." : "Hapus Terpilih"}</span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={rowsPerPage} onValueChange={setRowsPerPage}>
+              <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="25">25</SelectItem>
@@ -788,6 +836,16 @@ export default function AkunSantriPage() {
             <Table>
               <TableHeader>
                 <TableRow className="border-border">
+                  <TableHead className="w-[52px]">
+                    <Checkbox
+                      checked={displayedRows.length > 0 && displayedRows.every(r => selectedIds.includes(r.id))}
+                      onCheckedChange={v => {
+                        if (v) setSelectedIds(displayedRows.map(r => r.id))
+                        else setSelectedIds([])
+                      }}
+                      aria-label="Pilih semua"
+                    />
+                  </TableHead>
                   <TableHead>#</TableHead>
                   <TableHead>Nama Unit</TableHead>
                   <TableHead>Nama Akun</TableHead>
@@ -804,19 +862,28 @@ export default function AkunSantriPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                       Memuat data...
                     </TableCell>
                   </TableRow>
                 ) : displayedRows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
+                    <TableCell colSpan={11} className="py-8 text-center text-muted-foreground">
                       Belum ada data akun santri.
                     </TableCell>
                   </TableRow>
                 ) : (
                   displayedRows.map((row, index) => (
                     <TableRow key={row.id} className="border-border">
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.includes(row.id)}
+                          onCheckedChange={v => {
+                            if (v) setSelectedIds(p => p.includes(row.id) ? p : [...p, row.id])
+                            else setSelectedIds(p => p.filter(id => id !== row.id))
+                          }}
+                        />
+                      </TableCell>
                       <TableCell>{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
                       <TableCell>{row.namaUnit || "-"}</TableCell>
                       <TableCell>{row.namaAkun || "-"}</TableCell>

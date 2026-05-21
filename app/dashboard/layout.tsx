@@ -52,6 +52,7 @@ const adminMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
   { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
   { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
+  { icon: GraduationCap, label: "Santri Lulus", href: "/dashboard/santri/lulus" },
   { icon: UserCheck, label: "Data Akun Santri", href: "/dashboard/akun-santri" },
   { icon: GraduationCap, label: "Data Guru", href: "/dashboard/guru" },
   { icon: School, label: "Data Kelas", href: "/dashboard/kelas" },

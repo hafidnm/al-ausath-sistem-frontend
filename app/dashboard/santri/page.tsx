@@ -60,6 +60,7 @@ import {
   GraduationCap,
   Rows3,
   Search,
+  BookCheck,
 } from "lucide-react"
 
 interface SantriRow {
@@ -217,7 +218,7 @@ export default function SantriPage() {
   const [selectedKelas, setSelectedKelas] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
-  const [selectedStatus, setSelectedStatus] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("AKTIF")
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranOption[]>([])
@@ -244,6 +245,10 @@ export default function SantriPage() {
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState<SantriFormData>(defaultForm)
   const [editingFormData, setEditingFormData] = useState<SantriFormData>(defaultForm)
+
+  const [isLulusDialogOpen, setIsLulusDialogOpen] = useState(false)
+  const [tahunLulusInput, setTahunLulusInput] = useState(String(new Date().getFullYear()))
+  const [lulusSingleTarget, setLulusSingleTarget] = useState<SantriRow | null>(null)
 
   const rowsLimit = Number(rowsPerPage)
 
@@ -277,7 +282,14 @@ export default function SantriPage() {
       if (selectedUnit !== "all") params.kode_unit = selectedUnit
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
       if (selectedTahunAjaran !== "all") params.tahun_ajaran = selectedTahunAjaran
-      if (selectedStatus !== "all") params.status = selectedStatus
+
+      // Bila "all", kecualikan LULUS agar tidak memenuhi list — santri lulus ada di halaman tersendiri
+      if (selectedStatus === "all") {
+        // tidak kirim filter status, backend akan return semua termasuk LULUS
+        // tapi kita biarkan apa adanya — stats card lulus sudah dipisah
+      } else {
+        params.status = selectedStatus
+      }
 
       const result = await dataSantriService.getAll(params)
       const mappedRows = result.data.map(normalizeSantriRow).filter((row) => row.id > 0)
@@ -293,7 +305,7 @@ export default function SantriPage() {
       if (selectedKelas !== "all") summaryBaseParams.kode_kelas = selectedKelas
       if (selectedTahunAjaran !== "all") summaryBaseParams.tahun_ajaran = selectedTahunAjaran
 
-      if (selectedStatus === "all") {
+      if (selectedStatus === "all" || selectedStatus === "AKTIF" || selectedStatus === "CUTI" || selectedStatus === "KELUAR") {
         const [aktifResult, lulusResult, keluarResult] = await Promise.all([
           dataSantriService.getAll({ ...summaryBaseParams, status: "AKTIF", page: 1, per_page: 1 }),
           dataSantriService.getAll({ ...summaryBaseParams, status: "LULUS", page: 1, per_page: 1 }),
@@ -311,7 +323,7 @@ export default function SantriPage() {
         setSummaryTotals({
           totalSantri: totalByStatus,
           aktif: selectedStatus === "AKTIF" ? totalByStatus : 0,
-          lulus: selectedStatus === "LULUS" ? totalByStatus : 0,
+          lulus: 0,
           keluar: selectedStatus === "KELUAR" ? totalByStatus : 0,
         })
       }
@@ -591,6 +603,38 @@ export default function SantriPage() {
     }
   }
 
+  const openLulusDialog = (single?: SantriRow) => {
+    setLulusSingleTarget(single ?? null)
+    setTahunLulusInput(String(new Date().getFullYear()))
+    setIsLulusDialogOpen(true)
+  }
+
+  const handleConfirmLulus = async () => {
+    const tahun = parseInt(tahunLulusInput, 10)
+    if (!tahun || tahun < 2000 || tahun > 2100) {
+      toast({ title: "Tahun tidak valid", description: "Masukkan tahun antara 2000 – 2100.", variant: "destructive" })
+      return
+    }
+    const ids = lulusSingleTarget ? [lulusSingleTarget.id] : selectedIds
+    if (ids.length === 0) {
+      toast({ title: "Belum ada yang dipilih", description: "Pilih minimal satu santri.", variant: "destructive" })
+      return
+    }
+    setIsBulkActionLoading(true)
+    try {
+      const result = await dataSantriService.bulkLulus(ids, tahun)
+      toast({ title: "Berhasil", description: result.message })
+      setIsLulusDialogOpen(false)
+      setSelectedIds([])
+      setLulusSingleTarget(null)
+      void fetchRows()
+    } catch (error) {
+      toast({ title: "Gagal", description: getErrorMessage(error, "Gagal meluluskan santri."), variant: "destructive" })
+    } finally {
+      setIsBulkActionLoading(false)
+    }
+  }
+
   const formFields = (
     data: SantriFormData,
     setData: Dispatch<SetStateAction<SantriFormData>>,
@@ -754,6 +798,13 @@ export default function SantriPage() {
             </Button>
           </Link>
 
+          <Link href="/dashboard/santri/lulus">
+            <Button size="sm" className="h-10 bg-primary px-4 text-primary-foreground hover:bg-primary/90">
+              <GraduationCap className="mr-2 h-4 w-4" />
+              Santri Lulus
+            </Button>
+          </Link>
+
           <Link href="/dashboard/santri/trash">
             <Button size="sm" className="h-10 bg-primary px-4 text-primary-foreground hover:bg-primary/90">
               <Trash2 className="mr-2 h-4 w-4" />
@@ -765,26 +816,57 @@ export default function SantriPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {[
-          { label: "Jumlah Santri (Total)", count: summaryTotals.totalSantri, color: "bg-primary" },
-          { label: "Santri Aktif (Total)", count: stats.aktif, color: "bg-primary/90" },
-          { label: "Santri Lulus (Total)", count: stats.lulus, color: "bg-primary/80" },
-          { label: "Santri Keluar (Total)", count: stats.keluar, color: "bg-primary/70" },
-        ].map((stat) => (
-          <Card key={stat.label} className={`overflow-hidden border-0 text-white ${stat.color}`}>
+        <Card className="overflow-hidden border-0 text-white bg-primary">
+          <CardContent className="relative p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90">Jumlah Santri (Total)</p>
+                <p className="text-4xl font-semibold leading-tight">{summaryTotals.totalSantri}</p>
+              </div>
+              <div className="rounded-full bg-white/20 p-4"><GraduationCap className="h-9 w-9 opacity-80" /></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="overflow-hidden border-0 text-white bg-primary/90">
+          <CardContent className="relative p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90">Santri Aktif (Total)</p>
+                <p className="text-4xl font-semibold leading-tight">{stats.aktif}</p>
+              </div>
+              <div className="rounded-full bg-white/20 p-4"><GraduationCap className="h-9 w-9 opacity-80" /></div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Lulus card — klik langsung ke halaman arsip alumni */}
+        <Link href="/dashboard/santri/lulus" className="block">
+          <Card className="overflow-hidden border-0 text-white bg-primary/80 h-full hover:bg-primary/70 transition-colors cursor-pointer">
             <CardContent className="relative p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm opacity-90">{stat.label}</p>
-                  <p className="text-4xl font-semibold leading-tight">{stat.count}</p>
+                  <p className="text-sm opacity-90">Santri Lulus (Total)</p>
+                  <p className="text-4xl font-semibold leading-tight">{stats.lulus}</p>
+                  <p className="text-xs opacity-70 mt-1">Klik untuk lihat arsip →</p>
                 </div>
-                <div className="rounded-full bg-white/20 p-4">
-                  <GraduationCap className="h-9 w-9 opacity-80" />
-                </div>
+                <div className="rounded-full bg-white/20 p-4"><GraduationCap className="h-9 w-9 opacity-80" /></div>
               </div>
             </CardContent>
           </Card>
-        ))}
+        </Link>
+
+        <Card className="overflow-hidden border-0 text-white bg-primary/70">
+          <CardContent className="relative p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm opacity-90">Santri Keluar (Total)</p>
+                <p className="text-4xl font-semibold leading-tight">{stats.keluar}</p>
+              </div>
+              <div className="rounded-full bg-white/20 p-4"><GraduationCap className="h-9 w-9 opacity-80" /></div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Card className="border">
@@ -876,13 +958,16 @@ export default function SantriPage() {
                       <SelectValue placeholder="Status Santri" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Semua Status</SelectItem>
                       <SelectItem value="AKTIF">Aktif</SelectItem>
                       <SelectItem value="CUTI">Cuti</SelectItem>
-                      <SelectItem value="LULUS">Lulus</SelectItem>
                       <SelectItem value="KELUAR">Keluar</SelectItem>
+                      <SelectItem value="all">Semua (termasuk Lulus)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Santri Lulus dikelola di{" "}
+                    <Link href="/dashboard/santri/lulus" className="text-primary underline underline-offset-2">halaman Santri Lulus</Link>.
+                  </p>
                 </div>
               </div>
             </CardContent>
@@ -896,9 +981,8 @@ export default function SantriPage() {
             <Select
               defaultValue="aksi-massal"
               onValueChange={(value) => {
-                if (value === "hapus") {
-                  void handleBulkDelete()
-                }
+                if (value === "hapus") void handleBulkDelete()
+                if (value === "lulus") openLulusDialog()
               }}
             >
               <SelectTrigger className="w-[170px]">
@@ -906,6 +990,9 @@ export default function SantriPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="aksi-massal">Aksi Massal</SelectItem>
+                <SelectItem value="lulus" disabled={isBulkActionLoading}>
+                  <span className="flex items-center gap-2"><BookCheck className="h-4 w-4" />Luluskan Terpilih</span>
+                </SelectItem>
                 <SelectItem value="hapus" disabled={isBulkActionLoading}>
                   {isBulkActionLoading ? "Memproses..." : "Hapus Terpilih"}
                 </SelectItem>
@@ -1018,6 +1105,12 @@ export default function SantriPage() {
                               <FileSpreadsheet className="mr-2 h-4 w-4" />
                               Lihat Rapor
                             </DropdownMenuItem>
+                            {santri.status !== "LULUS" && (
+                              <DropdownMenuItem onClick={() => openLulusDialog(santri)}>
+                                <GraduationCap className="mr-2 h-4 w-4" />
+                                Luluskan
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(santri)}>
                               <Trash2 className="mr-2 h-4 w-4" />
@@ -1115,6 +1208,50 @@ export default function SantriPage() {
             </Button>
             <Button className="bg-primary text-primary-foreground" onClick={handleUpdate}>
               Simpan Perubahan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Konfirmasi Luluskan */}
+      <Dialog open={isLulusDialogOpen} onOpenChange={setIsLulusDialogOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="w-5 h-5 text-primary" />
+              Konfirmasi Kelulusan
+            </DialogTitle>
+            <DialogDescription>
+              {lulusSingleTarget
+                ? `Luluskan santri: ${lulusSingleTarget.namaLengkap}`
+                : `Luluskan ${selectedIds.length} santri yang dipilih`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="tahun-lulus">Tahun Lulus</Label>
+              <Input
+                id="tahun-lulus"
+                type="number"
+                min={2000}
+                max={2100}
+                value={tahunLulusInput}
+                onChange={(e) => setTahunLulusInput(e.target.value)}
+                placeholder="Contoh: 2025"
+              />
+            </div>
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+              Status santri akan berubah menjadi <strong>LULUS</strong> dan tahun lulus akan dicatat. Aksi ini bisa dibatalkan dari halaman Santri Lulus.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsLulusDialogOpen(false)}>Batal</Button>
+            <Button
+              className="bg-primary text-primary-foreground"
+              onClick={handleConfirmLulus}
+              disabled={isBulkActionLoading}
+            >
+              {isBulkActionLoading ? "Memproses..." : "Luluskan"}
             </Button>
           </DialogFooter>
         </DialogContent>
