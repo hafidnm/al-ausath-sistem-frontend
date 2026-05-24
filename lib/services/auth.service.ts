@@ -1,4 +1,4 @@
-import api, { getCsrfToken } from '../axios';
+import api, { getCsrfToken, setStoredPpdbToken } from '../axios';
 
 export interface LoginRequest {
   role: 'petugas' | 'santri';
@@ -17,6 +17,10 @@ export interface LoginResponse {
     peran_akun: string;
     pilihan_unit: string;
   };
+  access_token?: string;
+  api_token?: string;
+  plainTextToken?: string;
+  token?: string;
 }
 
 // Hapus cookie secara paksa dari sisi client
@@ -35,8 +39,20 @@ export const authService = {
     await getCsrfToken();
     
     const response = await api.post<LoginResponse>('/login', data);
+    const responseData = response.data;
     
-    return response.data;
+    // Extract and store token from various possible fields
+    const token = responseData.access_token || 
+                  responseData.plainTextToken || 
+                  responseData.api_token || 
+                  responseData.token ||
+                  response.headers['authorization']?.replace('Bearer ', '');
+    
+    if (token) {
+      setStoredPpdbToken(token);
+    }
+    
+    return responseData;
   },
 
   logout: async (): Promise<void> => {

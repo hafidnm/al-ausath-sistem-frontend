@@ -552,6 +552,47 @@ export default function SppTagihanDetailPage() {
                 <div className="text-muted-foreground">Status</div>
                 <div><StatusBadge statusKey={selectedInvoice.status_key} /></div>
               </div>
+
+              {/* Bukti Pembayaran */}
+              {selectedInvoice.bukti_bayar_url && (
+                <div className="mt-4 p-4 rounded-lg border bg-muted/40 space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Bukti Transfer / Bayar</span>
+                  {(() => {
+                    const resolvedUrl = (() => {
+                      const url = selectedInvoice.bukti_bayar_url;
+                      if (!url) return "";
+                      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+                      const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
+                      if (url.startsWith("/storage/")) return `${base}${url}`;
+                      if (url.startsWith("storage/")) return `${base}/${url}`;
+                      return `${base}/storage/${url.replace(/^\//, "")}`;
+                    })();
+
+                    return resolvedUrl.toLowerCase().endsWith('.pdf') ? (
+                      <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-1.5" asChild>
+                        <a href={resolvedUrl} target="_blank" rel="noreferrer">
+                          <span>Lihat Dokumen PDF Bukti Bayar</span>
+                        </a>
+                      </Button>
+                    ) : (
+                      <div className="relative group overflow-hidden rounded-md border bg-background flex flex-col items-center">
+                        <img 
+                          src={resolvedUrl} 
+                          alt="Bukti Transfer" 
+                          className="max-h-48 object-contain rounded w-full hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
+                          onClick={() => window.open(resolvedUrl, "_blank")}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1.5 pb-1">Klik gambar untuk melihat resolusi penuh</p>
+                      </div>
+                    );
+                  })()}
+                  {selectedInvoice.catatan_bayar && (
+                    <div className="text-xs text-muted-foreground italic border-t pt-2 mt-2">
+                      <strong>Catatan Pengirim:</strong> {selectedInvoice.catatan_bayar}
+                    </div>
+                  )}
+                </div>
+              )}
               
               {selectedInvoice.status_key === 'lunas' && (
                 <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100 flex items-center justify-between">

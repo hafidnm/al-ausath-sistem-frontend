@@ -60,13 +60,13 @@ export default function LandingPage() {
                 <Moon className="w-6 h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-lg font-bold text-foreground">e-Rapor Pesantren</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Sistem Penilaian Digital</p>
+                <h1 className="text-lg font-bold text-foreground">Pesantren Al Ausath</h1>
+                <p className="text-xs text-muted-foreground hidden sm:block">Portal & e-Rapor Digital</p>
               </div>
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <Link href="#ppdb" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <Link href="ppdb/register" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 PPDB
               </Link>
               <Link href="#profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
@@ -118,18 +118,14 @@ export default function LandingPage() {
       <section className="py-20 md:py-32 bg-gradient-to-b from-sidebar/10 to-background">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center space-y-6">
-            <Badge variant="secondary" className="px-4 py-1.5 text-sm">
-              <Star className="w-3.5 h-3.5 mr-2" />
-              Dipercaya oleh 500+ Pesantren di Indonesia
-            </Badge>
             
             <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
-              Sistem e-Rapor Digital untuk{" "}
+              Sistem Informasi Digital{" "}
               <span className="text-primary">Pesantren Modern</span>
             </h1>
             
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-              Kelola nilai santri dengan mudah dan efisien. Mendukung jenjang PAUD hingga SMA dengan fitur lengkap untuk admin, guru, dan wali santri.
+              Menggabungkan sistem pendidikan formal dengan keagamaan. Menyediakan portal pendaftaran santri baru (PPDB) serta pengelolaan administrasi & e-Rapor secara terintegrasi.
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -149,43 +145,22 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-4xl mx-auto">
-            <StatCard number="500+" label="Pesantren" />
-            <StatCard number="50K+" label="Santri Aktif" />
-            <StatCard number="5K+" label="Guru & Ustadz" />
-            <StatCard number="99.9%" label="Uptime" />
+            <StatCard number="1" label="Mitra Institusi" />
+            <StatCard number="4" label="Bidang Kegiatan" />
+            <StatCard number="10++" label="Ustadz & Guru" />
+            <StatCard number="Banyak" label="Fasilitas Belajar" />
           </div>
         </div>
       </section>
 
-      {/* PPDB Section */}
-      <section id="ppdb" className="scroll-mt-24 py-20 bg-background">
-        <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <Card className="border-border/70 shadow-lg">
-              <CardHeader className="bg-sidebar/5 border-b border-border rounded-t-xl">
-                <Badge variant="outline" className="w-fit mb-3">PPDB 1447/1448 H</Badge>
-                <CardTitle className="text-2xl md:text-3xl tracking-tight text-foreground">
-                  BUAT AKUN PENDAFTAR
-                </CardTitle>
-                <CardDescription className="text-base text-muted-foreground">
-                  Tahap 1 PPDB: daftar akun, lalu lengkapi form data santri di dashboard pendaftar.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-6 md:p-8">
-                <PpdbRegistrationForm />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
 
       {/* Profile Section */}
       <section id="profile" className="py-20 bg-sidebar/5">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">Tentang Kami</Badge>
+            <Badge variant="outline" className="mb-4">Profil Institusi Mitra</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Profil Pesantren
+              Pondok Pesantren Al Ausath
             </h2>
           </div>
 
@@ -230,20 +205,65 @@ export default function LandingPage() {
             </Card>
           </div>
 
-          <Card className="max-w-5xl mx-auto mt-8">
-            <CardHeader>
-              <CardTitle>Sejarah Singkat</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground leading-relaxed">
-                Pesantren kami didirikan pada tahun 1995 dengan visi mencetak generasi Qur'ani yang berakhlak mulia. 
-                Dimulai dari 25 santri, kini telah berkembang menjadi lembaga pendidikan terpercaya dengan lebih dari 
-                2.000 santri dari berbagai daerah di Indonesia. Dengan menggabungkan kurikulum pesantren tradisional 
-                dan pendidikan modern, kami terus berinovasi menghadirkan sistem pembelajaran terbaik, termasuk 
-                implementasi sistem e-Rapor digital untuk kemudahan monitoring perkembangan santri.
-              </p>
-            </CardContent>
-          </Card>
+          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 mt-8">
+            <Card className="flex flex-col h-full">
+              <CardHeader>
+                <CardTitle>Sejarah Singkat</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-4">
+                <p className="text-muted-foreground leading-relaxed text-justify">
+                  Pondok Pesantren Al Ausath merupakan salah satu lembaga pendidikan yang berada di Kabupaten Karanganyar, Jawa Tengah. Pondok pesantren ini menggabungkan sistem pendidikan formal dengan pendidikan berbasis keagamaan, sehingga santri tidak hanya memperoleh ilmu akademik, tetapi juga pemahaman agama yang kuat.
+                </p>
+                <p className="text-muted-foreground leading-relaxed text-justify">
+                  Dalam proses pembelajaran, Pondok Pesantren Al Ausath menerapkan kurikulum yang berlaku secara umum serta dipadukan dengan kurikulum keislaman. Selain kegiatan belajar mengajar, pesantren juga menyediakan berbagai kegiatan ekstrakurikuler seperti karate, basket, futsal, serta kelompok belajar untuk menunjang pengembangan kemampuan santri secara menyeluruh.
+                </p>
+                <p className="text-muted-foreground leading-relaxed text-justify">
+                  Pondok Pesantren Al Ausath memiliki tenaga pengajar yang kompeten, baik ustadz maupun guru, yang memiliki keahlian pada bidangnya masing-masing. Selain itu, tersedia berbagai fasilitas pendukung seperti ruang kelas, asrama, laboratorium, perpustakaan, lapangan olahraga, kantin, serta masjid yang menunjang kegiatan belajar dan kehidupan santri di lingkungan pesantren.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="flex flex-col h-full">
+              <CardHeader>
+                <CardTitle>Bidang Kegiatan</CardTitle>
+                <CardDescription>
+                  Program dan lingkup kegiatan Pondok Pesantren Al Ausath
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1">
+                <ul className="space-y-4">
+                  <li className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">1</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Pendidikan formal dan keagamaan</p>
+                      <p className="text-sm text-muted-foreground">Penggabungan kurikulum umum nasional dengan pengajaran keagamaan Islam secara intensif.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">2</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Pengelolaan administrasi santri</p>
+                      <p className="text-sm text-muted-foreground">Sistem informasi untuk mempermudah pendaftaran (PPDB), e-Rapor, dan rekam perkembangan santri.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">3</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Kegiatan ekstrakurikuler</p>
+                      <p className="text-sm text-muted-foreground">Penunjang minat bakat santri seperti olahraga karate, basket, futsal, dan kelompok belajar.</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">4</div>
+                    <div>
+                      <p className="font-semibold text-foreground">Pembinaan karakter dan keagamaan</p>
+                      <p className="text-sm text-muted-foreground">Pendidikan moral, pembentukan disiplin ibadah harian, dan kepribadian Islami yang kokoh.</p>
+                    </div>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </section>
 
@@ -389,8 +409,7 @@ export default function LandingPage() {
                   <div>
                     <p className="font-medium mb-1">Alamat Lengkap</p>
                     <p className="text-sm text-muted-foreground">
-                      Jl. Pesantren Modern No. 123, Kelurahan Pendidikan,
-                      Kecamatan Ilmu, Kota Santri, Provinsi Berkah 12345
+                      Unnamed Road, Gotamon, Jati, Kec. Jaten, Kabupaten Karanganyar, Jawa Tengah 57731, Indonesia
                     </p>
                   </div>
                 </div>
@@ -398,9 +417,8 @@ export default function LandingPage() {
                 <div className="flex gap-3">
                   <Phone className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
                   <div>
-                    <p className="font-medium mb-1">Telepon</p>
-                    <p className="text-sm text-muted-foreground">+62 21 1234 5678</p>
-                    <p className="text-sm text-muted-foreground">+62 812 3456 7890 (WhatsApp)</p>
+                    <p className="font-medium mb-1">Telepon & WhatsApp</p>
+                    <p className="text-sm text-muted-foreground">+62 812-3456-7890 (Layanan PPDB / Informasi)</p>
                   </div>
                 </div>
 
@@ -408,49 +426,50 @@ export default function LandingPage() {
                   <Mail className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
                   <div>
                     <p className="font-medium mb-1">Email</p>
-                    <p className="text-sm text-muted-foreground">info@pesantrenmodern.sch.id</p>
-                    <p className="text-sm text-muted-foreground">ppdb@pesantrenmodern.sch.id</p>
+                    <p className="text-sm text-muted-foreground">info@alausath-karanganyar.sch.id</p>
                   </div>
                 </div>
 
                 <div className="flex gap-3">
                   <Clock className="w-5 h-5 text-primary mt-1 flex-shrink-0" />
                   <div>
-                    <p className="font-medium mb-1">Jam Operasional</p>
-                    <p className="text-sm text-muted-foreground">Senin - Jumat: 08.00 - 16.00 WIB</p>
-                    <p className="text-sm text-muted-foreground">Sabtu: 08.00 - 14.00 WIB</p>
-                    <p className="text-sm text-muted-foreground">Minggu & Libur: Tutup</p>
+                    <p className="font-medium mb-1">Jam Operasional Kantor</p>
+                    <p className="text-sm text-muted-foreground">Senin - Sabtu: 08.00 - 15.00 WIB</p>
+                    <p className="text-sm text-muted-foreground">Minggu & Hari Libur Nasional: Tutup</p>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="flex flex-col">
               <CardHeader>
                 <CardTitle>Peta Lokasi</CardTitle>
-                <CardDescription>Temukan kami di Google Maps</CardDescription>
+                <CardDescription>Lokasi Pondok Pesantren Al Ausath di Google Maps</CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="aspect-video bg-muted rounded-lg flex items-center justify-center border border-border">
-                  <div className="text-center space-y-2">
-                    <MapPin className="w-12 h-12 text-muted-foreground mx-auto" />
-                    <p className="text-sm text-muted-foreground">
-                      Peta lokasi pesantren
-                    </p>
-                    <Button variant="outline" size="sm">
-                      Buka di Google Maps
-                    </Button>
-                  </div>
+              <CardContent className="flex-1 flex flex-col justify-between">
+                <div className="aspect-video w-full rounded-lg overflow-hidden border border-border">
+                  <iframe
+                    src="https://maps.google.com/maps?q=Pondok%20Pesantren%20Al%20Ausath%20Jaten%20Karanganyar&t=&z=15&ie=UTF8&iwloc=&output=embed"
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    allowFullScreen
+                    loading="lazy"
+                    title="Peta Lokasi Pondok Pesantren Al Ausath"
+                  ></iframe>
                 </div>
                 
-                <div className="mt-4 p-4 bg-sidebar/10 rounded-lg border border-border">
-                  <p className="text-sm font-medium mb-2">Akses Transportasi</p>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    <li>• 5 menit dari Terminal Kota</li>
-                    <li>• 15 menit dari Stasiun Kereta</li>
-                    <li>• 30 menit dari Bandara</li>
-                    <li>• Tersedia angkutan umum dan ojek online</li>
-                  </ul>
+                <div className="mt-4 flex justify-end">
+                  <Button variant="outline" size="sm" asChild>
+                    <a
+                      href="https://www.google.com/maps/search/?api=1&query=Pondok+Pesantren+Al+Ausath+Jaten+Karanganyar"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Buka di Google Maps
+                    </a>
+                  </Button>
                 </div>
               </CardContent>
             </Card>
@@ -468,12 +487,12 @@ export default function LandingPage() {
                   <Moon className="w-6 h-6 text-sidebar-primary-foreground" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-sidebar-foreground">e-Rapor Pesantren</h3>
-                  <p className="text-xs text-sidebar-foreground/70">Sistem Penilaian Digital</p>
+                  <h3 className="font-bold text-sidebar-foreground">PP Al Ausath</h3>
+                  <p className="text-xs text-sidebar-foreground/70">Portal & e-Rapor Digital</p>
                 </div>
               </div>
               <p className="text-sm text-sidebar-foreground/70">
-                Sistem e-Rapor digital untuk pesantren modern di seluruh Indonesia.
+                Sistem informasi, administrasi, dan e-Rapor digital Pondok Pesantren Al Ausath Karanganyar.
               </p>
             </div>
 
@@ -502,22 +521,22 @@ export default function LandingPage() {
               <ul className="space-y-2 text-sm text-sidebar-foreground/70">
                 <li className="flex items-center gap-2">
                   <Phone className="w-4 h-4" />
-                  <span>+62 21 1234 5678</span>
+                  <span>+62 812-3456-7890</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
-                  <span>info@pesantren.sch.id</span>
+                  <span>info@alausath-karanganyar.sch.id</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <MapPin className="w-4 h-4 mt-0.5" />
-                  <span>Kota Santri, Provinsi Berkah</span>
+                  <span className="text-xs">Gotamon, Jati, Kec. Jaten, Kabupaten Karanganyar, Jawa Tengah</span>
                 </li>
               </ul>
             </div>
           </div>
 
           <div className="pt-8 border-t border-sidebar-border text-center text-sm text-sidebar-foreground/60">
-            <p>&copy; 2026 e-Rapor Pesantren. All rights reserved.</p>
+            <p>&copy; 2026 Pondok Pesantren Al Ausath. All rights reserved.</p>
           </div>
         </div>
       </footer>
