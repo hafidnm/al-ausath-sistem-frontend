@@ -74,8 +74,21 @@ const extractList = (payload: unknown): ApiRecord[] => {
 
   const record = payload as ApiRecord
   if (Array.isArray(record.data)) return record.data.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  if (record.data && typeof record.data === "object" && Array.isArray((record.data as ApiRecord).data)) {
+    return (record.data as ApiRecord).data.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  }
+  if (record.data && typeof record.data === "object") {
+    const nested = record.data as ApiRecord
+    if (Array.isArray(nested.items)) return nested.items.filter((item): item is ApiRecord => !!item && typeof item === "object")
+    if (Array.isArray(nested.results)) return nested.results.filter((item): item is ApiRecord => !!item && typeof item === "object")
+    if (nested.data && typeof nested.data === "object" && Array.isArray((nested.data as ApiRecord).data)) {
+      return (nested.data as ApiRecord).data.filter((item): item is ApiRecord => !!item && typeof item === "object")
+    }
+  }
   if (Array.isArray(record.items)) return record.items.filter((item): item is ApiRecord => !!item && typeof item === "object")
   if (Array.isArray(record.results)) return record.results.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray((record as ApiRecord).rows)) return (record as ApiRecord).rows.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray((record as ApiRecord).list)) return (record as ApiRecord).list.filter((item): item is ApiRecord => !!item && typeof item === "object")
 
   return []
 }
@@ -108,10 +121,11 @@ const normalizeBobot = (raw: ApiRecord): BobotNilaiItem => {
   const bobotHarian = toNumber(raw.bobot_harian ?? raw.bobot_tugas ?? raw.tugas ?? raw.harian, 0)
   const bobotUts = toNumber(raw.bobot_uts ?? raw.ulangan ?? raw.uts, 0)
   const bobotUas = toNumber(raw.bobot_uas ?? raw.ujian_akhir ?? raw.ujianAkhir ?? raw.uas, 0)
+  const tahunAjaran = (toText(raw.tahun_ajaran ?? raw.tahunAjaran ?? raw.kode_tahun ?? raw.tahun) ?? "").trim()
 
   return {
     id: toNumber(raw.id ?? raw.id_bobot ?? raw.bobot_id, -1),
-    tahun_ajaran: toText(raw.tahun_ajaran ?? raw.tahunAjaran ?? raw.kode_tahun ?? raw.tahun) ?? "",
+    tahun_ajaran: tahunAjaran,
     semester: toNumber(raw.semester, 0),
     bobot_harian: bobotHarian,
     bobot_uts: bobotUts,
