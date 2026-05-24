@@ -1,15 +1,22 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getCachedUser } from "@/lib/auth-cache"
-import { useTagihan } from "@/hooks/use-pembayaran"
+import { useTagihan, useTagihanDetail } from "@/hooks/use-pembayaran"
 import type { StatusPembayaran } from "@/lib/services/pembayaran.service"
-import { AlertCircle, Megaphone, Receipt, Wallet } from "lucide-react"
+import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import api from "@/lib/axios"
 
 const toText = (value: unknown): string => {
   if (typeof value === "string") return value
@@ -26,194 +33,598 @@ const formatCurrency = (value: number): string =>
 
 const statusLabelMap: Record<StatusPembayaran, string> = {
   menunggu_pembayaran: "Menunggu Pembayaran",
-  menunggu_konfirmasi: "Menunggu Konfirmasi",
+  menunggu_konfirmasi: "Menunggu Verifikasi",
   lunas: "Lunas",
   dibatalkan: "Dibatalkan",
 }
 
 const statusBadgeClassMap: Record<StatusPembayaran, string> = {
-  menunggu_pembayaran: "bg-red-500/15 text-red-600 border-0",
-  menunggu_konfirmasi: "bg-blue-500/15 text-blue-600 border-0",
-  lunas: "bg-emerald-500/15 text-emerald-600 border-0",
-  dibatalkan: "bg-slate-500/15 text-slate-600 border-0",
+  menunggu_pembayaran: "bg-rose-500/15 text-rose-600 border-0 text-xs font-semibold",
+  menunggu_konfirmasi: "bg-amber-500/15 text-amber-600 border-0 text-xs font-semibold animate-pulse",
+  lunas: "bg-emerald-500/15 text-emerald-600 border-0 text-xs font-semibold",
+  dibatalkan: "bg-slate-500/15 text-slate-600 border-0 text-xs font-semibold",
+}
+
+type InvoiceDetailRow = {
+  id_pembayaran: number
+  nomor_invoice: string
+  periode_tagihan: string | null
+  rincian_tagihan: string | null
+  jenis_tagihan: string
+  jumlah_tagihan: number
+  jumlah_dibayar: number
+  jumlah_tunggakan: number
+  status: string
+  status_key: StatusPembayaran
+  status_label: string
+  waktu_invoice: string | null
+  kwitansi_tersedia: boolean
+  kwitansi_url: string | null
 }
 
 export default function SantriAdministrasiPage() {
-  const { data: allTagihan, loading, error, fetchTagihan } = useTagihan()
+  const { toast } = useToast()
+  const { data: allTagihan, loading: loadingAll, fetchTagihan } = useTagihan()
+  const { data: detailData, loading: loadingDetail, fetchTagihanDetail } = useTagihanDetail()
+  
   const [nomorInduk, setNomorInduk] = useState("")
 
-  useEffect(() => {
-    void fetchTagihan()
-  }, [fetchTagihan])
+  // Payment upload states
+  const [payDialogOpen, setPayDialogOpen] = useState(false)
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceDetailRow | null>(null)
+  const [file, setFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [metode, setMetode] = useState("Transfer Bank")
+  const [catatan, setCatatan] = useState("")
+  const [downloadingKwitansiId, setDownloadingKwitansiId] = useState<number | null>(null)
+  
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const loadAuth = async () => {
       const authData = await getCachedUser()
       const nis = toText(authData?.user?.nomor_induk).trim()
       setNomorInduk(nis)
+      if (nis) {
+        void fetchTagihan({ nomor_induk: nis })
+      } else {
+        void fetchTagihan()
+      }
     }
 
     void loadAuth()
-  }, [])
+  }, [fetchTagihan])
 
-  const myTagihan = useMemo(() => {
-    if (!nomorInduk) return []
-    return allTagihan.filter((item) => toText(item.nomorInduk).trim() === nomorInduk)
+  const myTagihanRow = useMemo(() => {
+    if (!nomorInduk) return null
+    return allTagihan.find((item) => toText(item.nomorInduk).trim() === nomorInduk)
   }, [allTagihan, nomorInduk])
 
+  useEffect(() => {
+    if (myTagihanRow?.id) {
+      void fetchTagihanDetail(myTagihanRow.id)
+    }
+  }, [myTagihanRow?.id, fetchTagihanDetail])
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+    }
+  }, [previewUrl])
+
+  const handlePayClick = (invoice: InvoiceDetailRow) => {
+    setSelectedInvoice(invoice)
+    setFile(null)
+    setPreviewUrl(null)
+    setMetode("Transfer Bank")
+    setCatatan("")
+    setPayDialogOpen(true)
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0]
+    if (!selected) return
+
+    if (selected.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File terlalu besar",
+        description: "Ukuran maksimal file adalah 5MB",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setFile(selected)
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(selected))
+  }
+
+  const handleUpload = async () => {
+    if (!file || !selectedInvoice) return
+
+    setUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append("bukti_bayar", file)
+      formData.append("metode_bayar", metode)
+      if (catatan) {
+        formData.append("catatan_bayar", catatan)
+      }
+
+      await api.post(`/administrasi/pembayaran/${selectedInvoice.id_pembayaran}/upload-bukti`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+
+      toast({
+        title: "Berhasil",
+        description: "Bukti pembayaran berhasil diunggah. Menunggu konfirmasi admin.",
+      })
+
+      setPayDialogOpen(false)
+      setFile(null)
+      setPreviewUrl(null)
+      
+      // Re-fetch bills
+      if (myTagihanRow?.id) {
+        await fetchTagihanDetail(myTagihanRow.id)
+      }
+      if (nomorInduk) {
+        await fetchTagihan({ nomor_induk: nomorInduk })
+      } else {
+        await fetchTagihan()
+      }
+    } catch (error: any) {
+      toast({
+        title: "Gagal mengunggah",
+        description: error.response?.data?.message || "Terjadi kesalahan saat mengunggah bukti pembayaran",
+        variant: "destructive",
+      })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDownloadKwitansi = async (id: number) => {
+    setDownloadingKwitansiId(id)
+    try {
+      const response = await api.get(`/administrasi/spp/pembayaran/${id}/kwitansi`, {
+        responseType: "blob",
+      })
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement("a")
+      link.href = url
+      link.setAttribute("download", `Kwitansi-SPP-${id}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+      
+      toast({
+        title: "Kwitansi Terunduh",
+        description: "File kwitansi resmi berhasil disimpan.",
+      })
+    } catch (error) {
+      toast({
+        title: "Gagal Mengunduh",
+        description: "Kwitansi belum tersedia atau gagal diunduh.",
+        variant: "destructive",
+      })
+    } finally {
+      setDownloadingKwitansiId(null)
+    }
+  }
+
+  const invoices = detailData?.invoice || []
+
+  const belumLunas = useMemo(
+    () => invoices.filter((item) => item.status_key !== "lunas"),
+    [invoices]
+  )
+
+  const sudahLunas = useMemo(
+    () => invoices.filter((item) => item.status_key === "lunas"),
+    [invoices]
+  )
+
   const summary = useMemo(() => {
-    return myTagihan.reduce(
+    return invoices.reduce(
       (acc, item) => {
-        acc.totalTagihan += item.totalTagihan
-        acc.totalDibayar += item.totalDibayar
-        acc.totalTunggakan += item.totalTunggakan
+        if (item.status_key === "dibatalkan") return acc
+        acc.totalTagihan += item.jumlah_tagihan
+        acc.totalDibayar += item.jumlah_dibayar
+        acc.totalTunggakan += item.jumlah_tunggakan
         return acc
       },
       {
         totalTagihan: 0,
         totalDibayar: 0,
         totalTunggakan: 0,
-      },
+      }
     )
-  }, [myTagihan])
+  }, [invoices])
+
+  const isLoading = loadingAll || loadingDetail
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Administrasi Santri</h1>
+          <h1 className="text-3xl font-extrabold tracking-tight text-foreground bg-gradient-to-r from-primary to-emerald-600 bg-clip-text text-transparent">
+            Administrasi Santri
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Pantau tagihan, progres pembayaran, dan informasi administrasi penting.
+            Pantau tagihan bulanan, unggah bukti transfer, dan unduh kwitansi resmi pesantren.
           </p>
         </div>
         <div className="flex gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/santri-panel">Kembali ke Dashboard</Link>
+          <Button asChild variant="outline" size="sm" className="shadow-sm">
+            <Link href="/dashboard/santri-panel">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Kembali ke Dashboard
+            </Link>
           </Button>
-          <Button asChild size="sm">
+          <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
             <Link href="/dashboard/pengumuman">Info Pembayaran</Link>
           </Button>
         </div>
       </div>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="border-border/50">
+        <Card className="border-border/50 bg-gradient-to-br from-white to-slate-50/50 shadow-md transition-all hover:shadow-lg dark:from-slate-900 dark:to-slate-900/50">
           <CardHeader className="pb-2">
-            <CardDescription>Total Tagihan</CardDescription>
-            <CardTitle className="text-xl">{formatCurrency(summary.totalTagihan)}</CardTitle>
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Total Seluruh Tagihan
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight text-slate-800 dark:text-slate-100">
+              {formatCurrency(summary.totalTagihan)}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Receipt className="h-4 w-4" />
-              Akumulasi seluruh invoice
+              <Receipt className="h-4 w-4 text-primary" />
+              Akumulasi tagihan aktif Anda
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="border-border/50 bg-gradient-to-br from-white to-emerald-50/20 shadow-md transition-all hover:shadow-lg dark:from-slate-900 dark:to-emerald-950/10">
           <CardHeader className="pb-2">
-            <CardDescription>Sudah Dibayar</CardDescription>
-            <CardTitle className="text-xl text-emerald-600">{formatCurrency(summary.totalDibayar)}</CardTitle>
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Sudah Dibayar (Lunas)
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight text-emerald-600">
+              {formatCurrency(summary.totalDibayar)}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Wallet className="h-4 w-4" />
-              Pembayaran terverifikasi
+              <Wallet className="h-4 w-4 text-emerald-500" />
+              Pembayaran terverifikasi petugas
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border/50">
+        <Card className="border-border/50 bg-gradient-to-br from-white to-rose-50/20 shadow-md transition-all hover:shadow-lg dark:from-slate-900 dark:to-rose-950/10">
           <CardHeader className="pb-2">
-            <CardDescription>Sisa Tunggakan</CardDescription>
-            <CardTitle className="text-xl text-red-600">{formatCurrency(summary.totalTunggakan)}</CardTitle>
+            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-rose-700/70 dark:text-rose-400">
+              Sisa Tunggakan
+            </CardDescription>
+            <CardTitle className="text-2xl font-bold tracking-tight text-rose-600">
+              {formatCurrency(summary.totalTunggakan)}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <AlertCircle className="h-4 w-4" />
-              Segera lunasi sebelum jatuh tempo
+              <AlertCircle className="h-4 w-4 text-rose-500" />
+              Silakan lunasi tagihan Anda
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-border/50">
-        <CardHeader>
-          <CardTitle>Daftar Tagihan Anda</CardTitle>
+      {/* Main Tagihan Card with Tabs */}
+      <Card className="border-border/50 shadow-md">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Detail Tagihan & Riwayat Transaksi</CardTitle>
           <CardDescription>
-            Menampilkan {myTagihan.length} data tagihan berdasarkan nomor induk santri.
+            Detail perincian SPP bulanan dan tagihan pendidikan Anda.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {error ? (
-            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              Gagal memuat data tagihan: {error}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nama Lengkap</TableHead>
-                    <TableHead>Kelas</TableHead>
-                    <TableHead>Tahun Ajaran</TableHead>
-                    <TableHead>Total Tagihan</TableHead>
-                    <TableHead>Total Dibayar</TableHead>
-                    <TableHead>Tunggakan</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading ? (
+          <Tabs defaultValue="belum-lunas" className="space-y-4">
+            <TabsList className="bg-muted/60 p-1 border">
+              <TabsTrigger value="belum-lunas" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                Belum Lunas ({belumLunas.length})
+              </TabsTrigger>
+              <TabsTrigger value="sudah-lunas" className="data-[state=active]:bg-background data-[state=active]:shadow-sm">
+                Sudah Lunas ({sudahLunas.length})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="belum-lunas" className="space-y-4">
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader className="bg-muted/40">
                     <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                        Memuat data tagihan...
-                      </TableCell>
+                      <TableHead className="w-12 text-center">#</TableHead>
+                      <TableHead>No. Invoice</TableHead>
+                      <TableHead>Tagihan / Periode</TableHead>
+                      <TableHead className="text-right">Jumlah Tagihan</TableHead>
+                      <TableHead className="text-right">Sisa Tunggakan</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center w-36">Aksi</TableHead>
                     </TableRow>
-                  ) : myTagihan.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
-                        Data tagihan belum tersedia untuk akun ini.
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    myTagihan.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell className="font-medium">{row.namaLengkap || "-"}</TableCell>
-                        <TableCell>{row.kelasSaatIni || "-"}</TableCell>
-                        <TableCell>{row.tahunAjaran || "-"}</TableCell>
-                        <TableCell>{formatCurrency(row.totalTagihan)}</TableCell>
-                        <TableCell>{formatCurrency(row.totalDibayar)}</TableCell>
-                        <TableCell>{formatCurrency(row.totalTunggakan)}</TableCell>
-                        <TableCell>
-                          <Badge className={statusBadgeClassMap[row.status]}>{statusLabelMap[row.status]}</Badge>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                            <span>Memuat data tagihan...</span>
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+                    ) : belumLunas.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground text-sm">
+                          Alhamdulillah! Tidak ada tagihan yang belum lunas.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      belumLunas.map((row, idx) => (
+                        <TableRow key={row.id_pembayaran} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="text-center text-sm font-medium text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell className="font-mono text-xs">{row.nomor_invoice}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground">{row.rincian_tagihan || "Tagihan SPP"}</p>
+                              <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-semibold">{formatCurrency(row.jumlah_tagihan)}</TableCell>
+                          <TableCell className="text-right text-sm font-semibold text-rose-600">{formatCurrency(row.jumlah_tunggakan)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={statusBadgeClassMap[row.status_key]}>{statusLabelMap[row.status_key]}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              onClick={() => handlePayClick(row)}
+                              size="sm"
+                              variant="default"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs h-8 shadow-sm flex items-center justify-center gap-1 mx-auto"
+                            >
+                              <UploadCloud className="w-3.5 h-3.5" />
+                              {row.status_key === "menunggu_konfirmasi" ? "Upload Ulang" : "Bayar Sekarang"}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="sudah-lunas" className="space-y-4">
+              <div className="overflow-x-auto rounded-lg border border-border">
+                <Table>
+                  <TableHeader className="bg-muted/40">
+                    <TableRow>
+                      <TableHead className="w-12 text-center">#</TableHead>
+                      <TableHead>No. Invoice</TableHead>
+                      <TableHead>Tagihan / Periode</TableHead>
+                      <TableHead className="text-right">Jumlah Tagihan</TableHead>
+                      <TableHead className="text-right">Dibayar</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
+                      <TableHead className="text-center w-36">Kwitansi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground">
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                            <span>Memuat data tagihan...</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : sudahLunas.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-12 text-center text-muted-foreground text-sm">
+                          Belum ada riwayat pembayaran yang lunas.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sudahLunas.map((row, idx) => (
+                        <TableRow key={row.id_pembayaran} className="hover:bg-muted/30 transition-colors">
+                          <TableCell className="text-center text-sm font-medium text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell className="font-mono text-xs">{row.nomor_invoice}</TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-semibold text-sm text-foreground">{row.rincian_tagihan || "Tagihan SPP"}</p>
+                              <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right text-sm font-semibold">{formatCurrency(row.jumlah_tagihan)}</TableCell>
+                          <TableCell className="text-right text-sm font-semibold text-emerald-600">{formatCurrency(row.jumlah_dibayar)}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={statusBadgeClassMap[row.status_key]}>{statusLabelMap[row.status_key]}</Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Button
+                              onClick={() => handleDownloadKwitansi(row.id_pembayaran)}
+                              disabled={downloadingKwitansiId === row.id_pembayaran}
+                              size="sm"
+                              variant="outline"
+                              className="text-emerald-700 border-emerald-200 hover:bg-emerald-50 font-medium text-xs h-8 shadow-sm flex items-center justify-center gap-1 mx-auto"
+                            >
+                              {downloadingKwitansiId === row.id_pembayaran ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Download className="w-3.5 h-3.5" />
+                              )}
+                              Kwitansi
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
-      <Card className="border-border/50 bg-muted/30">
+      {/* Info Card */}
+      <Card className="border-border/50 bg-gradient-to-r from-slate-50 to-slate-100/50 dark:from-slate-900 dark:to-slate-900/30">
         <CardHeader>
-          <CardTitle className="text-base">Butuh Bantuan Administrasi?</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Info className="h-5 w-5 text-primary shrink-0" />
+            Butuh Bantuan Verifikasi Pembayaran?
+          </CardTitle>
           <CardDescription>
-            Jika status belum berubah setelah melakukan transfer, kirim bukti pembayaran ke petugas admin.
+            Setelah mengunggah bukti pembayaran, petugas keuangan pesantren akan memverifikasi transfer Anda. Jika dalam 1x24 jam status belum berubah menjadi <strong>Lunas</strong>, silakan kunjungi kantor administrasi pesantren atau hubungi WhatsApp Admin melalui link di bawah ini.
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-0">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard/santri-panel/pengumuman">
-              <Megaphone className="mr-2 h-4 w-4" />
-              Lihat Pengumuman
+          <Button asChild variant="outline" size="sm" className="shadow-sm">
+            <Link href="/dashboard/pengumuman">
+              <Megaphone className="mr-2 h-4 w-4 text-emerald-600 animate-bounce" />
+              Lihat Cara Pembayaran & Rekening
             </Link>
           </Button>
         </CardContent>
       </Card>
+
+      {/* Payment Proof Dialog */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-emerald-600" />
+              Upload Bukti Transfer
+            </DialogTitle>
+            <DialogDescription>
+              Unggah bukti pembayaran untuk invoice <strong>{selectedInvoice?.nomor_invoice}</strong> ({selectedInvoice?.rincian_tagihan})
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid gap-4 py-4">
+            {selectedInvoice?.status_key === "menunggu_konfirmasi" && (
+              <div className="rounded border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900 p-3 text-xs text-amber-800 dark:text-amber-300 flex gap-2">
+                <Info className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Menunggu Verifikasi Admin</p>
+                  <p>Anda sudah pernah mengunggah bukti bayar sebelumnya. Jika ingin merevisi atau mengunggah ulang bukti bayar baru, silakan lakukan di bawah ini.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label className="text-xs text-muted-foreground uppercase font-bold">Total yang Harus Dibayar</Label>
+              <div className="text-2xl font-extrabold text-foreground bg-muted p-3 rounded-lg border border-border flex items-center justify-between">
+                <span>{formatCurrency(selectedInvoice?.jumlah_tunggakan ?? 0)}</span>
+                <Badge variant="outline" className="text-xs font-mono uppercase bg-background">
+                  {selectedInvoice?.jenis_tagihan}
+                </Badge>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="metode">Metode Pembayaran</Label>
+              <Select value={metode} onValueChange={setMetode}>
+                <SelectTrigger id="metode">
+                  <SelectValue placeholder="Pilih Metode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Transfer Bank">Transfer Bank</SelectItem>
+                  <SelectItem value="Tunai">Tunai / Bayar Langsung</SelectItem>
+                  <SelectItem value="Lainnya">Lainnya</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="catatan">Catatan Tambahan (Opsional)</Label>
+              <Input
+                id="catatan"
+                placeholder="Contoh: Transfer atas nama Budi"
+                value={catatan}
+                onChange={(e) => setCatatan(e.target.value)}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Bukti Transfer (Format JPG, PNG, atau PDF - Maks. 5MB)</Label>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="shadow-sm border-dashed border-2 hover:bg-slate-50"
+                >
+                  <UploadCloud className="w-4 h-4 mr-2 text-muted-foreground" />
+                  Pilih File Bukti
+                </Button>
+                <input
+                  type="file"
+                  className="hidden"
+                  ref={fileInputRef}
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  onChange={handleFileChange}
+                />
+                <span className="text-xs text-muted-foreground line-clamp-1 truncate max-w-[200px]">
+                  {file ? file.name : "Tidak ada file terpilih"}
+                </span>
+              </div>
+
+              {previewUrl && file?.type.startsWith("image/") && (
+                <div className="mt-2 border rounded-lg p-1.5 max-w-[150px] bg-muted/40 shadow-sm mx-auto">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt="Preview bukti pembayaran"
+                    className="w-full h-auto rounded object-contain max-h-36"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setPayDialogOpen(false)} disabled={uploading}>
+              Batal
+            </Button>
+            <Button
+              onClick={handleUpload}
+              disabled={!file || uploading}
+              size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex items-center gap-1.5"
+            >
+              {uploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Mengunggah...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  Kirim Bukti Pembayaran
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
