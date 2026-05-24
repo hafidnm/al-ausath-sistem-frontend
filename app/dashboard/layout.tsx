@@ -107,6 +107,7 @@ const santriMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/santri-panel/rapor" },
   { icon: Award, label: "Nilai Mapel", href: "/dashboard/santri-panel/nilai-mapel" },
+  { icon: Calendar, label: "Jadwal Pembelajaran", href: "/dashboard/santri-panel/jadwal-pembelajaran" },
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/santri-panel/pengumuman" },
 ]
