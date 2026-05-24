@@ -1,135 +1,414 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { BookOpen, FileText, Award } from "lucide-react"
-import { Receipt, Wallet, Megaphone } from "lucide-react"
-import { StudentInfoHeader } from "../shared/student-info-header"
-import { AttendanceSummaryCards } from "../shared/attendance-summary-cards"
-import { AttendanceCharts } from "../shared/attendance-charts"
-import { AttendanceBySubjectTab } from "../shared/attendance-by-subject"
-import { RecentAttendanceTab } from "../shared/recent-attendance"
-import { NilaiMapelList } from "../shared/nilai-mapel-list"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/hooks/use-toast"
+import { authService } from "@/lib/services/auth.service"
+import api from "@/lib/axios"
+import {
+  BookOpen, FileText, Award, Receipt, Wallet, Megaphone,
+  GraduationCap, CheckCircle, XCircle, Clock, AlertCircle,
+  Calendar, TrendingUp, User,
+} from "lucide-react"
 import { ParentInformationCard } from "../shared/parent-info-card"
 
-// Student data
-const santriInfo = {
-  name: "Ahmad Fauzi",
-  nis: "2024001",
-  kelas: "9A",
-  jenjang: "SMP",
-  waliKelas: "Ustadz Ibrahim",
-  tahunAjaran: "2025/2026",
-  semester: "Ganjil",
+/* ─── Types ──────────────────────────────────────────────────── */
+interface RekapSantri {
+  nomor_induk: string
+  nama_lengkap_santri: string
+  kode_kelas: string
+  nama_kelas: string
+  total_pertemuan: number
+  jumlah_hadir: number
+  jumlah_izin: number
+  jumlah_sakit: number
+  jumlah_alfa: number
+  persentase_kehadiran: number
 }
 
-// Attendance summary
-const attendanceSummary = {
-  hadir: 145,
-  sakit: 3,
-  izin: 2,
-  alpha: 0,
-  total: 150,
+interface AbsensiItem {
+  id_absensi?: number
+  tanggal?: string
+  status_kehadiran: string
+  nama_mapel?: string
+  nama_kelas?: string
+  keterangan?: string
+  id_sesi?: number
+  /* from sesi */
+  sesi?: {
+    tanggal?: string
+    jadwal?: {
+      kelasMapel?: {
+        mataPelajaran?: { nama_mapel?: string }
+        kelas?: { nama_kelas?: string }
+      }
+    }
+  }
 }
 
-// Monthly attendance data
-const monthlyData = [
-  { bulan: "Jul", hadir: 20, sakit: 1, izin: 0, alpha: 0 },
-  { bulan: "Agu", hadir: 22, sakit: 0, izin: 1, alpha: 0 },
-  { bulan: "Sep", hadir: 21, sakit: 1, izin: 0, alpha: 0 },
-  { bulan: "Okt", hadir: 23, sakit: 0, izin: 0, alpha: 0 },
-  { bulan: "Nov", hadir: 20, sakit: 1, izin: 1, alpha: 0 },
-  { bulan: "Des", hadir: 18, sakit: 0, izin: 0, alpha: 0 },
-  { bulan: "Jan", hadir: 21, sakit: 0, izin: 0, alpha: 0 },
-]
+interface UserInfo {
+  nama_lengkap: string
+  nomor_induk?: string
+  peran_akun: string
+  pilihan_unit?: string
+}
 
-// Attendance by subject
-const attendanceBySubject = [
-  { mapel: "Tahfidz Al-Quran", hadir: 28, sakit: 1, izin: 1, alpha: 0, total: 30, guru: "Ustadz Ahmad" },
-  { mapel: "Fiqih", hadir: 25, sakit: 1, izin: 0, alpha: 0, total: 26, guru: "Ustadz Umar" },
-  { mapel: "Hadits", hadir: 24, sakit: 0, izin: 1, alpha: 0, total: 25, guru: "Ustadz Ibrahim" },
-  { mapel: "Bahasa Arab", hadir: 26, sakit: 1, izin: 0, alpha: 0, total: 27, guru: "Ustadzah Fatimah" },
-  { mapel: "Matematika", hadir: 22, sakit: 0, izin: 0, alpha: 0, total: 22, guru: "Pak Budi" },
-  { mapel: "IPA", hadir: 20, sakit: 0, izin: 0, alpha: 0, total: 20, guru: "Bu Siti" },
-]
+const STATUS_COLORS: Record<string, string> = {
+  HADIR: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+  SAKIT: "bg-yellow-500/10 text-yellow-700 border-yellow-500/30",
+  IZIN: "bg-blue-500/10 text-blue-700 border-blue-500/30",
+  ALFA: "bg-destructive/10 text-destructive border-destructive/30",
+}
 
-// Recent attendance records
-const recentAttendance = [
-  { tanggal: "30 Jan 2026", mapel: "Tahfidz Al-Quran", status: "hadir", jam: "07:15" },
-  { tanggal: "30 Jan 2026", mapel: "Fiqih", status: "hadir", jam: "09:05" },
-  { tanggal: "29 Jan 2026", mapel: "Hadits", status: "hadir", jam: "07:10" },
-  { tanggal: "29 Jan 2026", mapel: "Matematika", status: "hadir", jam: "10:00" },
-  { tanggal: "28 Jan 2026", mapel: "Bahasa Arab", status: "sakit", jam: "-" },
-  { tanggal: "27 Jan 2026", mapel: "IPA", status: "hadir", jam: "08:30" },
-  { tanggal: "27 Jan 2026", mapel: "Tahfidz Al-Quran", status: "hadir", jam: "07:08" },
-  { tanggal: "26 Jan 2026", mapel: "Fiqih", status: "izin", jam: "-" },
-]
-
-const pieChartData = [
-  { name: "Hadir", value: attendanceSummary.hadir, color: "hsl(var(--primary))" },
-  { name: "Sakit", value: attendanceSummary.sakit, color: "hsl(var(--chart-3))" },
-  { name: "Izin", value: attendanceSummary.izin, color: "hsl(var(--accent))" },
-  { name: "Alpha", value: attendanceSummary.alpha, color: "hsl(var(--destructive))" },
-]
+const formatDate = (v: string) => {
+  if (!v) return "-"
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short", year: "numeric" })
+}
 
 export default function SantriPanelPage() {
-  const [selectedMonth, setSelectedMonth] = useState("all")
-  const [selectedMapel, setSelectedMapel] = useState("all")
+  const { toast } = useToast()
 
-  const attendancePercentage = Math.round((attendanceSummary.hadir / attendanceSummary.total) * 100)
+  const [user, setUser] = useState<UserInfo | null>(null)
+  const [rekap, setRekap] = useState<RekapSantri | null>(null)
+  const [absensiList, setAbsensiList] = useState<AbsensiItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isAbsensiLoading, setIsAbsensiLoading] = useState(true)
 
+  /* Filter riwayat */
+  const [filterStatus, setFilterStatus] = useState("all")
+  const [filterPeriode, setFilterPeriode] = useState("all")
+
+  /* ─── Fetch Logic ──────────────────────────────────────────── */
+  const fetchRiwayat = async (nomorInduk: string, periode: string) => {
+    setIsAbsensiLoading(true)
+    try {
+      const params: any = { nomor_induk: nomorInduk, per_page: 50 }
+      const now = new Date()
+      
+      if (periode === "7hari") {
+        const d = new Date()
+        d.setDate(d.getDate() - 7)
+        params.tanggal_mulai = d.toISOString().split('T')[0]
+      } else if (periode === "30hari") {
+        const d = new Date()
+        d.setDate(d.getDate() - 30)
+        params.tanggal_mulai = d.toISOString().split('T')[0]
+      } else if (periode === "bulan-ini") {
+        const y = now.getFullYear()
+        const m = String(now.getMonth() + 1).padStart(2, '0')
+        params.tanggal_mulai = `${y}-${m}-01`
+      }
+
+      const riwayatRes = await api.get("/akademik/sesi-absensi/riwayat-santri", { params })
+      setAbsensiList(riwayatRes.data?.data ?? [])
+    } catch { /* ignore */ } finally {
+      setIsAbsensiLoading(false)
+    }
+  }
+
+  /* ─── Load user + rekap ────────────────────────────────────── */
+  useEffect(() => {
+    const init = async () => {
+      const me = await authService.me()
+      if (!me) return
+      setUser(me.user)
+
+      const nomorInduk: string = me.user?.nomor_induk ?? ""
+      if (!nomorInduk) {
+        setIsLoading(false)
+        setIsAbsensiLoading(false)
+        return
+      }
+
+      try {
+        // Rekap ringkasan per-santri
+        const res = await api.get("/akademik/sesi-absensi/rekap/santri", {
+          params: { nomor_induk: nomorInduk, per_page: 1 },
+        })
+        const data = res.data?.data?.[0] ?? null
+        setRekap(data)
+      } catch {
+        toast({ title: "Gagal memuat rekap", description: "Data rekap kehadiran tidak dapat dimuat.", variant: "destructive" })
+      } finally {
+        setIsLoading(false)
+      }
+
+      // Initial fetch riwayat
+      await fetchRiwayat(nomorInduk, filterPeriode)
+    }
+    void init()
+  }, [])
+
+  // Trigger ulang riwayat saat filter periode berubah
+  useEffect(() => {
+    if (user?.nomor_induk) {
+      void fetchRiwayat(user.nomor_induk, filterPeriode)
+    }
+  }, [filterPeriode])
+
+  /* ─── Computed ─────────────────────────────────────────────── */
+  const hadir = Number(rekap?.jumlah_hadir ?? 0)
+  const sakit = Number(rekap?.jumlah_sakit ?? 0)
+  const izin = Number(rekap?.jumlah_izin ?? 0)
+  const alfa = Number(rekap?.jumlah_alfa ?? 0)
+  const total = Number(rekap?.total_pertemuan ?? 0)
+  const pct = rekap?.persentase_kehadiran ?? 0
+
+  const filteredAbsensi = absensiList.filter(a => {
+    if (filterStatus === "all") return true
+    return a.status_kehadiran?.toUpperCase() === filterStatus
+  })
+
+  /* ─── Stat Card Component ──────────────────────────────────── */
+  const StatCard = ({ label, value, icon: Icon, colorClass, bgClass }: {
+    label: string; value: number; icon: any; colorClass: string; bgClass: string
+  }) => (
+    <Card className="border-border/50">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {isLoading ? <Skeleton className="h-8 w-12 mt-1" /> : (
+              <p className={`text-2xl font-bold mt-1 ${colorClass}`}>{value}</p>
+            )}
+          </div>
+          <div className={`w-10 h-10 rounded-lg ${bgClass} flex items-center justify-center`}>
+            <Icon className={`w-5 h-5 ${colorClass}`} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  /* ─── Progress ring ─────────────────────────────────────────── */
+  const radius = 54
+  const circ = 2 * Math.PI * radius
+  const dashOffset = circ - (pct / 100) * circ
+
+  /* ─── Render ─────────────────────────────────────────────────── */
   return (
     <div className="space-y-6">
-      <StudentInfoHeader santriInfo={santriInfo} attendancePercentage={attendancePercentage} />
-      <AttendanceSummaryCards attendanceSummary={attendanceSummary} />
-      <AttendanceCharts
-        monthlyData={monthlyData}
-        pieChartData={pieChartData}
-        selectedMonth={selectedMonth}
-        onMonthChange={setSelectedMonth}
-      />
 
-      <Tabs defaultValue="mapel" className="space-y-4">
+      {/* ── Header Info Santri ── */}
+      <Card className="border-border/50 overflow-hidden">
+        <div className="h-2 bg-gradient-to-r from-primary to-primary/60" />
+        <CardContent className="p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <User className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                {isLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-5 w-40" />
+                    <Skeleton className="h-4 w-24" />
+                  </div>
+                ) : (
+                  <>
+                    <h2 className="text-lg font-semibold text-foreground">{user?.nama_lengkap ?? "-"}</h2>
+                    <div className="flex items-center gap-2 flex-wrap mt-1">
+                      <Badge variant="outline" className="text-xs">NIS: {user?.nomor_induk ?? "-"}</Badge>
+                      {rekap?.nama_kelas && <Badge variant="outline" className="text-xs">{rekap.nama_kelas}</Badge>}
+                      {user?.pilihan_unit && <Badge variant="outline" className="text-xs">{user.pilihan_unit}</Badge>}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Persentase ring */}
+            <div className="flex items-center gap-4">
+              <div className="text-center">
+                <svg width="128" height="128" viewBox="0 0 128 128">
+                  <circle cx="64" cy="64" r={radius} fill="none" stroke="currentColor" strokeWidth="10" className="text-muted/30" />
+                  <circle
+                    cx="64" cy="64" r={radius} fill="none" stroke="currentColor" strokeWidth="10"
+                    className="text-primary transition-all duration-700"
+                    strokeDasharray={circ}
+                    strokeDashoffset={isLoading ? circ : dashOffset}
+                    strokeLinecap="round"
+                    transform="rotate(-90 64 64)"
+                  />
+                  <text x="64" y="60" textAnchor="middle" className="fill-foreground" fontSize="18" fontWeight="bold">
+                    {isLoading ? "-" : `${pct}%`}
+                  </text>
+                  <text x="64" y="78" textAnchor="middle" className="fill-muted-foreground" fontSize="10">
+                    Kehadiran
+                  </text>
+                </svg>
+              </div>
+              <div className="text-sm space-y-1 text-muted-foreground hidden sm:block">
+                <p className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-primary inline-block" /> Hadir: <span className="font-semibold text-foreground">{hadir}</span></p>
+                <p className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-yellow-500 inline-block" /> Sakit: <span className="font-semibold text-foreground">{sakit}</span></p>
+                <p className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500 inline-block" /> Izin: <span className="font-semibold text-foreground">{izin}</span></p>
+                <p className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-destructive inline-block" /> Alfa: <span className="font-semibold text-foreground">{alfa}</span></p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Stat Cards ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Total Hadir" value={hadir} icon={CheckCircle} colorClass="text-primary" bgClass="bg-primary/10" />
+        <StatCard label="Total Sakit" value={sakit} icon={AlertCircle} colorClass="text-yellow-600" bgClass="bg-yellow-500/10" />
+        <StatCard label="Total Izin" value={izin} icon={Clock} colorClass="text-blue-600" bgClass="bg-blue-500/10" />
+        <StatCard label="Total Alfa" value={alfa} icon={XCircle} colorClass="text-destructive" bgClass="bg-destructive/10" />
+      </div>
+
+      {/* ── Tabs ── */}
+      <Tabs defaultValue="riwayat" className="space-y-4">
         <TabsList className="bg-muted/50">
-          <TabsTrigger value="mapel" className="data-[state=active]:bg-card">
-            <BookOpen className="w-4 h-4 mr-2" />
-            Per Mata Pelajaran
+          <TabsTrigger value="riwayat" className="data-[state=active]:bg-card">
+            <FileText className="w-4 h-4 mr-2" />Riwayat Kehadiran
           </TabsTrigger>
           <TabsTrigger value="nilai-mapel" className="data-[state=active]:bg-card">
-            <Award className="w-4 h-4 mr-2" />
-            Nilai Mapel
-          </TabsTrigger>
-          <TabsTrigger value="riwayat" className="data-[state=active]:bg-card">
-            <FileText className="w-4 h-4 mr-2" />
-            Riwayat Terbaru
+            <Award className="w-4 h-4 mr-2" />Nilai Mapel
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mapel" className="space-y-4">
-          <AttendanceBySubjectTab
-            attendanceBySubject={attendanceBySubject}
-            selectedMapel={selectedMapel}
-            onMapelChange={setSelectedMapel}
-          />
-        </TabsContent>
-
-        <TabsContent value="nilai-mapel" className="space-y-4">
-          <NilaiMapelList tahunAjaran={santriInfo.tahunAjaran} semester={1} />
-        </TabsContent>
-
+        {/* Tab Riwayat Kehadiran */}
         <TabsContent value="riwayat" className="space-y-4">
-          <RecentAttendanceTab recentAttendance={recentAttendance} />
+          <Card className="border-border/50">
+            <CardHeader className="pb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-base">Riwayat Kehadiran</CardTitle>
+                  <CardDescription>Daftar sesi absensi yang tercatat</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={filterPeriode} onValueChange={setFilterPeriode}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Waktu</SelectItem>
+                      <SelectItem value="7hari">7 Hari Terakhir</SelectItem>
+                      <SelectItem value="30hari">30 Hari Terakhir</SelectItem>
+                      <SelectItem value="bulan-ini">Bulan Ini</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="HADIR">Hadir</SelectItem>
+                      <SelectItem value="SAKIT">Sakit</SelectItem>
+                      <SelectItem value="IZIN">Izin</SelectItem>
+                      <SelectItem value="ALFA">Alfa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              {isAbsensiLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border/50">
+                    <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-1.5">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-3 w-24" />
+                    </div>
+                    <Skeleton className="h-6 w-16 rounded-full" />
+                  </div>
+                ))
+              ) : filteredAbsensi.length === 0 ? (
+                <div className="py-12 text-center">
+                  <Calendar className="h-12 w-12 mx-auto mb-3 text-muted-foreground/40" />
+                  <p className="text-muted-foreground text-sm">Belum ada data kehadiran.</p>
+                </div>
+              ) : (
+                filteredAbsensi.map((absensi, idx) => {
+                  const statusKehadiran = absensi.status_kehadiran?.toUpperCase() ?? "-"
+                  return (
+                    <div key={absensi.id_absensi ?? idx} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
+                      <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                        <BookOpen className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{absensi.nama_mapel || absensi.nama_kelas || `Sesi #${absensi.id_sesi}`}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(absensi.tanggal ?? "")}</p>
+                        {absensi.keterangan && <p className="text-xs text-muted-foreground italic">{absensi.keterangan}</p>}
+                      </div>
+                      <Badge variant="outline" className={`text-xs border shrink-0 ${STATUS_COLORS[statusKehadiran] ?? ""}`}>
+                        {statusKehadiran}
+                      </Badge>
+                    </div>
+                  )
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Rekap Ringkasan */}
+          {rekap && (
+            <Card className="border-border/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Rekap Keseluruhan
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                  {[
+                    ["Total Pertemuan", total],
+                    ["Hadir", hadir],
+                    ["Sakit", sakit],
+                    ["Izin", izin],
+                    ["Alfa", alfa],
+                    ["% Kehadiran", `${pct}%`],
+                  ].map(([label, val]) => (
+                    <div key={label} className="space-y-1">
+                      <p className="text-muted-foreground">{label}</p>
+                      <p className="font-semibold text-foreground">{val}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        {/* Tab Nilai Mapel */}
+        <TabsContent value="nilai-mapel" className="space-y-4">
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Award className="w-4 h-4 text-primary" />
+                Nilai Mata Pelajaran
+              </CardTitle>
+              <CardDescription>Lihat nilai rapor digital lengkap</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="bg-primary text-primary-foreground">
+                <Link href="/dashboard/rapor">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Lihat Rapor Digital
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
+      {/* ── Administrasi ── */}
       <Card className="border-border/50">
         <CardHeader>
           <CardTitle className="text-lg">Administrasi Santri</CardTitle>
           <CardDescription>
-            Akses cepat untuk memantau tagihan, status pembayaran, dan pengumuman administrasi terbaru.
+            Akses cepat untuk memantau tagihan, status pembayaran, dan pengumuman.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -146,9 +425,9 @@ export default function SantriPanelPage() {
             </Link>
           </Button>
           <Button asChild variant="outline" className="justify-start">
-            <Link href="/dashboard/santri-panel/pengumuman">
+            <Link href="/dashboard/pengumuman">
               <Megaphone className="mr-2 h-4 w-4" />
-              Info Administrasi
+              Pengumuman
             </Link>
           </Button>
         </CardContent>

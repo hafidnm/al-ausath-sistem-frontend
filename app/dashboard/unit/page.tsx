@@ -57,6 +57,7 @@ import {
   MoreVertical,
   PlusCircle,
   Trash2,
+  Pencil,
 } from "lucide-react"
 import {
   dataUnitService,
@@ -850,8 +851,8 @@ export default function UnitPage() {
                             <DropdownMenuLabel>Aksi Unit</DropdownMenuLabel>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => openDetailDialog(unit)}>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Detail
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit Unit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem className="text-destructive" onClick={() => deleteOneRow(unit.id)}>
@@ -901,8 +902,8 @@ export default function UnitPage() {
       <Dialog open={isDetailDialogOpen} onOpenChange={setIsDetailDialogOpen}>
         <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
-            <DialogTitle>Detail Unit</DialogTitle>
-            <DialogDescription>Ubah status Unit/PPDB melalui form detail ini.</DialogDescription>
+            <DialogTitle>Edit Unit</DialogTitle>
+            <DialogDescription>Perbarui data unit sesuai kebutuhan.</DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">

@@ -85,7 +85,7 @@ export interface AdminBukaSesiPayload {
   id_jadwal: number
   tanggal?: string
   id_petugas_hadir?: number
-  status_kehadiran?: "HADIR" | "IZIN" | "SAKIT"
+  status_kehadiran?: "HADIR" | "IZIN" | "SAKIT" | "ALFA"
   menit_terlambat?: number
   catat_absensi_pengajar?: boolean
   keterangan?: string
@@ -93,7 +93,7 @@ export interface AdminBukaSesiPayload {
 
 export interface AdminUpsertAbsensiPengajarPayload {
   id_petugas: number
-  status_kehadiran: "HADIR" | "IZIN" | "SAKIT"
+  status_kehadiran: "HADIR" | "IZIN" | "SAKIT" | "ALFA"
   menit_terlambat?: number
   keterangan?: string
 }
@@ -208,6 +208,11 @@ export const sesiAbsensiService = {
       data: { nomor_induk: nomorInduk }
     })
     return response.data
+  },
+
+  async adminGetBelumDiabsen(params?: { tanggal?: string; kode_unit?: string; kode_kelas?: string }) {
+    const response = await api.get<{ data: any[] }>(`${SESI_ABSENSI_BASE_PATH}/admin/belum-diabsen`, { params })
+    return response.data.data
   },
 
   // --- Export URL Helpers ---

@@ -92,7 +92,9 @@ export default function PresensiSantriPage() {
 
   const loadKelasByUnit = async (kode_unit?: string) => {
     try {
-      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
+      const params: any = { per_page: "500", status: "AKTIF" }
+      if (kode_unit) params.kode_unit = kode_unit
+      const kelasRes = await kelasService.getAll(params)
       setKelasOptions(kelasRes || [])
     } catch (e) {
       console.error("Gagal memuat kelas", e)
@@ -108,13 +110,16 @@ export default function PresensiSantriPage() {
     }
   }
 
-  const loadRekap = async () => {
+  const loadRekap = async (unitOverride?: string) => {
     setRekapLoading(true)
     try {
-      const response = await sesiAbsensiService.rekapSantri({
-        ...filterRekap,
-        per_page: 100
-      })
+      const activeUnit = unitOverride !== undefined ? unitOverride : selectedUnit
+      const params: any = { ...filterRekap, per_page: 100 }
+      if (activeUnit !== "ALL") params.kode_unit = activeUnit
+      // remove empty kode_kelas so backend won't filter by empty string
+      if (!params.kode_kelas) delete params.kode_kelas
+      
+      const response = await sesiAbsensiService.rekapSantri(params)
       setRekapRows(response?.data || [])
     } catch (error: any) {
       toast({
@@ -130,10 +135,11 @@ export default function PresensiSantriPage() {
   const loadRiwayatSesi = async () => {
     setSesiLoading(true)
     try {
-      const response = await sesiAbsensiService.getAll({
-        ...filterSesi,
-        per_page: 100
-      })
+      const params: any = { ...filterSesi, per_page: 100 }
+      if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
+      if (selectedUnitSesi !== "ALL") params.kode_unit = selectedUnitSesi
+      
+      const response = await sesiAbsensiService.getAll(params)
       setSesiRows(response as SesiAbsensiApiItem[])
     } catch (error: any) {
       toast({
@@ -147,7 +153,7 @@ export default function PresensiSantriPage() {
   }
 
   const handleApplyFilterRekap = () => {
-    loadRekap()
+    loadRekap(selectedUnit)
   }
 
   const handleApplyFilterSesi = () => {
@@ -155,7 +161,10 @@ export default function PresensiSantriPage() {
   }
 
   const handleExport = (format: 'pdf' | 'excel') => {
-    const url = sesiAbsensiService.getExportSantriUrl(format, filterRekap)
+    const params: any = { ...filterRekap }
+    if (selectedUnit !== "ALL") params.kode_unit = selectedUnit
+    if (!params.kode_kelas) delete params.kode_kelas
+    const url = sesiAbsensiService.getExportSantriUrl(format, params)
     window.open(url, '_blank')
   }
 
@@ -165,16 +174,19 @@ export default function PresensiSantriPage() {
     setIsLoadingSantri(true)
     
     try {
-      // Get detailed session info including santri
-      const detail = await sesiAbsensiService.getById(sesi.id_sesi || sesi.id || 0)
-      if (detail && detail.absensi_santri) {
-        setSantriList(detail.absensi_santri)
+      // Get list of all santri in the class for this session
+      const detail: any = await sesiAbsensiService.getDaftarSantri(sesi.id_sesi || sesi.id || 0)
+      if (detail && detail.santri) {
+        setSantriList(detail.santri)
         
         // Populate initial attendance data
         const initialData: Record<string, SantriStatus> = {}
-        detail.absensi_santri.forEach((s: any) => {
+        detail.santri.forEach((s: any) => {
           if (s.status_kehadiran) {
             initialData[s.nomor_induk] = s.status_kehadiran.toLowerCase() as SantriStatus
+          } else {
+            // Default to hadir if no attendance record exists yet
+            initialData[s.nomor_induk] = "hadir"
           }
         })
         setAttendanceData(initialData)
@@ -301,7 +313,7 @@ export default function PresensiSantriPage() {
                     value={selectedUnit} 
                     onValueChange={(val) => {
                       setSelectedUnit(val)
-                      setFilterRekap({ ...filterRekap, kode_kelas: "" })
+                      setFilterRekap(prev => ({ ...prev, kode_kelas: "" }))
                       loadKelasByUnit(val === "ALL" ? undefined : val)
                     }}
                   >
@@ -554,11 +566,11 @@ export default function PresensiSantriPage() {
                 </TableHeader>
                 <TableBody>
                   {santriList.map((s) => {
-                    const status = attendanceData[s.nomor_induk] || "alfa"
+                    const status = attendanceData[s.nomor_induk] || "hadir"
                     return (
                       <TableRow key={s.nomor_induk}>
                         <TableCell className="text-muted-foreground">{s.nomor_induk}</TableCell>
-                        <TableCell className="font-medium">{s.santri?.nama_lengkap_santri || s.nomor_induk}</TableCell>
+                        <TableCell className="font-medium">{s.nama_lengkap_santri || s.santri?.nama_lengkap_santri || s.nomor_induk}</TableCell>
                         <TableCell>
                           <input 
                             type="radio" 

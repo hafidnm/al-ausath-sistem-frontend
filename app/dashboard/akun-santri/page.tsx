@@ -173,6 +173,10 @@ export default function AkunSantriPage() {
   const [syncUseNisForNamaAkun, setSyncUseNisForNamaAkun] = useState(true)
   const [syncDefaultPassword, setSyncDefaultPassword] = useState("")
   const [syncStatus, setSyncStatus] = useState<BackendAkunSantriStatus>("AKTIF")
+  const [addSelectedUnit, setAddSelectedUnit] = useState("")
+  const [addSelectedKelas, setAddSelectedKelas] = useState("")
+  const [addSantriOptions, setAddSantriOptions] = useState<DataAkunSantriTanpaAkunItem[]>([])
+  const [addSelectedNis, setAddSelectedNis] = useState("")
 
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({ units: [], classes: [], years: [] })
   const rowsLimit = Number(rowsPerPage)
@@ -297,6 +301,12 @@ export default function AkunSantriPage() {
   useEffect(() => {
     void loadFilterOptions()
   }, [])
+
+  useEffect(() => {
+    if (useNisForNamaAkun && addSelectedNis) {
+      setFormData((prev) => ({ ...prev, nama_akun: addSelectedNis }))
+    }
+  }, [useNisForNamaAkun, addSelectedNis])
 
   useEffect(() => {
     if (!isSyncDialogOpen) return
@@ -555,16 +565,121 @@ export default function AkunSantriPage() {
     mode: "create" | "edit",
   ) => (
     <div className="grid gap-4 py-4">
-      <div className="space-y-2">
-        <Label htmlFor={`${mode}-nomor-induk`}>Nomor Induk</Label>
-        <Input
-          id={`${mode}-nomor-induk`}
-          placeholder="Nomor induk santri"
-          value={data.nomor_induk}
-          disabled={mode === "edit"}
-          onChange={(event) => setData((prev) => ({ ...prev, nomor_induk: event.target.value }))}
-        />
-      </div>
+      {mode === "create" ? (
+        <>
+          <div className="space-y-2">
+            <Label>Pilih Unit</Label>
+            <Select
+              value={addSelectedUnit}
+              onValueChange={(val) => {
+                setAddSelectedUnit(val)
+                setAddSelectedKelas("")
+                setAddSantriOptions([])
+                setAddSelectedNis("")
+                setData((prev) => ({ ...prev, nomor_induk: "", alamat_email: "", nomor_telepon: "" }))
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Pilih Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.units.map((unit) => (
+                  <SelectItem key={unit} value={unit}>
+                    {unit}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Pilih Kelas</Label>
+            <Select
+              value={addSelectedKelas}
+              disabled={!addSelectedUnit}
+              onValueChange={async (val) => {
+                setAddSelectedKelas(val)
+                setAddSelectedNis("")
+                setData((prev) => ({ ...prev, nomor_induk: "", alamat_email: "", nomor_telepon: "" }))
+                if (val) {
+                  try {
+                    const items = await dataAkunSantriService.getSantriTanpaAkunByKelas(val)
+                    setAddSantriOptions(items)
+                  } catch {
+                    setAddSantriOptions([])
+                  }
+                } else {
+                  setAddSantriOptions([])
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder={addSelectedUnit ? "Pilih Kelas" : "Pilih unit terlebih dahulu"} />
+              </SelectTrigger>
+              <SelectContent>
+                {filterOptions.classes
+                  .filter((cls) => cls.kodeUnit === addSelectedUnit)
+                  .map((cls) => (
+                    <SelectItem key={cls.value} value={cls.value}>
+                      {cls.label}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Pilih Santri</Label>
+            <Select
+              value={addSelectedNis}
+              disabled={!addSelectedKelas || addSantriOptions.length === 0}
+              onValueChange={(val) => {
+                setAddSelectedNis(val)
+                const selectedSantri = addSantriOptions.find((s) => s.nomor_induk === val)
+                if (selectedSantri) {
+                  setData((prev) => ({
+                    ...prev,
+                    nomor_induk: val,
+                    nama_akun: useNisForNamaAkun ? val : prev.nama_akun,
+                    alamat_email: selectedSantri.alamat_email || "",
+                    nomor_telepon: selectedSantri.nomor_telepon || "",
+                  }))
+                } else {
+                  setData((prev) => ({ ...prev, nomor_induk: "" }))
+                }
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    !addSelectedKelas
+                      ? "Pilih kelas terlebih dahulu"
+                      : addSantriOptions.length === 0
+                      ? "Tidak ada santri tanpa akun di kelas ini"
+                      : "Pilih Santri"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {addSantriOptions.map((santri) => (
+                  <SelectItem key={santri.nomor_induk} value={santri.nomor_induk || ""}>
+                    {santri.nomor_induk} - {santri.nama_lengkap_santri}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-2">
+          <Label htmlFor={`${mode}-nomor-induk`}>Nomor Induk</Label>
+          <Input
+            id={`${mode}-nomor-induk`}
+            value={data.nomor_induk}
+            disabled={true}
+          />
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor={`${mode}-nama-akun`}>Nama Akun</Label>
@@ -604,7 +719,6 @@ export default function AkunSantriPage() {
             onChange={(event) => setData((prev) => ({ ...prev, nomor_telepon: event.target.value }))}
           />
         </div>
-
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -656,6 +770,10 @@ export default function AkunSantriPage() {
               onClick={() => {
                 resetAddForm()
                 setUseNisForNamaAkun(true)
+                setAddSelectedUnit("")
+                setAddSelectedKelas("")
+                setAddSantriOptions([])
+                setAddSelectedNis("")
                 setIsAddDialogOpen(true)
               }}
             >

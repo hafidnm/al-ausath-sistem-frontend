@@ -62,6 +62,16 @@ export default function PresensiGuruPage() {
     id_petugas_hadir: "ALL",
   })
 
+  // States for Belum Diabsen
+  const [belumDiabsenRows, setBelumDiabsenRows] = useState<any[]>([])
+  const [belumDiabsenLoading, setBelumDiabsenLoading] = useState(false)
+  const [selectedUnitBelum, setSelectedUnitBelum] = useState("ALL")
+  const [selectedKelasBelum, setSelectedKelasBelum] = useState("ALL")
+  const [kelasBelumOptions, setKelasBelumOptions] = useState<KelasItem[]>([])
+  const [filterBelumDiabsen, setFilterBelumDiabsen] = useState({
+    tanggal: new Date().toISOString().slice(0, 10)
+  })
+
   // Options
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [jadwalOptions, setJadwalOptions] = useState<JadwalOption[]>([])
@@ -72,7 +82,7 @@ export default function PresensiGuruPage() {
   const [selectedSesi, setSelectedSesi] = useState<SesiAbsensiApiItem | null>(null)
   const [editData, setEditData] = useState({
     id_petugas: 0,
-    status_kehadiran: "HADIR" as "HADIR" | "IZIN" | "SAKIT",
+    status_kehadiran: "HADIR" as "HADIR" | "IZIN" | "SAKIT" | "ALFA",
     menit_terlambat: 0,
     keterangan: "",
   })
@@ -84,7 +94,7 @@ export default function PresensiGuruPage() {
     id_jadwal: 0,
     tanggal: "",
     id_petugas_hadir: 0,
-    status_kehadiran: "HADIR" as "HADIR" | "IZIN" | "SAKIT",
+    status_kehadiran: "HADIR" as "HADIR" | "IZIN" | "SAKIT" | "ALFA",
     menit_terlambat: 0,
     keterangan: "",
   })
@@ -93,6 +103,7 @@ export default function PresensiGuruPage() {
     loadOptions()
     loadRekap()
     loadRiwayatSesi()
+    loadBelumDiabsen()
   }, [])
 
   const loadOptions = async () => {
@@ -128,6 +139,7 @@ export default function PresensiGuruPage() {
       
       setUnitOptions(unitRes.data || [])
       setKelasSesiOptions(kelasRes || [])
+      setKelasBelumOptions(kelasRes || [])
     } catch (error) {
       console.error("Gagal memuat options", error)
     }
@@ -139,6 +151,17 @@ export default function PresensiGuruPage() {
       setKelasSesiOptions(kelasRes || [])
     } catch (e) {
       console.error("Gagal memuat kelas untuk riwayat sesi", e)
+    }
+  }
+
+  const loadKelasBelumByUnit = async (kode_unit?: string) => {
+    try {
+      const params: any = { per_page: "500", status: "AKTIF" }
+      if (kode_unit) params.kode_unit = kode_unit
+      const kelasRes = await kelasService.getAll(params)
+      setKelasBelumOptions(kelasRes || [])
+    } catch (e) {
+      console.error("Gagal memuat kelas untuk belum diabsen", e)
     }
   }
 
@@ -166,6 +189,9 @@ export default function PresensiGuruPage() {
     try {
       const params: any = { ...filterSesi, per_page: 100 }
       if (params.id_petugas_hadir === "ALL") delete params.id_petugas_hadir
+      if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
+      if (selectedUnitSesi !== "ALL") params.kode_unit = selectedUnitSesi
+      
       const response = await sesiAbsensiService.getAll(params)
       setSesiRows(response as SesiAbsensiApiItem[])
     } catch (error: any) {
@@ -176,6 +202,32 @@ export default function PresensiGuruPage() {
       })
     } finally {
       setSesiLoading(false)
+    }
+  }
+
+  const loadBelumDiabsen = async (unitOverride?: string, kelasOverride?: string, dateOverride?: string) => {
+    setBelumDiabsenLoading(true)
+    try {
+      const activeUnit = unitOverride !== undefined ? unitOverride : selectedUnitBelum
+      const activeKelas = kelasOverride !== undefined ? kelasOverride : selectedKelasBelum
+      const activeDate = dateOverride !== undefined ? dateOverride : filterBelumDiabsen.tanggal
+      
+      const params: any = {
+        tanggal: activeDate
+      }
+      if (activeUnit !== "ALL") params.kode_unit = activeUnit
+      if (activeKelas !== "ALL") params.kode_kelas = activeKelas
+
+      const response = await sesiAbsensiService.adminGetBelumDiabsen(params)
+      setBelumDiabsenRows(response || [])
+    } catch (error: any) {
+      toast({
+        title: "Gagal memuat jadwal belum diabsen",
+        description: error?.response?.data?.message || "Terjadi kesalahan.",
+        variant: "destructive",
+      })
+    } finally {
+      setBelumDiabsenLoading(false)
     }
   }
 
@@ -228,6 +280,7 @@ export default function PresensiGuruPage() {
       toast({ title: "Berhasil", description: "Data absensi guru berhasil diperbarui." })
       setIsEditModalOpen(false)
       loadRekap()
+      loadRiwayatSesi()
     } catch (error: any) {
       toast({
         title: "Gagal menyimpan",
@@ -251,6 +304,18 @@ export default function PresensiGuruPage() {
     setIsBukaSesiOpen(true)
   }
 
+  const openBukaSesiManualFromJadwal = (item: any) => {
+    setBukaSesiData({
+      id_jadwal: item.id_jadwal,
+      tanggal: item.tanggal,
+      id_petugas_hadir: item.id_petugas_hadir || 0,
+      status_kehadiran: "ALFA", // Default to ALFA for missed sessions
+      menit_terlambat: 0,
+      keterangan: "Sesi terlewat, ditambahkan otomatis",
+    })
+    setIsBukaSesiOpen(true)
+  }
+
   const handleBukaSesi = async () => {
     if (!bukaSesiData.id_jadwal || !bukaSesiData.tanggal || !bukaSesiData.id_petugas_hadir) {
       toast({ title: "Validasi Gagal", description: "Jadwal, Tanggal, dan Petugas Hadir wajib diisi.", variant: "destructive" })
@@ -267,6 +332,7 @@ export default function PresensiGuruPage() {
       setIsBukaSesiOpen(false)
       loadRiwayatSesi()
       loadRekap()
+      loadBelumDiabsen()
     } catch (error: any) {
       toast({
         title: "Gagal Buka Sesi",
@@ -307,6 +373,10 @@ export default function PresensiGuruPage() {
           <TabsTrigger value="riwayat" className="data-[state=active]:bg-card">
             <History className="w-4 h-4 mr-2" />
             Riwayat Sesi (Edit)
+          </TabsTrigger>
+          <TabsTrigger value="belum_diabsen" className="data-[state=active]:bg-card">
+            <Clock className="w-4 h-4 mr-2" />
+            Belum Diabsen
           </TabsTrigger>
         </TabsList>
 
@@ -467,7 +537,7 @@ export default function PresensiGuruPage() {
                   
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-  q                       <Input
+                    <Input
                       type="text"
                       placeholder="Cari Mapel..."
                       className="pl-9 w-40"
@@ -509,6 +579,7 @@ export default function PresensiGuruPage() {
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Petugas Hadir</TableHead>
+                      <TableHead>Status Guru</TableHead>
                       <TableHead>Status Sesi</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
@@ -534,6 +605,13 @@ export default function PresensiGuruPage() {
                             petugasOptions.find(p => p.id === Number(sesi.id_petugas_hadir))?.label?.split(' (')[0] 
                             || `ID: ${sesi.id_petugas_hadir || '-'}`
                           }</TableCell>
+                          <TableCell>
+                            {getStatusBadge(
+                              ((sesi.absensi_pengajar as any[])?.[0]?.status_kehadiran) || 
+                              (((sesi as any).absensiPengajar as any[])?.[0]?.status_kehadiran) || 
+                              "-"
+                            )}
+                          </TableCell>
                           <TableCell>{getStatusBadge(sesi.status_sesi || "")}</TableCell>
                           <TableCell className="text-right">
                             <Button 
@@ -543,6 +621,124 @@ export default function PresensiGuruPage() {
                               onClick={() => openEditModal(sesi)}
                             >
                               Edit Absensi Guru
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab Belum Diabsen */}
+        <TabsContent value="belum_diabsen" className="space-y-4">
+          <Card className="border-border/50 border-destructive/20 shadow-sm shadow-destructive/10">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg text-destructive flex items-center gap-2">
+                    <Clock className="w-5 h-5" /> 
+                    Jadwal Belum Diabsen
+                  </CardTitle>
+                  <CardDescription>
+                    Daftar kelas yang belum dibuka sesinya pada tanggal terpilih
+                  </CardDescription>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select 
+                    value={selectedUnitBelum} 
+                    onValueChange={(val) => {
+                      setSelectedUnitBelum(val)
+                      setSelectedKelasBelum("ALL")
+                      loadKelasBelumByUnit(val === "ALL" ? undefined : val)
+                    }}
+                  >
+                    <SelectTrigger className="w-32">
+                      <SelectValue placeholder="Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Unit</SelectItem>
+                      {unitOptions.map((u) => (
+                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select 
+                    value={selectedKelasBelum} 
+                    onValueChange={(val) => {
+                      setSelectedKelasBelum(val)
+                    }}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Kelas" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      <SelectItem value="ALL">Semua Kelas</SelectItem>
+                      {kelasBelumOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    type="date"
+                    value={filterBelumDiabsen.tanggal}
+                    onChange={(e) => {
+                      setFilterBelumDiabsen({ tanggal: e.target.value })
+                    }}
+                    className="w-40"
+                  />
+                  <Button variant="secondary" onClick={() => loadBelumDiabsen()} disabled={belumDiabsenLoading}>
+                    Filter
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-destructive/5 hover:bg-destructive/5">
+                    <TableRow>
+                      <TableHead>Hari</TableHead>
+                      <TableHead>Waktu</TableHead>
+                      <TableHead>Mata Pelajaran</TableHead>
+                      <TableHead>Kelas</TableHead>
+                      <TableHead>Petugas (Default)</TableHead>
+                      <TableHead className="text-right">Aksi</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {belumDiabsenLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Memuat jadwal...</TableCell>
+                      </TableRow>
+                    ) : belumDiabsenRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Semua jadwal pada tanggal ini sudah diabsen.</TableCell>
+                      </TableRow>
+                    ) : (
+                      belumDiabsenRows.map((item, idx) => (
+                        <TableRow key={item.id_jadwal || idx} className="hover:bg-muted/30">
+                          <TableCell className="font-medium">{item.hari}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs font-normal">
+                              {item.jam_mulai} - {item.jam_selesai}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="font-medium">{item.mapel}</TableCell>
+                          <TableCell>{item.kelas}</TableCell>
+                          <TableCell>{item.petugas_hadir?.nama_lengkap || "Tanpa Guru"}</TableCell>
+                          <TableCell className="text-right">
+                            <Button 
+                              size="sm" 
+                              variant="destructive"
+                              onClick={() => openBukaSesiManualFromJadwal(item)}
+                            >
+                              Tindak Lanjuti
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -583,7 +779,7 @@ export default function PresensiGuruPage() {
 
             <div className="space-y-3">
               <Label>Status Kehadiran</Label>
-              <RadioGroup value={editData.status_kehadiran} onValueChange={(v) => setEditData({...editData, status_kehadiran: v as any})} className="grid grid-cols-3 gap-3">
+              <RadioGroup value={editData.status_kehadiran} onValueChange={(v) => setEditData({...editData, status_kehadiran: v as any})} className="grid grid-cols-4 gap-3">
                 <Label htmlFor="edit-hadir" className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${editData.status_kehadiran === "HADIR" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50 text-foreground"}`}>
                   <RadioGroupItem value="HADIR" id="edit-hadir" className="sr-only" />
                   <span className="font-medium">Hadir</span>
@@ -595,6 +791,10 @@ export default function PresensiGuruPage() {
                 <Label htmlFor="edit-izin" className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${editData.status_kehadiran === "IZIN" ? "border-accent bg-accent/10 text-accent" : "border-border hover:border-accent/50 text-foreground"}`}>
                   <RadioGroupItem value="IZIN" id="edit-izin" className="sr-only" />
                   <span className="font-medium">Izin</span>
+                </Label>
+                <Label htmlFor="edit-alfa" className={`flex flex-col items-center gap-2 p-3 border-2 rounded-lg cursor-pointer transition-all ${editData.status_kehadiran === "ALFA" ? "border-destructive bg-destructive/10 text-destructive" : "border-border hover:border-destructive/50 text-foreground"}`}>
+                  <RadioGroupItem value="ALFA" id="edit-alfa" className="sr-only" />
+                  <span className="font-medium">Alfa</span>
                 </Label>
               </RadioGroup>
             </div>
@@ -695,6 +895,10 @@ export default function PresensiGuruPage() {
                 <div className="flex items-center gap-2">
                   <RadioGroupItem value="IZIN" id="bs-izin" />
                   <Label htmlFor="bs-izin" className="font-normal cursor-pointer text-accent">Izin</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="ALFA" id="bs-alfa" />
+                  <Label htmlFor="bs-alfa" className="font-normal cursor-pointer text-destructive">Alfa</Label>
                 </div>
               </RadioGroup>
             </div>
