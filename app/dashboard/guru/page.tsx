@@ -81,7 +81,7 @@ const defaultFormState: GuruFormData = {
   status: "Aktif",
 }
 
-const fallbackPeranOptions = ["Petugas Admin", "Petugas Tata Usaha", "Petugas PPDB", "Staf Pengajar"]
+const fallbackPeranOptions = ["Petugas Admin", "Petugas Tata Usaha", "Petugas PPDB", "Petugas SPP", "Staf Pengajar"]
 
 const toText = (value: unknown): string => {
   if (value == null) return ""
@@ -813,7 +813,8 @@ export default function GuruPage() {
                             guru.peran === "Petugas Keuangan" && "bg-lime-500 text-white hover:bg-lime-500",
                             guru.peran === "Petugas Admin" && "bg-blue-600 text-white hover:bg-blue-600",
                             guru.peran === "Petugas PPDB" && "bg-emerald-500 text-white hover:bg-emerald-500",
-                            !["Petugas Keuangan", "Petugas Admin", "Petugas PPDB"].includes(guru.peran) &&
+                            guru.peran === "Petugas SPP" && "bg-violet-500 text-white hover:bg-violet-500",
+                            !["Petugas Keuangan", "Petugas Admin", "Petugas PPDB", "Petugas SPP"].includes(guru.peran) &&
                               "bg-muted text-muted-foreground",
                           )}
                         >

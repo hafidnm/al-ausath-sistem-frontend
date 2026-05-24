@@ -30,6 +30,8 @@ import {
   Loader2,
   Filter,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { useTagihan, useRingkasanPembayaran } from "@/hooks/use-pembayaran"
 import type { TagihanRow, StatusPembayaran } from "@/hooks/use-pembayaran"
@@ -69,20 +71,52 @@ const statusOptions: Array<{ value: string; label: string }> = [
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TagihanPage() {
-  const { data: tagihanData, loading, error, fetchTagihan } = useTagihan()
+  const { data: tagihanData, meta, loading, error, fetchTagihan } = useTagihan()
   const { data: ringkasan, loading: ringkasanLoading, fetchRingkasan } = useRingkasanPembayaran()
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedSumber, setSelectedSumber] = useState("all")
+  const [selectedKelas, setSelectedKelas] = useState("all")
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
+  
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
+
+  // Pagination Logic
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedStatus, selectedSumber, selectedKelas, selectedTahunAjaran])
+
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
 
   useEffect(() => {
-    void fetchTagihan()
+    void fetchTagihan({
+      page: currentPage,
+      per_page: itemsPerPage,
+      q: debouncedQuery,
+      status: selectedStatus !== "all" ? selectedStatus : undefined,
+      sumber: selectedSumber !== "all" ? selectedSumber : undefined,
+    })
     void fetchRingkasan()
-  }, [fetchTagihan, fetchRingkasan])
+  }, [fetchTagihan, fetchRingkasan, currentPage, debouncedQuery, selectedStatus, selectedSumber])
 
   const refreshAll = async () => {
-    await Promise.all([fetchTagihan(), fetchRingkasan()])
+    await Promise.all([
+      fetchTagihan({
+        page: currentPage,
+        per_page: itemsPerPage,
+        q: debouncedQuery,
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        sumber: selectedSumber !== "all" ? selectedSumber : undefined,
+      }),
+      fetchRingkasan()
+    ])
   }
 
   // ── Derived stats ─────────────────────────────────────────────────────────
@@ -98,32 +132,48 @@ export default function TagihanPage() {
     }
   }, [ringkasan, tagihanData])
 
-  // ── Unit options from data ─────────────────────────────────────────────────
+  // ── Options from data ─────────────────────────────────────────────────
   const sumberOptions = useMemo(() => {
     const set = new Set(tagihanData.map((r) => r.sumber))
     return Array.from(set)
   }, [tagihanData])
 
+  const kelasOptions = useMemo(() => {
+    const set = new Set(tagihanData.map((r) => r.kelasSaatIni).filter(Boolean))
+    return Array.from(set).sort()
+  }, [tagihanData])
+
+  const tahunAjaranOptions = useMemo(() => {
+    const set = new Set(tagihanData.map((r) => r.tahunAjaran).filter(Boolean))
+    return Array.from(set).sort()
+  }, [tagihanData])
+
   // ── Filter ─────────────────────────────────────────────────────────────────
+  // Since we use server-side pagination, filteredData is just tagihanData
+  // But we still apply local filters for kelas and tahunAjaran since backend doesn't support them yet
   const filteredData = useMemo(() => {
-    const keyword = searchQuery.toLowerCase().trim()
     return tagihanData.filter((row) => {
-      const matchesSearch =
-        keyword.length === 0 ||
-        row.namaLengkap.toLowerCase().includes(keyword) ||
-        row.nomorInduk.toLowerCase().includes(keyword) ||
-        row.namaUnit.toLowerCase().includes(keyword)
-      const matchesStatus = selectedStatus === "all" || row.status === selectedStatus
-      const matchesSumber = selectedSumber === "all" || row.sumber === selectedSumber
-      return matchesSearch && matchesStatus && matchesSumber
+      const matchesKelas = selectedKelas === "all" || row.kelasSaatIni === selectedKelas
+      const matchesTahunAjaran = selectedTahunAjaran === "all" || row.tahunAjaran === selectedTahunAjaran
+      return matchesKelas && matchesTahunAjaran
     })
-  }, [tagihanData, searchQuery, selectedStatus, selectedSumber])
+  }, [tagihanData, selectedKelas, selectedTahunAjaran])
 
   const totalTunggakanFiltered = filteredData.reduce((s, r) => s + r.totalTunggakan, 0)
-  const totalSantriTagihan = useMemo(() => {
+  
+  const localTotalSantri = useMemo(() => {
     const ids = new Set(tagihanData.map((row) => row.id).filter(Boolean))
     return ids.size
   }, [tagihanData])
+  const totalSantriTagihan = meta?.total ?? localTotalSantri
+
+  const totalPages = meta?.last_page ?? Math.max(1, Math.ceil(filteredData.length / itemsPerPage))
+  
+  const localPaginatedData = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredData.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredData, currentPage, itemsPerPage])
+  const paginatedData = meta ? filteredData : localPaginatedData
 
   if (error) {
     return (
@@ -238,7 +288,7 @@ export default function TagihanPage() {
               </CardDescription>
             </div>
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
+            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
               <div className="relative w-full sm:w-60">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -250,7 +300,7 @@ export default function TagihanPage() {
                 />
               </div>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-full sm:w-[200px]" id="filter-status-tagihan">
+                <SelectTrigger className="w-full sm:w-[160px]" id="filter-status-tagihan">
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
@@ -264,7 +314,7 @@ export default function TagihanPage() {
               </Select>
               {sumberOptions.length > 0 && (
                 <Select value={selectedSumber} onValueChange={setSelectedSumber}>
-                  <SelectTrigger className="w-full sm:w-[150px]" id="filter-sumber-tagihan">
+                  <SelectTrigger className="w-full sm:w-[110px]" id="filter-sumber-tagihan">
                     <SelectValue placeholder="Sumber" />
                   </SelectTrigger>
                   <SelectContent>
@@ -274,6 +324,32 @@ export default function TagihanPage() {
                   </SelectContent>
                 </Select>
               )}
+              <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+                <SelectTrigger className="w-full sm:w-[130px]" id="filter-kelas-tagihan">
+                  <SelectValue placeholder="Semua Kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                  {kelasOptions.map((k) => (
+                    <SelectItem key={k} value={k}>
+                      Kelas {k}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
+                <SelectTrigger className="w-full sm:w-[130px]" id="filter-tahun-tagihan">
+                  <SelectValue placeholder="Semua Tahun" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Tahun</SelectItem>
+                  {tahunAjaranOptions.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      TA {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardHeader>
@@ -312,7 +388,7 @@ export default function TagihanPage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredData.map((row: TagihanRow) => (
+                  paginatedData.map((row: TagihanRow) => (
                     <TableRow key={row.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -359,6 +435,39 @@ export default function TagihanPage() {
               </TableBody>
             </Table>
           </div>
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-muted-foreground">
+                Menampilkan {Math.min(filteredData.length, (currentPage - 1) * itemsPerPage + 1)} -{" "}
+                {Math.min(filteredData.length, currentPage * itemsPerPage)} dari {filteredData.length} data
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Sebelummya
+                </Button>
+                <div className="text-sm font-medium">
+                  Halaman {currentPage} dari {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Selanjutnya
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

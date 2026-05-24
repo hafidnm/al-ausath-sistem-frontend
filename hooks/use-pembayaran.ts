@@ -30,10 +30,10 @@ export type {
 export function useTagihan() {
   const query = useCallback(
     (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }) =>
-      pembayaranService.getTagihan(params).then((r) => r.data),
+      pembayaranService.getTagihan(params),
     [],
   );
-  const { data, loading, error, run } = useAsyncQuery(query, [] as TagihanRow[], {
+  const { data: responseData, loading, error, run } = useAsyncQuery(query, { data: [] } as { data: TagihanRow[], meta?: any }, {
     fallbackError: 'Gagal memuat daftar tagihan',
     logLabel: 'Error fetching tagihan:',
   });
@@ -42,7 +42,7 @@ export function useTagihan() {
     async (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }) => run(params),
     [run],
   );
-  return { data, loading, error, fetchTagihan };
+  return { data: responseData?.data || [], meta: responseData?.meta, loading, error, fetchTagihan };
 }
 
 export function useTagihanDetail() {

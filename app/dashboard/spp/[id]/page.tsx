@@ -51,6 +51,8 @@ import {
 import { useTagihanDetail, useUbahStatusPembayaran } from "@/hooks/use-pembayaran"
 import { useToast } from "@/hooks/use-toast"
 import { pembayaranService } from "@/lib/services/pembayaran.service"
+import { sppService } from "@/lib/services/spp.service"
+import type { SppSetting } from "@/lib/services/spp.types"
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("id-ID", {
@@ -79,6 +81,8 @@ type InvoiceRow = {
   status_key: string
   waktu_invoice: string | null
   kwitansi_url: string | null
+  bukti_bayar_url?: string | null
+  catatan_bayar?: string | null
 }
 
 const StatusBadge = ({ statusKey }: { statusKey: string }) => {
@@ -113,14 +117,13 @@ function InvoiceTable({
         <TableHeader>
           <TableRow className="bg-muted/40">
             <TableHead className="w-10 text-center">#</TableHead>
-            <TableHead>Tagihan Unit</TableHead>
-            <TableHead>Tagihan Kelas</TableHead>
-            <TableHead>Periode Tagihan</TableHead>
+            <TableHead>No. Invoice</TableHead>
             <TableHead>Rincian Tagihan</TableHead>
-            <TableHead className="text-right">Jml. Potongan</TableHead>
+            <TableHead>Periode Tagihan</TableHead>
             <TableHead className="text-right">Jml. Tagihan</TableHead>
-            <TableHead className="text-right">Jml. Dibayar</TableHead>
-            <TableHead className="text-right">Jml. Tunggakan</TableHead>
+            <TableHead className="text-right">Potongan</TableHead>
+            <TableHead className="text-right">Dibayar</TableHead>
+            <TableHead className="text-right">Tunggakan</TableHead>
             <TableHead className="text-center">Status</TableHead>
             <TableHead className="text-right">Aksi</TableHead>
           </TableRow>
@@ -138,30 +141,24 @@ function InvoiceTable({
                 <TableCell className="text-center text-sm text-muted-foreground font-medium">
                   {index_start + idx}
                 </TableCell>
+                <TableCell className="text-sm font-mono text-muted-foreground">
+                  {row.nomor_invoice || "-"}
+                </TableCell>
                 <TableCell className="text-sm">
                   {row.rincian_tagihan ? (
                     <div>
                       <p className="font-semibold text-primary text-xs">{row.rincian_tagihan}</p>
-                      <p className="text-xs text-muted-foreground">{formatCurrency(row.jumlah_tagihan)}</p>
                     </div>
                   ) : (
-                    <span className="text-muted-foreground">-</span>
+                    <span className="text-muted-foreground">Tagihan SPP</span>
                   )}
                 </TableCell>
-                <TableCell className="text-sm">
-                  {row.rincian_tagihan ? (
-                    <div>
-                      <p className="font-semibold text-primary text-xs">UNIT {row.rincian_tagihan.split(' ')[0]}</p>
-                    </div>
-                  ) : "-"}
-                </TableCell>
                 <TableCell className="text-sm">{row.periode_tagihan || formatDate(row.waktu_invoice)}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">{row.rincian_tagihan || "Tagihan SPP"}</TableCell>
-                <TableCell className="text-right text-sm">
-                  {formatCurrency(row.jumlah_potongan ?? 0)}
-                </TableCell>
                 <TableCell className="text-right text-sm font-medium">
                   {formatCurrency(row.jumlah_tagihan)}
+                </TableCell>
+                <TableCell className="text-right text-sm">
+                  {formatCurrency(row.jumlah_potongan ?? 0)}
                 </TableCell>
                 <TableCell className="text-right text-sm font-medium text-emerald-600">
                   {formatCurrency(row.jumlah_dibayar)}
@@ -216,7 +213,11 @@ export default function SppTagihanDetailPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<InvoiceRow | null>(null)
   const [payDialogOpen, setPayDialogOpen] = useState(false)
   const [detailDialogOpen, setDetailDialogOpen] = useState(false)
+  const [tambahDialogOpen, setTambahDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // SPP settings loaded from API
+  const [sppSettings, setSppSettings] = useState<SppSetting[]>([])
 
   // Payment form state
   const [payForm, setPayForm] = useState({
@@ -226,9 +227,24 @@ export default function SppTagihanDetailPage() {
     catatan: ''
   })
 
+  // New tagihan form state
+  const [tambahForm, setTambahForm] = useState({
+    id_setting: "",
+    nominal_bayar: 0,
+    metode_bayar: "Tunai",
+    status: "menunggu_pembayaran",
+    tanggal_bayar: new Date().toISOString().split('T')[0]
+  })
+
   useEffect(() => {
     if (id) void fetchTagihanDetail(id)
   }, [id, fetchTagihanDetail])
+
+  useEffect(() => {
+    sppService.getSettings({ per_page: 100 })
+      .then(res => setSppSettings(res.data))
+      .catch(err => console.error("Gagal memuat setting SPP", err))
+  }, [])
 
   const handlePayClick = (row: InvoiceRow) => {
     setSelectedInvoice(row)
@@ -257,6 +273,66 @@ export default function SppTagihanDetailPage() {
         description: "Pembayaran telah berhasil dicatat.",
       })
       setPayDialogOpen(false)
+      if (id) void fetchTagihanDetail(id)
+    } catch (err) {
+      toast({
+        title: "Gagal",
+        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        variant: "destructive"
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSettingChange = (settingId: string) => {
+    const selected = sppSettings.find(s => s.id === settingId)
+    setTambahForm(prev => ({
+      ...prev,
+      id_setting: settingId,
+      nominal_bayar: selected ? selected.nominal : 0
+    }))
+  }
+
+  const handleCreateTagihan = async () => {
+    if (!tambahForm.id_setting) {
+      toast({
+        title: "Gagal",
+        description: "Silakan pilih jenis tagihan.",
+        variant: "destructive"
+      })
+      return
+    }
+    setSubmitting(true)
+    try {
+      const payload: any = {
+        id_setting: Number(tambahForm.id_setting),
+        nominal_bayar: tambahForm.nominal_bayar,
+        metode_bayar: tambahForm.metode_bayar,
+        status: tambahForm.status,
+        tanggal_bayar: tambahForm.tanggal_bayar,
+      }
+      if (data?.profil?.sumber === 'ppdb') {
+        payload.id_pendaftaran = Number(data.profil.id)
+      } else if (data?.profil?.id) {
+        payload.id_santri = Number(data.profil.id)
+      }
+
+      await sppService.createPayment(payload)
+
+      toast({
+        title: "Berhasil",
+        description: "Tagihan baru berhasil diterbitkan.",
+      })
+      setTambahDialogOpen(false)
+      // Reset form
+      setTambahForm({
+        id_setting: "",
+        nominal_bayar: 0,
+        metode_bayar: "Tunai",
+        status: "menunggu_pembayaran",
+        tanggal_bayar: new Date().toISOString().split('T')[0]
+      })
       if (id) void fetchTagihanDetail(id)
     } catch (err) {
       toast({
@@ -319,7 +395,7 @@ export default function SppTagihanDetailPage() {
           <p className="text-sm text-muted-foreground">Ringkasan dan rincian invoice per santri/calon santri</p>
         </div>
         <div className="ml-auto flex gap-2">
-          <Button className="bg-blue-600 hover:bg-blue-700 h-9">
+          <Button className="bg-blue-600 hover:bg-blue-700 h-9" onClick={() => setTambahDialogOpen(true)}>
             <PlusCircle className="w-4 h-4 mr-2" /> Tambah
           </Button>
           <Button variant="outline" className="h-9">
@@ -552,6 +628,51 @@ export default function SppTagihanDetailPage() {
                 <div className="text-muted-foreground">Status</div>
                 <div><StatusBadge statusKey={selectedInvoice.status_key} /></div>
               </div>
+
+              {/* Bukti Pembayaran */}
+              {selectedInvoice.bukti_bayar_url && (
+                <div className="mt-4 p-4 rounded-lg border bg-muted/40 space-y-2">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Bukti Transfer / Bayar</span>
+                  {(() => {
+                    const resolvedUrl = (() => {
+                      let url = selectedInvoice.bukti_bayar_url;
+                      if (!url) return "";
+                      const storageIndex = url.indexOf('/storage/');
+                      if (storageIndex !== -1) {
+                        url = url.substring(storageIndex);
+                      }
+                      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+                      const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
+                      if (url.startsWith("/storage/")) return `${base}${url}`;
+                      if (url.startsWith("storage/")) return `${base}/${url}`;
+                      return `${base}/storage/${url.replace(/^\//, "")}`;
+                    })();
+
+                    return resolvedUrl.toLowerCase().endsWith('.pdf') ? (
+                      <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-1.5" asChild>
+                        <a href={resolvedUrl} target="_blank" rel="noreferrer">
+                          <span>Lihat Dokumen PDF Bukti Bayar</span>
+                        </a>
+                      </Button>
+                    ) : (
+                      <div className="relative group overflow-hidden rounded-md border bg-background flex flex-col items-center">
+                        <img 
+                          src={resolvedUrl} 
+                          alt="Bukti Transfer" 
+                          className="max-h-48 object-contain rounded w-full hover:scale-[1.02] transition-transform duration-200 cursor-pointer"
+                          onClick={() => window.open(resolvedUrl, "_blank")}
+                        />
+                        <p className="text-[11px] text-muted-foreground mt-1.5 pb-1">Klik gambar untuk melihat resolusi penuh</p>
+                      </div>
+                    );
+                  })()}
+                  {selectedInvoice.catatan_bayar && (
+                    <div className="text-xs text-muted-foreground italic border-t pt-2 mt-2">
+                      <strong>Catatan Pengirim:</strong> {selectedInvoice.catatan_bayar}
+                    </div>
+                  )}
+                </div>
+              )}
               
               {selectedInvoice.status_key === 'lunas' && (
                 <div className="mt-4 p-3 bg-emerald-50 rounded-lg border border-emerald-100 flex items-center justify-between">
@@ -572,6 +693,90 @@ export default function SppTagihanDetailPage() {
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailDialogOpen(false)}>Tutup</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tambah Tagihan Dialog */}
+      <Dialog open={tambahDialogOpen} onOpenChange={setTambahDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Buat Tagihan SPP Baru</DialogTitle>
+            <DialogDescription>
+              Menerbitkan tagihan SPP manual untuk <strong>{data.profil?.nama_lengkap}</strong>
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="tambah-setting">Pilih Jenis SPP / Paket Tagihan *</Label>
+              <Select value={tambahForm.id_setting} onValueChange={handleSettingChange}>
+                <SelectTrigger id="tambah-setting">
+                  <SelectValue placeholder="Pilih Jenis SPP..." />
+                </SelectTrigger>
+                <SelectContent className="max-h-60">
+                  {sppSettings.map((s) => (
+                    <SelectItem key={s.id} value={s.id.toString()}>
+                      {s.nama} ({formatCurrency(s.nominal)})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="tambah-nominal">Nominal SPP (Rp) *</Label>
+              <Input
+                id="tambah-nominal"
+                type="number"
+                value={tambahForm.nominal_bayar}
+                onChange={(e) => setTambahForm({ ...tambahForm, nominal_bayar: Number(e.target.value) })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tambah-tanggal">Tanggal Tagihan</Label>
+              <Input
+                id="tambah-tanggal"
+                type="date"
+                value={tambahForm.tanggal_bayar}
+                onChange={(e) => setTambahForm({ ...tambahForm, tanggal_bayar: e.target.value })}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tambah-metode">Metode Bayar (Jika Lunas)</Label>
+              <Select value={tambahForm.metode_bayar} onValueChange={(v) => setTambahForm({ ...tambahForm, metode_bayar: v })}>
+                <SelectTrigger id="tambah-metode">
+                  <SelectValue placeholder="Pilih Metode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Tunai">Tunai</SelectItem>
+                  <SelectItem value="Transfer">Transfer Bank</SelectItem>
+                  <SelectItem value="Lainnya">Lainnya</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="tambah-status">Status Awal Tagihan</Label>
+              <Select value={tambahForm.status} onValueChange={(v) => setTambahForm({ ...tambahForm, status: v })}>
+                <SelectTrigger id="tambah-status">
+                  <SelectValue placeholder="Pilih Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="menunggu_pembayaran">Menunggu Pembayaran (Belum Bayar)</SelectItem>
+                  <SelectItem value="menunggu_verifikasi">Menunggu Verifikasi (Sudah Upload)</SelectItem>
+                  <SelectItem value="lunas">Lunas (Selesai)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTambahDialogOpen(false)}>Batal</Button>
+            <Button onClick={handleCreateTagihan} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700">
+              {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <PlusCircle className="w-4 h-4 mr-2" />}
+              Terbitkan Tagihan
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

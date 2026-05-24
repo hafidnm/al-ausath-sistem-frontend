@@ -109,7 +109,7 @@ function DocLink({
               <ExternalLink className="w-3 h-3" />
               Preview
             </a>
-            <a href={url} download
+            <a href={url} download target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground hover:underline">
               <FileDown className="w-3 h-3" />
               Download

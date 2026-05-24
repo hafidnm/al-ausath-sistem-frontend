@@ -139,11 +139,6 @@ export default function LoginPage() {
             />
           </div>
         </div>
-
-        <div className="flex items-center gap-2 text-sidebar-foreground/60 text-sm">
-          <Star className="w-4 h-4" />
-          <span>Dipercaya oleh 500+ pesantren di Indonesia</span>
-        </div>
       </div>
 
       {/* Right Panel - Login Form */}

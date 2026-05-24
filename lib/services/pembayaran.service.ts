@@ -79,6 +79,8 @@ export interface TagihanDetailResponse {
     waktu_invoice: string | null;
     kwitansi_tersedia: boolean;
     kwitansi_url: string | null;
+    bukti_bayar_url?: string | null;
+    catatan_bayar?: string | null;
   }>;
 }
 
@@ -378,7 +380,7 @@ export const pembayaranService = {
     try {
       const response = await api.get(`${BASE}/tagihan`, { params });
       const data = extractList(response.data).map(normalizeTagihanRow);
-      return { data };
+      return { data, meta: response.data.meta };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat daftar tagihan'));
     }
@@ -422,6 +424,8 @@ export const pembayaranService = {
               waktu_invoice: toStr(item.waktu_invoice ?? '') || null,
               kwitansi_tersedia: Boolean(item.kwitansi_tersedia ?? false),
               kwitansi_url: toStr(item.kwitansi_url ?? '') || null,
+              bukti_bayar_url: toStr(item.bukti_bayar_url ?? '') || null,
+              catatan_bayar: toStr(item.catatan_bayar ?? '') || null,
             }))
           : [],
       };

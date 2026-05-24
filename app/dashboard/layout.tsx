@@ -74,6 +74,7 @@ const adminMenuItems = [
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
   { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
+  { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
   { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
   { icon: Settings, label: "Pengaturan", href: "/dashboard/pengaturan" },
 ]
@@ -85,6 +86,20 @@ const guruMenuItems = [
   { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
   { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
   { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+]
+
+const sppMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
+  { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
+  { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
+  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+]
+
+const ppdbMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+  { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 
@@ -205,8 +220,13 @@ export default function DashboardLayout({
 
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1">
-            {(role === 'petugas' 
-               ? (user?.peran_akun === 'Petugas Admin' ? adminMenuItems : guruMenuItems)
+            {(role === 'petugas'
+               ? (
+                   user?.peran_akun === 'Petugas Admin' ? adminMenuItems
+                   : user?.peran_akun === 'Petugas SPP'  ? sppMenuItems
+                   : user?.peran_akun === 'Petugas PPDB' ? ppdbMenuItems
+                   : guruMenuItems   // Staf Pengajar & Petugas Tata Usaha
+                 )
                : santriMenuItems
              ).map((item) => {
               const isActive = pathname === item.href
@@ -277,7 +297,7 @@ export default function DashboardLayout({
               )}
               <div>
                 <h2 className="font-semibold text-foreground">
-                  {[...adminMenuItems, ...guruMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
+                  {[...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
                 </h2>
                 <p className="text-xs text-muted-foreground">Tahun Ajaran 2024/2025 - Semester Ganjil</p>
               </div>
