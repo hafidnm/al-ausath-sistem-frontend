@@ -380,7 +380,7 @@ export const pembayaranService = {
     try {
       const response = await api.get(`${BASE}/tagihan`, { params });
       const data = extractList(response.data).map(normalizeTagihanRow);
-      return { data };
+      return { data, meta: response.data.meta };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat daftar tagihan'));
     }
