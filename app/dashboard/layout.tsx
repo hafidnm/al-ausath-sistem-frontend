@@ -65,7 +65,7 @@ const adminMenuItems = [
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
   { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
   { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
-  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/nilai" },
+  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/admin-panel/nilai-mapel" },
   { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
   { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
   { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },

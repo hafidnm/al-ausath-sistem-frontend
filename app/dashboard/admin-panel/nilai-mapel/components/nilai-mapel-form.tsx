@@ -22,6 +22,7 @@ import {
   UpsertNilaiMapelPayload,
 } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
+import { BobotNilaiItem, bobotNilaiService } from "@/lib/services/bobot-nilai.service"
 import { authService } from "@/lib/services/auth.service"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
 import { mataPelajaranService, type MataPelajaranItem } from "@/lib/services/mata-pelajaran.service"
@@ -134,11 +135,32 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
   const [nilaiKkm, setNilaiKkm] = useState<number | undefined>(undefined)
   const [isLoadingKkm, setIsLoadingKkm] = useState(false)
+  const [bobot, setBobot] = useState<{ tugas: number; ulangan: number; ujian: number }>({ tugas: 0, ulangan: 0, ujian: 0 })
+  const [isLoadingBobot, setIsLoadingBobot] = useState(false)
   const [isUserReady, setIsUserReady] = useState(false)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const normalizeCode = (value: string): string => value.trim().toUpperCase()
+
+  const pickLatestBobot = (items: BobotNilaiItem[]) => {
+    if (items.length === 0) return undefined
+
+    const toTimestamp = (value?: string) => {
+      if (!value) return 0
+      const time = Date.parse(value)
+      return Number.isFinite(time) ? time : 0
+    }
+
+    return items
+      .slice()
+      .sort((a, b) => {
+        const timeA = Math.max(toTimestamp(a.updated_at), toTimestamp(a.created_at))
+        const timeB = Math.max(toTimestamp(b.updated_at), toTimestamp(b.created_at))
+        if (timeA !== timeB) return timeB - timeA
+        return b.id - a.id
+      })[0]
+  }
 
   const applySelectedSantri = (santri: SantriItem) => {
     const normalizedSantriId = Number.isFinite(santri.id) && santri.id > 0 ? santri.id : null
@@ -416,6 +438,70 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
     }
   }, [kodeMapel, tahunAjaran, semester])
 
+  useEffect(() => {
+    if (!tahunAjaran || !semester) {
+      setBobot({ tugas: 0, ulangan: 0, ujian: 0 })
+      return
+    }
+
+    let cancelled = false
+
+    const loadBobot = async () => {
+      try {
+        setIsLoadingBobot(true)
+        let rows = await bobotNilaiService.getAll({
+          tahun_ajaran: tahunAjaran,
+          semester: Number(semester),
+          per_page: "10",
+        })
+
+        // Fallback: backend filter kadang diabaikan. Ambil semua lalu match di frontend.
+        if (rows.data.length === 0) {
+          rows = await bobotNilaiService.getAll({ per_page: "100" })
+        }
+
+        if (cancelled) return
+
+        const tahunAjaranNormalized = tahunAjaran.trim()
+        const semesterNormalized = String(semester).trim()
+
+        const matching = rows.data.filter((row) => (
+          row.tahun_ajaran.trim() === tahunAjaranNormalized
+          && String(row.semester).trim() === semesterNormalized
+        ))
+
+        const selected = pickLatestBobot(matching)
+          ?? pickLatestBobot(rows.data.filter((row) => row.is_default))
+          ?? pickLatestBobot(rows.data)
+
+        if (!selected) {
+          setBobot({ tugas: 0, ulangan: 0, ujian: 0 })
+          return
+        }
+
+        setBobot({
+          tugas: Number.isFinite(selected.bobot_harian) ? selected.bobot_harian : 0,
+          ulangan: Number.isFinite(selected.bobot_uts) ? selected.bobot_uts : 0,
+          ujian: Number.isFinite(selected.bobot_uas) ? selected.bobot_uas : 0,
+        })
+      } catch {
+        if (!cancelled) {
+          setBobot({ tugas: 0, ulangan: 0, ujian: 0 })
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingBobot(false)
+        }
+      }
+    }
+
+    loadBobot()
+
+    return () => {
+      cancelled = true
+    }
+  }, [tahunAjaran, semester])
+
   const preview = useMemo(() => {
     const tugasForCalc: NilaiMapelTugasItem[] = tugas.map((item) => ({
       ...item,
@@ -426,7 +512,11 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       nilai: normalizeNilaiInput(item.nilai),
     }))
 
-    const raw = calculateRaporRaw(tugasForCalc, ulanganForCalc, normalizeNilaiInput(ujianAkhir))
+    const raw = calculateRaporRaw(tugasForCalc, ulanganForCalc, normalizeNilaiInput(ujianAkhir), {
+      tugas: bobot.tugas,
+      ulangan: bobot.ulangan,
+      ujian: bobot.ujian,
+    })
     const normalized = normalizeRaporDisplay(raw)
     const status = statusKkm(normalized.nilai, nilaiKkm ?? 75)
 
@@ -436,7 +526,13 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
       isRed: normalized.isRed,
       status,
     }
-  }, [nilaiKkm, tugas, ulangan, ujianAkhir])
+  }, [nilaiKkm, tugas, ulangan, ujianAkhir, bobot])
+
+  const bobotLabel = isLoadingBobot
+    ? "Memuat..."
+    : (bobot.tugas + bobot.ulangan + bobot.ujian > 0
+      ? `${bobot.tugas}/${bobot.ulangan}/${bobot.ujian}`
+      : "Belum diset")
 
   const updateTugas = (index: number, patch: Partial<TugasFormItem>) => {
     setTugas((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
@@ -854,7 +950,7 @@ export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: N
             <h4 className="font-semibold text-foreground mb-2">Preview Nilai Rapor</h4>
             <div className="grid sm:grid-cols-4 gap-3 text-sm">
               <div>
-                <p className="text-muted-foreground">Rapor Raw (20/30/50)</p>
+                <p className="text-muted-foreground">Rapor Raw ({bobotLabel})</p>
                 <p className="font-semibold text-foreground">{preview.raw.toFixed(2)}</p>
               </div>
               <div>

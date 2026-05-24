@@ -1,2 +1,2 @@
 notulensi
-1. Tugasnya adalah ketika santri sudah aktif makka otomatis genearet spp  dibagian tagihan jadi spp otomatis ada billnya dibagian detail santri, untuk membatasi nya itu bisa disesuaikan dengan tahun ajaran yang ada 
+1. Nomor induk  huruf saja 
