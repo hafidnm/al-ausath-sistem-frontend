@@ -4,8 +4,6 @@ export type BackendStatus = "AKTIF" | "NONAKTIF"
 
 export interface DataJadwalPembelajaranApiItem {
   kelas_mapel: any
-  kelas_mapel: any
-  kelas_mapel: any
   id_jadwal_pembelajaran?: number
   id?: number
   id_jadwal?: number

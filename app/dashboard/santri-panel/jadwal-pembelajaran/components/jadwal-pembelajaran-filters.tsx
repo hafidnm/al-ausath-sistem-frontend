@@ -10,12 +10,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const tahunAjaranOptions = [
-  { value: "2025/2026", label: "2025/2026" },
-  { value: "2024/2025", label: "2024/2025" },
-  { value: "2023/2024", label: "2023/2024" },
-]
-
 const hariOptions = [
   { value: "SENIN", label: "Senin" },
   { value: "SELASA", label: "Selasa" },
@@ -31,7 +25,6 @@ const statusOptions = [
 ]
 
 export interface JadwalPembelajaranFilterState {
-  tahunAjaran: string
   hari: string
   status: string
   q: string
@@ -44,24 +37,7 @@ interface JadwalPembelajaranFiltersProps {
 
 export function JadwalPembelajaranFilters({ filters, onChange }: JadwalPembelajaranFiltersProps) {
   return (
-    <div className="grid gap-4 md:grid-cols-4">
-      <div className="space-y-2">
-        <Label>Tahun Ajaran</Label>
-        <Select
-          value={filters.tahunAjaran || "all"}
-          onValueChange={(value) => onChange({ ...filters, tahunAjaran: value === "all" ? "" : value })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Semua" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua</SelectItem>
-            {tahunAjaranOptions.map((item) => (
-              <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="grid gap-4 md:grid-cols-3">
       <div className="space-y-2">
         <Label>Hari</Label>
         <Select

@@ -28,10 +28,6 @@ const getMapelName = (item: DataJadwalPembelajaranApiItem) => (
   || item.kelasMapel?.mataPelajaran?.nama_mapel
   || item.kelasMapel?.mata_pelajaran?.nama_mapel
   || item.mapel?.nama_mapel
-  || item.kelasMapel?.mataPelajaran?.nama_mapel
-  || item.kelasMapel?.mata_pelajaran?.nama_mapel
-  || (item.kelasMapel as any)?.mataPelajaran?.nama_mapel
-  || (item.kelasMapel as any)?.nama_mapel
   || item.kode_mapel
   || item.kelasMapel?.kode_mapel
   || item.kelas_mapel?.kode_mapel
@@ -43,7 +39,6 @@ const getKelasName = (item: DataJadwalPembelajaranApiItem) => (
   || item.kelas?.nama_kelas
   || item.kelasMapel?.kelas?.nama_kelas
   || item.kelas_mapel?.kelas?.nama_kelas
-  || (item.kelasMapel as any)?.nama_kelas
   || item.kode_kelas
   || item.kelasMapel?.kode_kelas
   || item.kelas_mapel?.kode_kelas

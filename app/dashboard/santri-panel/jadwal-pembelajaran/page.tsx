@@ -8,7 +8,6 @@ import { JadwalPembelajaranTable } from "./components/jadwal-pembelajaran-table"
 import { useJadwalPembelajaranSantri } from "@/hooks/use-jadwal-pembelajaran-santri"
 
 const defaultFilters: JadwalPembelajaranFilterState = {
-  tahunAjaran: "",
   hari: "",
   status: "",
   q: "",
@@ -18,7 +17,6 @@ export default function JadwalPembelajaranSantriPage() {
   const [filters, setFilters] = useState<JadwalPembelajaranFilterState>(defaultFilters)
 
   const queryParams = useMemo(() => ({
-    tahunAjaran: filters.tahunAjaran || undefined,
     hari: filters.hari || undefined,
     status: filters.status ? (filters.status as "AKTIF" | "NONAKTIF") : undefined,
     q: filters.q || undefined,
