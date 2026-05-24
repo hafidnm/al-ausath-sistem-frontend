@@ -49,6 +49,7 @@ import {
   Receipt,
   Award,
 } from "lucide-react"
+import NotificationsBell from "@/components/notifications/notifications-bell"
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
@@ -306,10 +307,7 @@ export default function DashboardLayout({
 
             <div className="flex items-center gap-2">
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="w-5 h-5 text-muted-foreground" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
-              </Button>
+              <NotificationsBell />
 
               {/* User Menu */}
               <DropdownMenu>
