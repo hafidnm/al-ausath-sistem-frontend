@@ -456,16 +456,7 @@ export default function PresensiSantriPage() {
                     className="w-40"
                   />
                   
-                  <Select value={filterSesi.status_sesi} onValueChange={(val) => setFilterSesi({ ...filterSesi, status_sesi: val })}>
-                    <SelectTrigger className="w-36">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Status</SelectItem>
-                      <SelectItem value="SELESAI">Selesai</SelectItem>
-                      <SelectItem value="BATAL">Batal</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  
                   
                   <div className="relative">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
