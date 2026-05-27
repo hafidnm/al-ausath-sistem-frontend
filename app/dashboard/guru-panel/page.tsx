@@ -22,6 +22,7 @@ import { santriService } from "@/lib/services/santri.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajaran.service"
+import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import {
   Dialog,
   DialogContent,
@@ -80,6 +81,7 @@ type JadwalItem = {
   jam: string
   siswa: number
   nama_petugas?: string
+  tahun_ajaran?: string
 }
 
 type SantriItem = {
@@ -238,6 +240,7 @@ const mapSesiToJadwal = (item: any): JadwalItem => {
     kode_unit: normalizeUnitCode(kelas?.kode_unit ?? kelasMapel?.kode_unit ?? jadwal?.kode_unit ?? item?.kode_unit),
     nama_unit: String(kelas?.nama_unit ?? kelasMapel?.nama_unit ?? jadwal?.nama_unit ?? item?.nama_unit ?? "").trim(),
     siswa: normalizeNumber(item?.absensi_santri_count ?? item?.total_santri ?? 0),
+    tahun_ajaran: kelasMapel?.tahun_ajaran ?? kelas?.tahun_ajaran ?? item?.tahun_ajaran ?? undefined,
   }
 }
 
@@ -316,6 +319,8 @@ export default function GuruPanelPage() {
 
   const [rekapLoading, setRekapLoading] = useState(false)
   const [rekapPetugasRows, setRekapPetugasRows] = useState<RekapPetugasRow[]>([])
+  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
+  const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
 
   const [step, setStep] = useState(1)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -441,7 +446,13 @@ export default function GuruPanelPage() {
     return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentPetugasId))
   }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser])
 
-  const todayDateStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const todayDateStr = useMemo(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const date = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${date}`
+  }, [])
 
   const jadwalDilimpahkan = useMemo(() => {
     if (!currentPetugasId) return []
@@ -459,15 +470,20 @@ export default function GuruPanelPage() {
   }, [aktivitasSesi, currentPetugasId, todayDateStr])
 
   const riwayatPresensi = useMemo(() => {
-    const filtered = currentPetugasId
+    let filtered = currentPetugasId
       ? aktivitasSesi.filter(
           (item) =>
             Number(item.id_petugas_hadir) === Number(currentPetugasId) ||
             Number(item.id_petugas_pengganti) === Number(currentPetugasId)
         )
       : aktivitasSesi
+
+    if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
+      filtered = filtered.filter((item) => item.tahun_ajaran === selectedTahunAjaranRekap)
+    }
+
     return [...filtered].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
-  }, [aktivitasSesi, currentPetugasId])
+  }, [aktivitasSesi, currentPetugasId, selectedTahunAjaranRekap])
 
   // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
 
@@ -599,15 +615,35 @@ export default function GuruPanelPage() {
     }
   }
 
-  const loadRekap = async (idPetugas?: number | null) => {
+  const loadTahunAjaran = async () => {
+    try {
+      const res = await tahunAjaranService.getAll({ per_page: 100 })
+      const list = res.data || []
+      setTahunAjaranOptions(list)
+      const active = list.find((t) => t.status === "AKTIF")
+      if (active?.kode_tahun) {
+        setSelectedTahunAjaranRekap(active.kode_tahun)
+      }
+    } catch (e) {
+      console.error("Gagal memuat tahun ajaran", e)
+    }
+  }
+
+  const loadRekap = async (idPetugas?: number | null, tahunOverride?: string) => {
     setRekapLoading(true)
     try {
       const params: Record<string, string | number | boolean> = { per_page: 100 }
-      if (idPetugas) params.id_petugas = idPetugas
+      const activePetugas = idPetugas !== undefined ? idPetugas : currentPetugasId
+      if (activePetugas) params.id_petugas = activePetugas
+
+      const activeTahun = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaranRekap
+      if (activeTahun && activeTahun !== "ALL") {
+        params.tahun_ajaran = activeTahun
+      }
+
       const result = await sesiAbsensiService.rekapPetugas(params)
       const rows = toArray(result?.data) as RekapPetugasRow[]
-      // If filtered by id_petugas but API returns all, filter client-side
-      const filtered = idPetugas ? rows.filter((r) => Number(r.id_petugas) === Number(idPetugas)) : rows
+      const filtered = activePetugas ? rows.filter((r) => Number(r.id_petugas) === Number(activePetugas)) : rows
       setRekapPetugasRows(filtered)
     } catch (error: any) {
       toast({
@@ -625,13 +661,14 @@ export default function GuruPanelPage() {
     void loadJadwal()
     void loadAktivitasSesi()
     void loadPetugasPengajar()
+    void loadTahunAjaran()
   }, [])
 
   useEffect(() => {
     if (currentPetugasId) {
-      void loadRekap(currentPetugasId)
+      void loadRekap(currentPetugasId, selectedTahunAjaranRekap)
     }
-  }, [currentPetugasId])
+  }, [currentPetugasId, selectedTahunAjaranRekap])
 
   const resetDialogState = () => {
     setStep(1)
@@ -1269,12 +1306,30 @@ export default function GuruPanelPage() {
             const rekap = rekapPetugasRows[0]
             return (
               <Card className="border-border/50">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-lg text-foreground flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-primary" />
-                    Rekap Kehadiran Saya
-                  </CardTitle>
-                  <CardDescription>Rekapitulasi kehadiran mengajar Anda secara keseluruhan</CardDescription>
+                <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-lg text-foreground flex items-center gap-2">
+                      <UserCheck className="w-5 h-5 text-primary" />
+                      Rekap Kehadiran Saya
+                    </CardTitle>
+                    <CardDescription>Rekapitulasi kehadiran mengajar Anda secara keseluruhan</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Tahun Ajaran:</span>
+                    <Select value={selectedTahunAjaranRekap} onValueChange={setSelectedTahunAjaranRekap}>
+                      <SelectTrigger className="w-44 h-9">
+                        <SelectValue placeholder="Tahun Ajaran" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
+                        {tahunAjaranOptions.map((t) => (
+                          <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
+                            {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {rekapLoading ? (

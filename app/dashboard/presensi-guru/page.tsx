@@ -19,6 +19,7 @@ import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajara
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
+import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 
 interface RekapPetugasRow {
   id_petugas: number
@@ -48,6 +49,7 @@ export default function PresensiGuruPage() {
     tanggal_selesai: "",
     q: "",
   })
+  const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
 
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
@@ -55,6 +57,8 @@ export default function PresensiGuruPage() {
   const [selectedUnitSesi, setSelectedUnitSesi] = useState("ALL")
   const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
   const [kelasSesiOptions, setKelasSesiOptions] = useState<KelasItem[]>([])
+  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
     status_sesi: "SELESAI",
@@ -101,18 +105,47 @@ export default function PresensiGuruPage() {
 
   useEffect(() => {
     loadOptions()
-    loadRekap()
-    loadRiwayatSesi()
-    loadBelumDiabsen()
   }, [])
+
+  // Auto load Rekap
+  useEffect(() => {
+    void loadRekap()
+  }, [
+    selectedTahunAjaranRekap,
+    filterRekap.tanggal_mulai,
+    filterRekap.tanggal_selesai,
+    filterRekap.q
+  ])
+
+  // Auto load Riwayat Sesi
+  useEffect(() => {
+    void loadRiwayatSesi()
+  }, [
+    selectedTahunAjaran,
+    selectedUnitSesi,
+    selectedKelasSesi,
+    filterSesi.tanggal,
+    filterSesi.q,
+    filterSesi.id_petugas_hadir
+  ])
+
+  // Auto load Belum Diabsen
+  useEffect(() => {
+    void loadBelumDiabsen()
+  }, [
+    selectedUnitBelum,
+    selectedKelasBelum,
+    filterBelumDiabsen.tanggal
+  ])
 
   const loadOptions = async () => {
     try {
-      const [petugasRes, jadwalRes, unitRes, kelasRes] = await Promise.all([
+      const [petugasRes, jadwalRes, unitRes, kelasRes, tahunRes] = await Promise.all([
         dataPetugasService.getAll({ per_page: 300, status: "AKTIF" }),
         dataJadwalPembelajaranService.getAll({ per_page: 300, status: "AKTIF" }),
         dataUnitService.getAll({ per_page: 100, status: "AKTIF" }),
-        kelasService.getAll({ per_page: "500", status: "AKTIF" })
+        kelasService.getAll({ per_page: "500", status: "AKTIF" }),
+        tahunAjaranService.getAll({ per_page: 100 })
       ])
       
       const mappedPetugas = (petugasRes.data || []).map((item: any) => ({
@@ -140,6 +173,15 @@ export default function PresensiGuruPage() {
       setUnitOptions(unitRes.data || [])
       setKelasSesiOptions(kelasRes || [])
       setKelasBelumOptions(kelasRes || [])
+
+      const tahunList = tahunRes.data || []
+      setTahunAjaranOptions(tahunList)
+
+      const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+      if (activeTahun?.kode_tahun) {
+        setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
+        setSelectedTahunAjaran(activeTahun.kode_tahun)
+      }
     } catch (error) {
       console.error("Gagal memuat options", error)
     }
@@ -168,10 +210,11 @@ export default function PresensiGuruPage() {
   const loadRekap = async () => {
     setRekapLoading(true)
     try {
-      const response = await sesiAbsensiService.rekapPetugas({
-        ...filterRekap,
-        per_page: 100
-      })
+      const params: any = { ...filterRekap, per_page: 100 }
+      if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
+        params.tahun_ajaran = selectedTahunAjaranRekap
+      }
+      const response = await sesiAbsensiService.rekapPetugas(params)
       setRekapRows(response?.data || [])
     } catch (error: any) {
       toast({
@@ -184,13 +227,18 @@ export default function PresensiGuruPage() {
     }
   }
 
-  const loadRiwayatSesi = async () => {
+  const loadRiwayatSesi = async (tahunOverride?: string) => {
     setSesiLoading(true)
     try {
       const params: any = { ...filterSesi, per_page: 100 }
       if (params.id_petugas_hadir === "ALL") delete params.id_petugas_hadir
       if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
       if (selectedUnitSesi !== "ALL") params.kode_unit = selectedUnitSesi
+      
+      const yearToUse = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaran
+      if (yearToUse !== "ALL") {
+        params.tahun_ajaran = yearToUse
+      }
       
       const response = await sesiAbsensiService.getAll(params)
       setSesiRows(response as SesiAbsensiApiItem[])
@@ -232,7 +280,11 @@ export default function PresensiGuruPage() {
   }
 
   const handleExport = (format: 'pdf' | 'excel') => {
-    const url = sesiAbsensiService.getExportPetugasUrl(format, filterRekap)
+    const params: any = { ...filterRekap }
+    if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
+      params.tahun_ajaran = selectedTahunAjaranRekap
+    }
+    const url = sesiAbsensiService.getExportPetugasUrl(format, params)
     window.open(url, '_blank')
   }
 
@@ -386,6 +438,19 @@ export default function PresensiGuruPage() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <CardTitle className="text-lg">Rekap Kehadiran Guru</CardTitle>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Select value={selectedTahunAjaranRekap} onValueChange={setSelectedTahunAjaranRekap}>
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Tahun Ajaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
+                      {tahunAjaranOptions.map((t) => (
+                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
+                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     type="date"
                     value={filterRekap.tanggal_mulai}
@@ -483,6 +548,25 @@ export default function PresensiGuruPage() {
                   <CardTitle className="text-lg">Riwayat Sesi Absensi</CardTitle>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Select
+                    value={selectedTahunAjaran}
+                    onValueChange={(val) => {
+                      setSelectedTahunAjaran(val)
+                    }}
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue placeholder="Tahun Ajaran" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
+                      {tahunAjaranOptions.map((t) => (
+                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
+                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
                   <Select 
                     value={selectedUnitSesi} 
                     onValueChange={(val) => {
@@ -549,7 +633,7 @@ export default function PresensiGuruPage() {
                     </SelectContent>
                   </Select>
                   
-                  <Button variant="secondary" onClick={loadRiwayatSesi}>Filter</Button>
+                  <Button variant="secondary" onClick={() => loadRiwayatSesi()}>Filter</Button>
                   
                   <div className="border-l pl-2 ml-2">
                     <Button onClick={openBukaSesiModal} className="bg-primary text-primary-foreground gap-2">

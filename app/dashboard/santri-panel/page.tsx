@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
+import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import api from "@/lib/axios"
 import {
   BookOpen, FileText, Award, Receipt, Wallet, Megaphone,
@@ -84,12 +85,29 @@ export default function SantriPanelPage() {
   /* Filter riwayat */
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPeriode, setFilterPeriode] = useState("all")
+  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
 
-  /* ─── Fetch Logic ──────────────────────────────────────────── */
-  const fetchRiwayat = async (nomorInduk: string, periode: string) => {
+  /* ─── Fetch rekap ─────────────────────────────────────── */
+  const fetchRekap = async (nomorInduk: string, tahunAjaran?: string) => {
+    try {
+      const params: any = { nomor_induk: nomorInduk, per_page: 1 }
+      const activeTahun = tahunAjaran ?? selectedTahunAjaran
+      if (activeTahun && activeTahun !== "ALL") {
+        params.tahun_ajaran = activeTahun
+      }
+      const res = await api.get("/akademik/sesi-absensi/rekap/santri", { params })
+      const data = res.data?.data?.[0] ?? null
+      setRekap(data)
+    } catch {
+      toast({ title: "Gagal memuat rekap", description: "Data rekap kehadiran tidak dapat dimuat.", variant: "destructive" })
+    }
+  }
+
+  const fetchRiwayat = async (nomorInduk: string, periode: string, tahunAjaran?: string) => {
     setIsAbsensiLoading(true)
     try {
-      const params: any = { nomor_induk: nomorInduk, per_page: 50 }
+      const params: any = { nomor_induk: nomorInduk, per_page: 100 }
       const now = new Date()
       
       if (periode === "7hari") {
@@ -104,6 +122,11 @@ export default function SantriPanelPage() {
         const y = now.getFullYear()
         const m = String(now.getMonth() + 1).padStart(2, '0')
         params.tanggal_mulai = `${y}-${m}-01`
+      }
+
+      const activeTahun = tahunAjaran ?? selectedTahunAjaran
+      if (activeTahun && activeTahun !== "ALL") {
+        params.tahun_ajaran = activeTahun
       }
 
       const riwayatRes = await api.get("/akademik/sesi-absensi/riwayat-santri", { params })
@@ -127,31 +150,38 @@ export default function SantriPanelPage() {
         return
       }
 
+
+      // Load tahun ajaran options dan rekap
       try {
-        // Rekap ringkasan per-santri
-        const res = await api.get("/akademik/sesi-absensi/rekap/santri", {
-          params: { nomor_induk: nomorInduk, per_page: 1 },
-        })
-        const data = res.data?.data?.[0] ?? null
-        setRekap(data)
+        const tahunRes = await tahunAjaranService.getAll({ per_page: 100 })
+        const tahunList = tahunRes.data || []
+        setTahunAjaranOptions(tahunList)
+        const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+        if (activeTahun?.kode_tahun) {
+          setSelectedTahunAjaran(activeTahun.kode_tahun)
+          await fetchRekap(nomorInduk, activeTahun.kode_tahun)
+          await fetchRiwayat(nomorInduk, filterPeriode, activeTahun.kode_tahun)
+        } else {
+          await fetchRekap(nomorInduk)
+          await fetchRiwayat(nomorInduk, filterPeriode)
+        }
       } catch {
-        toast({ title: "Gagal memuat rekap", description: "Data rekap kehadiran tidak dapat dimuat.", variant: "destructive" })
+        await fetchRekap(nomorInduk)
+        await fetchRiwayat(nomorInduk, filterPeriode)
       } finally {
         setIsLoading(false)
       }
-
-      // Initial fetch riwayat
-      await fetchRiwayat(nomorInduk, filterPeriode)
     }
     void init()
   }, [])
 
-  // Trigger ulang riwayat saat filter periode berubah
+  // Trigger ulang riwayat saat filter periode atau tahun ajaran berubah
   useEffect(() => {
     if (user?.nomor_induk) {
       void fetchRiwayat(user.nomor_induk, filterPeriode)
+      void fetchRekap(user.nomor_induk)
     }
-  }, [filterPeriode])
+  }, [filterPeriode, selectedTahunAjaran])
 
   /* ─── Computed ─────────────────────────────────────────────── */
   const hadir = Number(rekap?.jumlah_hadir ?? 0)
@@ -284,7 +314,20 @@ export default function SantriPanelPage() {
                   <CardTitle className="text-base">Riwayat Kehadiran</CardTitle>
                   <CardDescription>Daftar sesi absensi yang tercatat</CardDescription>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
+                    <SelectTrigger className="w-[160px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
+                      {tahunAjaranOptions.map((t) => (
+                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
+                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select value={filterPeriode} onValueChange={setFilterPeriode}>
                     <SelectTrigger className="w-[140px]">
                       <SelectValue />
@@ -352,33 +395,31 @@ export default function SantriPanelPage() {
           </Card>
 
           {/* Rekap Ringkasan */}
-          {rekap && (
-            <Card className="border-border/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-primary" />
-                  Rekap Keseluruhan
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
-                  {[
-                    ["Total Pertemuan", total],
-                    ["Hadir", hadir],
-                    ["Sakit", sakit],
-                    ["Izin", izin],
-                    ["Alfa", alfa],
-                    ["% Kehadiran", `${pct}%`],
-                  ].map(([label, val]) => (
-                    <div key={label} className="space-y-1">
-                      <p className="text-muted-foreground">{label}</p>
-                      <p className="font-semibold text-foreground">{val}</p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          <Card className="border-border/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-primary" />
+                Rekap Keseluruhan
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                {[
+                  ["Total Pertemuan", total],
+                  ["Hadir", hadir],
+                  ["Sakit", sakit],
+                  ["Izin", izin],
+                  ["Alfa", alfa],
+                  ["% Kehadiran", `${pct}%`],
+                ].map(([label, val]) => (
+                  <div key={label} className="space-y-1">
+                    <p className="text-muted-foreground">{label}</p>
+                    <p className="font-semibold text-foreground">{val}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Tab Nilai Mapel */}

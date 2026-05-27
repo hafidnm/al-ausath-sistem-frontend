@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -9,8 +9,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
+import { dataUnitService } from "@/lib/services/unit.service"
+import { kelasService } from "@/lib/services/kelas.service"
+import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import {
   Table,
   TableBody,
@@ -26,6 +30,7 @@ import {
   Calendar,
   RefreshCw,
   BookOpen,
+  Filter,
 } from "lucide-react"
 
 interface OverviewData {
@@ -46,16 +51,16 @@ const getInitials = (name: string) => {
 const getStatusBadge = (status: string) => {
   switch (status?.toUpperCase()) {
     case "HADIR":
-      return <Badge className="bg-primary/10 text-primary border-0">Hadir</Badge>
+      return <Badge className="bg-emerald-500/10 text-emerald-600 border-0 hover:bg-emerald-500/20 transition-all">Hadir</Badge>
     case "SAKIT":
-      return <Badge className="bg-yellow-500/10 text-yellow-700 border-0">Sakit</Badge>
+      return <Badge className="bg-yellow-500/10 text-yellow-600 border-0 hover:bg-yellow-500/20 transition-all">Sakit</Badge>
     case "IZIN":
-      return <Badge className="bg-blue-500/10 text-blue-700 border-0">Izin</Badge>
+      return <Badge className="bg-blue-500/10 text-blue-600 border-0 hover:bg-blue-500/20 transition-all">Izin</Badge>
     case "ALFA":
     case "TIDAK HADIR":
-      return <Badge className="bg-destructive/10 text-destructive border-0">Tidak Hadir</Badge>
+      return <Badge className="bg-destructive/10 text-destructive border-0 hover:bg-destructive/20 transition-all">Tidak Hadir</Badge>
     default:
-      return <Badge variant="outline">{status || "-"}</Badge>
+      return <Badge variant="outline" className="border-muted-foreground/30">{status || "-"}</Badge>
   }
 }
 
@@ -64,16 +69,66 @@ export default function PresensiOverviewPage() {
   
   // Default to today in YYYY-MM-DD
   const today = new Date().toISOString().split("T")[0]
-  const [selectedDate, setSelectedDate] = useState(today)
+  const [selectedDate, setSelectedDate] = useState("")
+  const [periode, setPeriode] = useState<"semua" | "harian" | "mingguan" | "bulanan">("semua")
+  const [selectedUnit, setSelectedUnit] = useState<string>("ALL")
+  const [selectedKelas, setSelectedKelas] = useState<string>("ALL")
+  
+  const [unitOptions, setUnitOptions] = useState<any[]>([])
+  const [kelasOptions, setKelasOptions] = useState<any[]>([])
+  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
+  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
+
   const [data, setData] = useState<OverviewData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Memoize filtered kelas options based on selectedUnit
+  const filteredKelasOptions = useMemo(() => {
+    if (selectedUnit === "ALL") {
+      return kelasOptions
+    }
+    return kelasOptions.filter((k: any) => k.kode_unit === selectedUnit)
+  }, [selectedUnit, kelasOptions])
+
+  useEffect(() => {
+    const loadOptions = async () => {
+      try {
+        const [unitRes, allKelas, tahunRes] = await Promise.all([
+          dataUnitService.getAll({ per_page: 100, status: "AKTIF" }),
+          kelasService.getAll({ per_page: "500", status: "AKTIF" }),
+          tahunAjaranService.getAll({ per_page: 100 })
+        ])
+        setUnitOptions(unitRes.data || [])
+        setKelasOptions(allKelas)
+        
+        const tahunList = tahunRes.data || []
+        setTahunAjaranOptions(tahunList)
+        const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+        if (activeTahun?.kode_tahun) {
+          setSelectedTahunAjaran(activeTahun.kode_tahun)
+        }
+      } catch (error) {
+        console.error("Gagal memuat filter options", error)
+      }
+    }
+    void loadOptions()
+  }, [])
 
   const fetchData = async () => {
     setIsLoading(true)
     try {
-      const res = await api.get("/akademik/presensi/overview", {
-        params: { tanggal: selectedDate }
-      })
+      const params: any = { periode }
+      // Only send tanggal when periode requires it and date is filled
+      if (periode !== "semua" && selectedDate) {
+        params.tanggal = selectedDate
+      }
+      if (selectedUnit !== "ALL") params.kode_unit = selectedUnit
+      if (selectedKelas !== "ALL") params.kode_kelas = selectedKelas
+      if (selectedTahunAjaran && selectedTahunAjaran !== "ALL") {
+        params.tahun_ajaran = selectedTahunAjaran
+      }
+
+      const res = await api.get("/akademik/presensi/overview", { params })
       setData(res.data)
     } catch (error) {
       toast({ title: "Gagal memuat data", description: "Tidak dapat mengambil data presensi.", variant: "destructive" })
@@ -84,110 +139,211 @@ export default function PresensiOverviewPage() {
 
   useEffect(() => {
     void fetchData()
-  }, [selectedDate])
+  }, [selectedDate, periode, selectedUnit, selectedKelas, selectedTahunAjaran])
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      {/* Header & Main Filters */}
+      <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-card/60 backdrop-blur-md p-4 rounded-xl border border-border/40 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Overview Presensi</h1>
-          <p className="text-muted-foreground">Ringkasan kehadiran harian santri dan guru</p>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Overview Presensi</h1>
+          <p className="text-muted-foreground text-sm">Ringkasan statistik kehadiran santri dan guru</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2">
-            <Calendar className="w-4 h-4 text-muted-foreground" />
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border-0 p-0 h-auto focus-visible:ring-0 w-32"
-            />
+        
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Tahun Ajaran Filter */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedTahunAjaran} onValueChange={(val) => setSelectedTahunAjaran(val)}>
+              <SelectTrigger className="w-44 h-9">
+                <SelectValue placeholder="Tahun Ajaran" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Tahun</SelectItem>
+                {tahunAjaranOptions.map((t) => (
+                  <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
+                    {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void fetchData()} disabled={isLoading}>
-            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+
+          {/* Periode Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Periode:</span>
+            <Select value={periode} onValueChange={(val: any) => setPeriode(val)}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue placeholder="Periode" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="semua">Semua</SelectItem>
+                <SelectItem value="harian">Harian</SelectItem>
+                <SelectItem value="mingguan">Mingguan</SelectItem>
+                <SelectItem value="bulanan">Bulanan</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Unit Filter */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedKelas("ALL"); }}>
+              <SelectTrigger className="w-36 h-9">
+                <SelectValue placeholder="Semua Unit" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Semua Unit</SelectItem>
+                {unitOptions.map((u) => (
+                  <SelectItem key={u.kode_unit} value={u.kode_unit}>
+                    {u.nama_unit}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Kelas Filter */}
+          <div className="flex items-center gap-2">
+            <Select value={selectedKelas} onValueChange={(val) => setSelectedKelas(val)}>
+              <SelectTrigger className="w-40 h-9">
+                <SelectValue placeholder="Semua Kelas" />
+              </SelectTrigger>
+              <SelectContent className="max-h-60">
+                <SelectItem value="ALL">Semua Kelas</SelectItem>
+                {filteredKelasOptions.map((k: any) => (
+                  <SelectItem key={k.kode_kelas} value={k.kode_kelas}>
+                    {k.nama_kelas}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Date Picker - only shown when periode is not 'semua' */}
+          {periode !== "semua" && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                {periode === "harian" ? "Tanggal:" : periode === "mingguan" ? "Acuan Minggu:" : "Acuan Bulan:"}
+              </span>
+              <div className="flex items-center gap-2 bg-background border border-input rounded-md px-3 py-1.5 shadow-sm text-sm">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <Input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border-0 p-0 h-auto focus-visible:ring-0 w-32 bg-transparent text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Refresh Button */}
+          <Button variant="outline" size="sm" className="h-9 gap-1" onClick={() => void fetchData()} disabled={isLoading}>
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Quick Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Santri Hadir */}
-        <Card className="border-border/50">
+        <Card className="border-border/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Santri Aktif Hadir</p>
+                <p className="text-sm font-medium text-muted-foreground">Santri Aktif Hadir</p>
                 <div className="flex items-baseline gap-2">
                   {isLoading ? <Skeleton className="h-8 w-24" /> : (
                     <>
-                      <p className="text-2xl font-bold text-primary">{data?.summary?.santri?.hadir ?? 0}</p>
+                      <p className="text-2xl font-extrabold text-primary">{data?.summary?.santri?.hadir ?? 0}</p>
                       <span className="text-sm text-muted-foreground">/ {data?.summary?.santri?.total ?? 0}</span>
                     </>
                   )}
                 </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Users className="w-6 h-6 text-primary" />
               </div>
             </div>
             <div className="mt-4">
               <Progress value={data?.summary?.santri?.percentage ?? 0} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                {isLoading ? "-" : `${data?.summary?.santri?.percentage}% kehadiran`}
+              <p className="text-xs text-muted-foreground mt-2 font-medium">
+                {isLoading ? "-" : `${data?.summary?.santri?.percentage}% tingkat kehadiran`}
               </p>
             </div>
           </CardContent>
         </Card>
 
         {/* Guru Hadir */}
-        <Card className="border-border/50">
+        <Card className="border-border/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Guru Hadir (Tercatat)</p>
+                <p className="text-sm font-medium text-muted-foreground">Guru Hadir (Tercatat)</p>
                 <div className="flex items-baseline gap-2">
                   {isLoading ? <Skeleton className="h-8 w-24" /> : (
                     <>
-                      <p className="text-2xl font-bold text-accent">{data?.summary?.guru?.hadir ?? 0}</p>
+                      <p className="text-2xl font-extrabold text-emerald-600">{data?.summary?.guru?.hadir ?? 0}</p>
                       <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total ?? 0}</span>
                     </>
                   )}
                 </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-accent" />
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <GraduationCap className="w-6 h-6 text-emerald-600" />
               </div>
             </div>
             <div className="mt-4">
-              <Progress value={data?.summary?.guru?.percentage ?? 0} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
+              <Progress value={data?.summary?.guru?.percentage ?? 0} className="h-2 bg-emerald-100" />
+              <p className="text-xs text-muted-foreground mt-2 font-medium">
                 {isLoading ? "-" : `${data?.summary?.guru?.percentage}% kehadiran`}
               </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Tidak Hadir */}
-        <Card className="border-border/50">
+        {/* Santri Tidak Hadir */}
+        <Card className="border-border/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Santri Tidak Hadir</p>
+                <p className="text-sm font-medium text-muted-foreground">Santri Tidak Hadir</p>
                 {isLoading ? <Skeleton className="h-8 w-16" /> : (
-                  <p className="text-2xl font-bold text-foreground">
+                  <p className="text-2xl font-extrabold text-amber-600">
                     {(data?.summary?.santri?.sakit ?? 0) + (data?.summary?.santri?.izin ?? 0) + (data?.summary?.santri?.alfa ?? 0)}
                   </p>
                 )}
-                <div className="flex items-center gap-3 text-xs pt-1">
-                  <span className="text-yellow-600">S: {data?.summary?.santri?.sakit ?? 0}</span>
-                  <span className="text-blue-600">I: {data?.summary?.santri?.izin ?? 0}</span>
-                  <span className="text-destructive">A: {data?.summary?.santri?.alfa ?? 0}</span>
+                <div className="flex items-center gap-3 text-xs pt-2 font-semibold">
+                  <span className="text-yellow-600 bg-yellow-500/10 px-1.5 py-0.5 rounded">S: {data?.summary?.santri?.sakit ?? 0}</span>
+                  <span className="text-blue-600 bg-blue-500/10 px-1.5 py-0.5 rounded">I: {data?.summary?.santri?.izin ?? 0}</span>
+                  <span className="text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">A: {data?.summary?.santri?.alfa ?? 0}</span>
                 </div>
               </div>
-              <div className="w-12 h-12 rounded-xl bg-chart-3/20 flex items-center justify-center">
-                <UserX className="w-6 h-6 text-chart-4" />
+              <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <UserX className="w-6 h-6 text-amber-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Guru Tidak Hadir */}
+        <Card className="border-border/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+          <CardContent className="p-5">
+            <div className="flex items-start justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Guru Tidak Hadir</p>
+                <div className="flex items-baseline gap-2">
+                  {isLoading ? <Skeleton className="h-8 w-16" /> : (
+                    <p className="text-2xl font-extrabold text-destructive">
+                      {data?.summary?.guru?.tidakHadir ?? 0}
+                    </p>
+                  )}
+                  <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total ?? 0}</span>
+                </div>
+                <p className="text-xs text-muted-foreground pt-2">Memerlukan tindak lanjut / jadwal pengganti</p>
+              </div>
+              <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <UserX className="w-6 h-6 text-destructive" />
               </div>
             </div>
           </CardContent>
@@ -197,67 +353,67 @@ export default function PresensiOverviewPage() {
       {/* Tabs for detailed views */}
       <Tabs defaultValue="kelas" className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="kelas" className="data-[state=active]:bg-card">
+          <TabsList className="bg-muted/50 p-1 border border-border/40">
+            <TabsTrigger value="kelas" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
               <Users className="w-4 h-4 mr-2" />
               Per Kelas
             </TabsTrigger>
-            <TabsTrigger value="mapel" className="data-[state=active]:bg-card">
+            <TabsTrigger value="mapel" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
               <BookOpen className="w-4 h-4 mr-2" />
               Per Mapel
             </TabsTrigger>
-            <TabsTrigger value="guru" className="data-[state=active]:bg-card">
+            <TabsTrigger value="guru" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
               <GraduationCap className="w-4 h-4 mr-2" />
-              Guru
+              Kehadiran Guru
             </TabsTrigger>
           </TabsList>
         </div>
 
         {/* Per Kelas Tab */}
         <TabsContent value="kelas">
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Kehadiran per Kelas</CardTitle>
-              <CardDescription>Berdasarkan entri sesi absensi di tanggal {selectedDate}</CardDescription>
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="border-b border-border/40 pb-4">
+              <CardTitle className="text-lg font-bold text-foreground">Kehadiran per Kelas</CardTitle>
+              <CardDescription>Berdasarkan status keaktifan kelas dan jadwal pelajaran</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Kelas</TableHead>
-                      <TableHead>Jenjang</TableHead>
-                      <TableHead className="text-center">Tercatat</TableHead>
-                      <TableHead className="text-center">Hadir</TableHead>
-                      <TableHead className="text-center">Sakit</TableHead>
-                      <TableHead className="text-center">Izin</TableHead>
-                      <TableHead className="text-center">Alfa</TableHead>
-                      <TableHead>Tingkat Kehadiran</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="font-bold">Kelas</TableHead>
+                      <TableHead className="font-bold">Jenjang</TableHead>
+                      <TableHead className="text-center font-bold">Total Santri</TableHead>
+                      <TableHead className="text-center font-bold">Hadir</TableHead>
+                      <TableHead className="text-center font-bold text-yellow-600">Sakit</TableHead>
+                      <TableHead className="text-center font-bold text-blue-600">Izin</TableHead>
+                      <TableHead className="text-center font-bold text-destructive">Alfa</TableHead>
+                      <TableHead className="font-bold">Tingkat Kehadiran</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Memuat data kelas...</TableCell></TableRow>
                     ) : data?.perKelas?.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8">Belum ada absensi kelas hari ini.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Belum ada absensi kelas untuk kriteria ini.</TableCell></TableRow>
                     ) : (
                       data?.perKelas?.map((item, idx) => (
-                        <TableRow key={idx} className="hover:bg-muted/30">
-                          <TableCell className="font-medium text-foreground">{item.kelas}</TableCell>
+                        <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
+                          <TableCell className="font-semibold text-foreground">{item.kelas}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="bg-transparent">{item.jenjang || "-"}</Badge>
+                            <Badge variant="outline" className="bg-transparent border-border/60">{item.jenjang || "-"}</Badge>
                           </TableCell>
-                          <TableCell className="text-center text-foreground">{item.total}</TableCell>
+                          <TableCell className="text-center font-medium text-foreground">{item.total}</TableCell>
                           <TableCell className="text-center">
-                            <span className="font-medium text-primary">{item.hadir}</span>
+                            <span className="font-semibold text-primary">{item.hadir}</span>
                           </TableCell>
-                          <TableCell className="text-center text-yellow-600">{item.sakit}</TableCell>
-                          <TableCell className="text-center text-blue-600">{item.izin}</TableCell>
-                          <TableCell className="text-center text-destructive">{item.alfa}</TableCell>
+                          <TableCell className="text-center font-medium text-yellow-600">{item.sakit}</TableCell>
+                          <TableCell className="text-center font-medium text-blue-600">{item.izin}</TableCell>
+                          <TableCell className="text-center font-medium text-destructive">{item.alfa}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Progress value={item.percentage} className="h-2 w-20" />
-                              <span className="text-sm font-medium text-foreground">{item.percentage}%</span>
+                              <Progress value={item.percentage} className="h-2 w-24" />
+                              <span className="text-sm font-bold text-foreground">{item.percentage}%</span>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -272,46 +428,46 @@ export default function PresensiOverviewPage() {
 
         {/* Per Mapel Tab */}
         <TabsContent value="mapel">
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Kehadiran per Mata Pelajaran</CardTitle>
-              <CardDescription>Rata-rata kehadiran santri berdasarkan mata pelajaran</CardDescription>
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="border-b border-border/40 pb-4">
+              <CardTitle className="text-lg font-bold text-foreground">Kehadiran per Mata Pelajaran</CardTitle>
+              <CardDescription>Rata-rata kehadiran santri berdasarkan sesi mapel yang telah selesai</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Mata Pelajaran</TableHead>
-                      <TableHead>Guru Pengampu</TableHead>
-                      <TableHead className="text-center">Total Sesi</TableHead>
-                      <TableHead>Rata-rata Kehadiran</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="font-bold">Mata Pelajaran</TableHead>
+                      <TableHead className="font-bold">Guru Pengampu</TableHead>
+                      <TableHead className="text-center font-bold">Total Sesi</TableHead>
+                      <TableHead className="font-bold">Rata-rata Kehadiran</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Memuat data mapel...</TableCell></TableRow>
                     ) : data?.perMapel?.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="text-center py-8">Belum ada absensi mapel hari ini.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4} className="text-center py-8 text-muted-foreground">Belum ada absensi mapel untuk kriteria ini.</TableCell></TableRow>
                     ) : (
                       data?.perMapel?.map((item, idx) => (
-                        <TableRow key={idx} className="hover:bg-muted/30">
-                          <TableCell className="font-medium text-foreground">{item.mapel}</TableCell>
+                        <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
+                          <TableCell className="font-semibold text-foreground">{item.mapel}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Avatar className="w-7 h-7">
-                                <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                                <AvatarFallback className="bg-primary/10 text-primary text-[10px] font-bold">
                                   {getInitials(item.guru)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="text-foreground">{item.guru || "-"}</span>
+                              <span className="text-sm font-medium text-foreground">{item.guru || "-"}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-center text-foreground">{item.sessions}</TableCell>
+                          <TableCell className="text-center font-medium text-foreground">{item.sessions}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <Progress value={item.avgHadir} className="h-2 w-20" />
-                              <span className="text-sm font-medium text-foreground">{item.avgHadir}%</span>
+                              <Progress value={item.avgHadir} className="h-2 w-24" />
+                              <span className="text-sm font-bold text-foreground">{item.avgHadir}%</span>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -326,54 +482,66 @@ export default function PresensiOverviewPage() {
 
         {/* Guru Tab */}
         <TabsContent value="guru">
-          <Card className="border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg text-foreground">Kehadiran Guru</CardTitle>
-              <CardDescription>Status absensi guru yang terekam hari ini</CardDescription>
+          <Card className="border-border/50 shadow-sm">
+            <CardHeader className="border-b border-border/40 pb-4">
+              <CardTitle className="text-lg font-bold text-foreground">Kehadiran Guru</CardTitle>
+              <CardDescription>Status kehadiran guru dan catatan waktu terlambat</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Nama Guru</TableHead>
-                      <TableHead>NIP</TableHead>
-                      <TableHead>Jabatan</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Jam Masuk</TableHead>
-                      <TableHead className="text-center">Sesi Mengajar</TableHead>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="font-bold">Nama Guru</TableHead>
+                      <TableHead className="font-bold">NIP</TableHead>
+                      <TableHead className="font-bold">Jabatan</TableHead>
+                      <TableHead className="font-bold">Status Kehadiran</TableHead>
+                      <TableHead className="font-bold">Keterangan Terlambat / Jam Masuk</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-8">Memuat data...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Memuat data guru...</TableCell></TableRow>
                     ) : data?.guru?.length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center py-8">Belum ada data absensi guru.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada data absensi guru.</TableCell></TableRow>
                     ) : (
                       data?.guru?.map((guru) => (
-                        <TableRow key={guru.id} className="hover:bg-muted/30">
+                        <TableRow key={guru.id} className="hover:bg-muted/20 transition-colors">
                           <TableCell>
                             <div className="flex items-center gap-3">
                               <Avatar className="w-8 h-8">
-                                <AvatarFallback className="bg-accent/20 text-accent text-xs">
+                                <AvatarFallback className="bg-emerald-500/10 text-emerald-600 text-xs font-bold">
                                   {getInitials(guru.nama)}
                                 </AvatarFallback>
                               </Avatar>
-                              <span className="font-medium text-foreground">{guru.nama}</span>
+                              <span className="font-semibold text-foreground text-sm">{guru.nama}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">{guru.nip || "-"}</TableCell>
-                          <TableCell className="text-foreground">{guru.jabatan}</TableCell>
+                          <TableCell className="text-muted-foreground text-sm font-medium">{guru.nip || "-"}</TableCell>
+                          <TableCell className="text-foreground text-sm font-medium">{guru.jabatan}</TableCell>
                           <TableCell>
                             <div className="flex flex-col gap-1 items-start">
                               {getStatusBadge(guru.status)}
                               {guru.keterangan && (
-                                <span className="text-xs text-muted-foreground">{guru.keterangan}</span>
+                                <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded">{guru.keterangan}</span>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="text-foreground">{guru.jamMasuk}</TableCell>
-                          <TableCell className="text-center text-foreground">{guru.mapelHariIni}</TableCell>
+                          <TableCell className="text-foreground text-sm font-semibold">
+                            {guru.status?.toUpperCase() === "HADIR" ? (
+                              guru.jamMasuk?.includes("+") ? (
+                                <span className="text-amber-600 bg-amber-500/10 px-2 py-1 rounded-md text-xs">
+                                  Terlambat ({guru.jamMasuk})
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md text-xs">
+                                  Tepat Waktu
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-muted-foreground font-normal">-</span>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}

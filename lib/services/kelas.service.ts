@@ -1,4 +1,4 @@
-﻿import api, { getCsrfToken } from "../axios"
+import api, { getCsrfToken } from "../axios"
 
 export type BackendKelasStatus = "AKTIF" | "NONAKTIF"
 
@@ -144,6 +144,7 @@ export interface KelasItem {
   kode_kelas: string
   nama_kelas?: string
   tahun_ajaran?: string
+  kode_unit?: string
 }
 
 export interface GetKelasParams {
@@ -343,6 +344,7 @@ const normalizeKelasItem = (raw: any): KelasItem => ({
     ?? raw?.tahunAjaranRelasi?.tahun_ajaran
     ?? raw?.tahun_ajaran_relasi?.tahun_ajaran,
   ),
+  kode_unit: toText(raw?.kode_unit ?? raw?.kelas?.kode_unit),
 })
 
 export const kelasService = {
