@@ -3,6 +3,7 @@ import api, { getCsrfToken } from "../axios"
 export type BackendStatus = "AKTIF" | "NONAKTIF"
 
 export interface DataJadwalPembelajaranApiItem {
+  kelas_mapel: any
   id_jadwal_pembelajaran?: number
   id?: number
   id_jadwal?: number
@@ -181,6 +182,23 @@ export const dataJadwalPembelajaranService = {
     params?: DataJadwalPembelajaranListParams,
   ): Promise<{ data: DataJadwalPembelajaranApiItem[]; meta: DataJadwalPembelajaranPaginationMeta }> {
     const response = await api.get<DataJadwalPembelajaranListApiResponse>(JADWAL_PEMBELAJARAN_BASE_PATH, { params })
+
+    return {
+      data: extractList(response.data),
+      meta: response.data,
+    }
+  },
+
+  async getByNomorInduk(
+    nomorInduk: string,
+    params?: Omit<DataJadwalPembelajaranListParams, "id_kelas_mapel" | "id_petugas">,
+  ): Promise<{ data: DataJadwalPembelajaranApiItem[]; meta: DataJadwalPembelajaranPaginationMeta }> {
+    const response = await api.get<DataJadwalPembelajaranListApiResponse>(JADWAL_PEMBELAJARAN_BASE_PATH, {
+      params: {
+        ...params,
+        nomor_induk: nomorInduk,
+      },
+    })
 
     return {
       data: extractList(response.data),
