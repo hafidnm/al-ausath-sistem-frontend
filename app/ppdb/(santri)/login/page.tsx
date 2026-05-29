@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ArrowLeft, Loader2, LogIn, UserRound } from 'lucide-react';
+import { ArrowLeft, Loader2, LogIn, UserRound, Eye, EyeOff } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { usePpdbPortalLogin } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import { useRouter } from 'next/navigation';
 import type { PpdbPortalDashboard } from '@/types/ppdb/portal';
+import { toErrorMessage } from '@/hooks/shared/react-query-helpers';
 
 const wait = (ms: number) => new Promise((resolve) => {
   setTimeout(resolve, ms);
@@ -51,6 +52,7 @@ export default function PpdbLoginPage() {
     login: '',
     password: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleLoginParam = (v: string) => setForm((prev) => ({ ...prev, login: v }));
 
@@ -92,7 +94,7 @@ export default function PpdbLoginPage() {
         router.push(nextRoute);
       }, 400);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Login PPDB gagal';
+      const message = toErrorMessage(error, 'Login PPDB gagal');
       toast({
         title: 'Login gagal',
         description: message,
@@ -140,16 +142,31 @@ export default function PpdbLoginPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Kata Sandi</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Masukkan kata sandi"
-                  value={form.password}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, password: event.target.value }))
-                  }
-                />
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Kata Sandi</Label>
+                  <Link href="/ppdb/forgot-password" className="text-xs text-primary hover:underline font-medium">
+                    Lupa kata sandi?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Masukkan kata sandi"
+                    value={form.password}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, password: event.target.value }))
+                    }
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <Button type="submit" className="w-full" disabled={loading}>

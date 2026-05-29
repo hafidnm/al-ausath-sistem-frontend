@@ -87,9 +87,16 @@ interface Santri {
 export default function AdministrasiBebasPage() {
   const { toast } = useToast()
   const [data, setData] = useState<TagihanBebas[]>([])
-  const [santriList, setSantriList] = useState<Santri[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
+
+  // Step-by-step filters for student selection in creation modal
+  const [units, setUnits] = useState<any[]>([])
+  const [classes, setClasses] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
+  const [selectedJenjang, setSelectedJenjang] = useState("")
+  const [selectedKelas, setSelectedKelas] = useState("")
+  const [selectedGender, setSelectedGender] = useState("")
 
   // Filters & Searches
   const [search, setSearch] = useState("")
@@ -118,15 +125,7 @@ export default function AdministrasiBebasPage() {
     try {
       // Fetch bills
       const res = await api.get("/administrasi/bebas")
-      setData(res.data?.data || res.data)
-
-      // Fetch active students for the creation select dropdown
-      try {
-        const resSantri = await api.get("/santri", { params: { per_page: 500 } })
-        setSantriList(resSantri.data?.data || resSantri.data)
-      } catch (error) {
-        console.error("Failed to fetch santri list:", error)
-      }
+      setData(res.data?.data || res.data || [])
     } catch (error) {
       console.error(error)
       toast({
@@ -139,8 +138,62 @@ export default function AdministrasiBebasPage() {
     }
   }
 
+  const fetchUnits = async () => {
+    try {
+      const res = await api.get("/akademik/unit")
+      setUnits(res.data?.data || res.data || [])
+    } catch (err) {
+      console.error("Gagal memuat jenjang:", err)
+    }
+  }
+
+  const handleJenjangChange = async (unitCode: string) => {
+    setSelectedJenjang(unitCode)
+    setSelectedKelas("")
+    setSelectedGender("")
+    setNewTagihan(prev => ({ ...prev, id_santri: "" }))
+    setStudents([])
+    setClasses([])
+
+    try {
+      const res = await api.get("/akademik/kelas", { params: { kode_unit: unitCode, per_page: 100 } })
+      setClasses(res.data?.data || res.data || [])
+    } catch (err) {
+      console.error("Gagal memuat kelas:", err)
+    }
+  }
+
+  const handleKelasChange = (kelasCode: string) => {
+    setSelectedKelas(kelasCode)
+    setSelectedGender("")
+    setNewTagihan(prev => ({ ...prev, id_santri: "" }))
+    setStudents([])
+  }
+
+  const handleGenderChange = async (gender: string) => {
+    setSelectedGender(gender)
+    setNewTagihan(prev => ({ ...prev, id_santri: "" }))
+    setStudents([])
+
+    if (!selectedKelas) return
+
+    try {
+      const res = await api.get("/akademik/santri", {
+        params: {
+          kode_kelas: selectedKelas,
+          jenis_kelamin: gender,
+          per_page: 200
+        }
+      })
+      setStudents(res.data?.data || res.data || [])
+    } catch (err) {
+      console.error("Gagal memuat santri:", err)
+    }
+  }
+
   useEffect(() => {
     fetchAllData()
+    fetchUnits()
   }, [])
 
   // Derived filtered metrics
@@ -469,7 +522,17 @@ export default function AdministrasiBebasPage() {
       </Card>
 
       {/* Dialog: Create Tagihan */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog open={createOpen} onOpenChange={(open) => {
+        setCreateOpen(open)
+        if (!open) {
+          setSelectedJenjang("")
+          setSelectedKelas("")
+          setSelectedGender("")
+          setClasses([])
+          setStudents([])
+          setNewTagihan({ id_santri: "", nama_tagihan: "", nominal_tagihan: "" })
+        }
+      }}>
         <DialogContent suppressHydrationWarning>
           <form onSubmit={handleCreateTagihan}>
             <DialogHeader>
@@ -478,16 +541,79 @@ export default function AdministrasiBebasPage() {
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-1">
+                <Label htmlFor="jenjang">Pilih Jenjang *</Label>
+                <Select
+                  value={selectedJenjang}
+                  onValueChange={handleJenjangChange}
+                >
+                  <SelectTrigger id="jenjang">
+                    <SelectValue placeholder="Pilih jenjang..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((u) => (
+                      <SelectItem key={u.id_unit || u.kode_unit} value={u.kode_unit}>
+                        {u.nama_unit} ({u.kode_unit})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="kelas">Pilih Kelas *</Label>
+                <Select
+                  value={selectedKelas}
+                  onValueChange={handleKelasChange}
+                  disabled={!selectedJenjang}
+                >
+                  <SelectTrigger id="kelas">
+                    <SelectValue placeholder={selectedJenjang ? "Pilih kelas..." : "Pilih jenjang terlebih dahulu"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((c) => (
+                      <SelectItem key={c.id_kelas || c.kode_kelas} value={c.kode_kelas}>
+                        {c.nama_kelas}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="gender">Kategori Putra/Putri *</Label>
+                <Select
+                  value={selectedGender}
+                  onValueChange={handleGenderChange}
+                  disabled={!selectedKelas}
+                >
+                  <SelectTrigger id="gender">
+                    <SelectValue placeholder={selectedKelas ? "Pilih kategori..." : "Pilih kelas terlebih dahulu"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="L">Putra (Laki-laki)</SelectItem>
+                    <SelectItem value="P">Putri (Perempuan)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
                 <Label htmlFor="santri">Pilih Santri *</Label>
                 <Select
                   value={newTagihan.id_santri}
                   onValueChange={(val) => setNewTagihan({ ...newTagihan, id_santri: val })}
+                  disabled={!selectedGender || students.length === 0}
                 >
                   <SelectTrigger id="santri">
-                    <SelectValue placeholder="Pilih nama santri..." />
+                    <SelectValue placeholder={
+                      !selectedGender 
+                        ? "Pilih kategori terlebih dahulu" 
+                        : students.length === 0 
+                          ? "Tidak ada santri di filter ini" 
+                          : "Pilih nama santri..."
+                    } />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {santriList.map((s) => (
+                    {students.map((s) => (
                       <SelectItem key={s.id_santri} value={s.id_santri.toString()}>
                         {s.nama_lengkap_santri} ({s.nomor_induk})
                       </SelectItem>

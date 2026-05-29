@@ -276,6 +276,8 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
       nominal_bayar: Number(rawPembayaran.nominal_bayar ?? rawPembayaran.nominal ?? 100000),
       has_tagihan: true,
     } : null,
+    namaGelombang: pickText(sources, ['nama_gelombang', 'namaGelombang']) || undefined,
+    tahunAjaran: pickText(sources, ['tahun_ajaran', 'tahunAjaran']) || undefined,
   };
 };
 
@@ -311,6 +313,11 @@ const resolveToken = (payload: unknown): string => {
 };
 
 export const ppdbPortalApi = {
+  async checkOpen(): Promise<{ is_open: boolean; is_kuota_penuh: boolean; period: any }> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/period/check-open`);
+    return response.data.data;
+  },
+
   async register(data: PpdbPortalRegisterRequest): Promise<PpdbPortalRegisterResponse> {
     await getCsrfToken();
     const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/register`, data);
@@ -413,6 +420,16 @@ export const ppdbPortalApi = {
       soal_jawab: payload.soalJawab,
     });
     return response.data;
+  },
+
+  async forgotPassword(email: string): Promise<{ message: string; otp_code?: string }> {
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/forgot-password`, { email });
+    return response.data as { message: string; otp_code?: string };
+  },
+
+  async resetPassword(data: Record<string, string>): Promise<{ message: string }> {
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/reset-password`, data);
+    return response.data as { message: string };
   },
 
   logout() {

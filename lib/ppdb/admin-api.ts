@@ -714,4 +714,29 @@ export const ppdbAdminApi = {
 
     throw lastError;
   },
+
+  async getPeriods(): Promise<any[]> {
+    const response = await api.get('/administrasi/ppdb/periods');
+    return response.data?.data || [];
+  },
+
+  async getPeriodDetail(id: number | string): Promise<any> {
+    const response = await api.get(`/administrasi/ppdb/periods/${id}`);
+    return response.data?.data;
+  },
+
+  async createPeriod(payload: any): Promise<any> {
+    const response = await api.post('/administrasi/ppdb/periods', payload);
+    return response.data?.data;
+  },
+
+  async updatePeriod(id: number | string, payload: any): Promise<any> {
+    const response = await api.put(`/administrasi/ppdb/periods/${id}`, payload);
+    return response.data?.data;
+  },
+
+  async deletePeriod(id: number | string): Promise<any> {
+    const response = await api.delete(`/administrasi/ppdb/periods/${id}`);
+    return response.data;
+  },
 };
