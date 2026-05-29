@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
-import { ArrowLeft, KeyRound, Loader2, Mail, Phone, UserPlus } from 'lucide-react';
+import { ArrowLeft, KeyRound, Loader2, Mail, Phone, UserPlus, Eye, EyeOff, Calendar } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalRegister } from '@/hooks/ppdb/santri';
+import { usePpdbPortalRegister, usePpdbPortalPeriodCheck } from '@/hooks/ppdb/santri';
+import { toErrorMessage } from '@/hooks/shared/react-query-helpers';
 
 export default function PpdbRegisterPage() {
   const { toast } = useToast();
-  const { register, loading } = usePpdbPortalRegister();
+  const { register, loading: registerLoading } = usePpdbPortalRegister();
+  const { isOpen, loading: checkLoading, period } = usePpdbPortalPeriodCheck();
 
   const [form, setForm] = useState({
     email: '',
@@ -21,13 +23,73 @@ export default function PpdbRegisterPage() {
     passwordConfirmation: '',
   });
 
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  if (checkLoading) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-muted-foreground mt-4 text-sm font-medium">Memeriksa status pendaftaran...</p>
+      </div>
+    );
+  }
+
+  if (!isOpen) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="w-full max-w-xl space-y-4">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Kembali ke Beranda
+          </Link>
+
+          <Card className="border-border/60 shadow-lg text-center overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/10 via-transparent to-transparent pointer-events-none" />
+            <CardHeader className="pt-8 pb-4">
+              <div className="mx-auto w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center text-amber-500 mb-4 animate-pulse">
+                <Calendar className="w-8 h-8" />
+              </div>
+              <CardTitle className="text-2xl font-bold tracking-tight">Pendaftaran Santri Baru Ditutup</CardTitle>
+              <CardDescription className="text-base mt-2">
+                Saat ini pendaftaran santri baru (PPDB) belum dibuka atau gelombang pendaftaran telah berakhir.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pb-8">
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 max-w-md mx-auto">
+                <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+                  Pantau terus halaman ini atau media sosial kami untuk informasi pembukaan gelombang berikutnya.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild variant="outline">
+                  <Link href="/">Kembali ke Beranda</Link>
+                </Button>
+                <Button asChild>
+                  <a href="https://wa.me/6281234567890" target="_blank" rel="noopener noreferrer">
+                    <Phone className="w-4 h-4 mr-2" />
+                    Hubungi Admin
+                  </a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!form.email.trim() || !form.phone.trim() || !form.password || !form.passwordConfirmation) {
       toast({
         title: 'Data belum lengkap',
-        description: 'Email, nomor telepon, dan kata sandi wajib diisi.',
+        description: 'Email, nomor telepon, and kata sandi wajib diisi.',
         variant: 'destructive',
       });
       return;
@@ -77,7 +139,7 @@ export default function PpdbRegisterPage() {
         window.location.href = '/ppdb/login';
       }, 500);
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Registrasi akun PPDB gagal';
+      const message = toErrorMessage(error, 'Registrasi akun PPDB gagal');
       toast({
         title: 'Registrasi gagal',
         description: message,
@@ -148,12 +210,19 @@ export default function PpdbRegisterPage() {
                   <KeyRound className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
                     id="password"
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     placeholder="Minimal 8 karakter"
-                    className="pl-9"
+                    className="pl-9 pr-10"
                     value={form.password}
                     onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -163,19 +232,26 @@ export default function PpdbRegisterPage() {
                   <KeyRound className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
                     id="password-confirm"
-                    type="password"
+                    type={showConfirmPassword ? 'text' : 'password'}
                     placeholder="Ulangi kata sandi"
-                    className="pl-9"
+                    className="pl-9 pr-10"
                     value={form.passwordConfirmation}
                     onChange={(event) =>
                       setForm((prev) => ({ ...prev, passwordConfirmation: event.target.value }))
                     }
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
+              <Button type="submit" className="w-full" disabled={registerLoading}>
+                {registerLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserPlus className="w-4 h-4 mr-2" />}
                 Buat Akun Pendaftar
               </Button>
             </form>

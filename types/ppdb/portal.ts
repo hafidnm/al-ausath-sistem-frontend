@@ -151,6 +151,8 @@ export interface PpdbPortalDashboard {
     has_tagihan: boolean;
   } | null;
   statusVerifikasi: string;
+  namaGelombang?: string;
+  tahunAjaran?: string;
 }
 
 export interface PpdbPortalTesStatus {

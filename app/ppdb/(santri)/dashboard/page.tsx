@@ -239,29 +239,39 @@ export default function PpdbDashboardPage() {
       return;
     }
 
-    const hasPendingFiles = Boolean(
-      files.dokumenAkta
-      || files.dokumenKk
-      || files.dokumenRekomendasiUstadz
-      || files.dokumenSuratPernyataan,
-    );
-
     clearAutoSaveTimer();
+
+    // Snapshot files at scheduling time so we only clear files that were actually sent
+    const snapshotFiles = { ...files };
+    const snapshotForm = { ...form };
 
     autoSaveTimerRef.current = setTimeout(() => {
       void (async () => {
         setAutoSaveStatus('saving');
         isSavingRef.current = true;
 
+        const hasPendingFiles = Boolean(
+          snapshotFiles.dokumenAkta
+          || snapshotFiles.dokumenKk
+          || snapshotFiles.dokumenRekomendasiUstadz
+          || snapshotFiles.dokumenSuratPernyataan,
+        );
+
         try {
-          await updateForm(buildPpdbUpdatePayload(form, files, data));
+          await updateForm(buildPpdbUpdatePayload(snapshotForm, snapshotFiles, data));
 
           if (hasPendingFiles) {
+            // Only clear the specific files that were sent, not newer ones
+            setFiles((prev) => ({
+              dokumenAkta: prev.dokumenAkta === snapshotFiles.dokumenAkta ? null : prev.dokumenAkta,
+              dokumenKk: prev.dokumenKk === snapshotFiles.dokumenKk ? null : prev.dokumenKk,
+              dokumenRekomendasiUstadz: prev.dokumenRekomendasiUstadz === snapshotFiles.dokumenRekomendasiUstadz ? null : prev.dokumenRekomendasiUstadz,
+              dokumenSuratPernyataan: prev.dokumenSuratPernyataan === snapshotFiles.dokumenSuratPernyataan ? null : prev.dokumenSuratPernyataan,
+            }));
             // Fetch refreshed dashboard from server and compute canonical signature
             const refreshed = await fetchDashboard();
             const refreshedForm = refreshed ? mapDashboardToForm(refreshed) : form;
             lastSavedSignatureRef.current = buildAutosaveSignature(refreshedForm, initialPpdbDashboardFiles);
-            resetPendingFiles();
           } else {
             lastSavedSignatureRef.current = currentSignature;
           }
@@ -279,7 +289,9 @@ export default function PpdbDashboardPage() {
     return () => {
       clearAutoSaveTimer();
     };
-  }, [clearAutoSaveTimer, data, fetchDashboard, files, form, resetPendingFiles, updateForm]);
+  }, [clearAutoSaveTimer, data, fetchDashboard, files, form, updateForm]);
+
+  const [manualSaving, setManualSaving] = useState(false);
 
   const handleSaveForm = async () => {
     if (isPpdbFormIncomplete(form)) {
@@ -292,19 +304,19 @@ export default function PpdbDashboardPage() {
       return;
     }
 
-    // Validasi: semua dokumen wajib harus sudah terupload
-    const allDocsUploaded = Boolean(
-      data?.berkasAktaUrl &&
-      data?.berkasKkUrl &&
-      data?.berkasRekomendasiUstadzUrl &&
-      data?.berkasSuratPernyataanUrl
+    // Validasi: semua dokumen wajib harus sudah terupload atau dipilih
+    const allDocsUploadedOrSelected = Boolean(
+      (data?.berkasAktaUrl || files.dokumenAkta) &&
+      (data?.berkasKkUrl || files.dokumenKk) &&
+      (data?.berkasRekomendasiUstadzUrl || files.dokumenRekomendasiUstadz) &&
+      (data?.berkasSuratPernyataanUrl || files.dokumenSuratPernyataan)
     );
 
-    if (!allDocsUploaded) {
+    if (!allDocsUploadedOrSelected) {
       toast({
         title: 'Dokumen belum lengkap',
         description:
-          'Upload semua dokumen wajib terlebih dahulu: Akta, KK, Rekomendasi Ustadz, dan Surat Pernyataan.',
+          'Pilih atau upload semua dokumen wajib terlebih dahulu: Akta, KK, Rekomendasi Ustadz, dan Surat Pernyataan.',
         variant: 'destructive',
       });
       return;
@@ -317,13 +329,10 @@ export default function PpdbDashboardPage() {
       || files.dokumenSuratPernyataan,
     );
 
+    // Cancel any in-progress auto-save and take over
     clearAutoSaveTimer();
-    // prevent concurrent manual save while autosave is in progress
-    if (isSavingRef.current) {
-      toast({ title: 'Simpan sedang berjalan', description: 'Tunggu hingga proses simpan selesai.', variant: 'default' });
-      return;
-    }
 
+    setManualSaving(true);
     isSavingRef.current = true;
     setAutoSaveStatus('saving');
 
@@ -395,6 +404,7 @@ export default function PpdbDashboardPage() {
       });
     } finally {
       isSavingRef.current = false;
+      setManualSaving(false);
     }
   };
 
@@ -462,13 +472,38 @@ export default function PpdbDashboardPage() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-1 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-primary/5 border-primary/10">
+            <CardContent className="p-4">
+              <p className="text-xs text-primary/80 font-medium animate-pulse">Gelombang Pendaftaran</p>
+              <p className="text-lg font-semibold text-primary mt-1">
+                {data?.namaGelombang || 'Gelombang Umum'}
+              </p>
+              <p className="text-xs text-muted-foreground">Tahun Ajaran: {data?.tahunAjaran || '2026/2027'}</p>
+            </CardContent>
+          </Card>
           <Card>
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Waktu Pendaftaran</p>
               <p className="text-lg font-semibold text-foreground mt-1">
                 {formatDateTime(data?.waktuPendaftaran || '')}
               </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground">Status Verifikasi</p>
+              <div className="mt-1.5">
+                <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                  data?.status === 'Diterima' || data?.status === 'Lulus'
+                    ? 'bg-emerald-500/10 text-emerald-600'
+                    : data?.status === 'Ditolak'
+                      ? 'bg-destructive/10 text-destructive'
+                      : 'bg-amber-500/10 text-amber-600'
+                }`}>
+                  {data?.status || 'Menunggu'}
+                </span>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -831,28 +866,22 @@ export default function PpdbDashboardPage() {
               <div className="space-y-2">
                 <Button 
                   onClick={() => void handleSaveForm()} 
-                  disabled={updateLoading || !Boolean(
-                    data?.berkasAktaUrl &&
-                    data?.berkasKkUrl &&
-                    data?.berkasRekomendasiUstadzUrl &&
-                    data?.berkasSuratPernyataanUrl
-                  )}
+                  disabled={manualSaving}
                 >
-                  {updateLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
+                  {manualSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileText className="w-4 h-4 mr-2" />}
                   Simpan Form PPDB
                 </Button>
                 {!Boolean(
-                  data?.berkasAktaUrl &&
-                  data?.berkasKkUrl &&
-                  data?.berkasRekomendasiUstadzUrl &&
-                  data?.berkasSuratPernyataanUrl
+                  (data?.berkasAktaUrl || files.dokumenAkta) &&
+                  (data?.berkasKkUrl || files.dokumenKk) &&
+                  (data?.berkasRekomendasiUstadzUrl || files.dokumenRekomendasiUstadz) &&
+                  (data?.berkasSuratPernyataanUrl || files.dokumenSuratPernyataan)
                 ) && (
                   <p className="text-xs text-destructive flex items-center gap-1">
-                    <span>⚠️ Upload semua dokumen wajib sebelum submit</span>
+                    <span>⚠️ Pilih/upload semua dokumen wajib sebelum submit</span>
                   </p>
                 )}
               </div>
-              <p className="text-xs text-muted-foreground">{autoSaveDescription}</p>
             </div>
           </CardContent>
         </Card>
