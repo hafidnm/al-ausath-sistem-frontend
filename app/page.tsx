@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useToast } from "@/hooks/use-toast"
-import { usePpdbPortalRegister } from "@/hooks/ppdb/santri"
+import { usePpdbPortalRegister, usePpdbPortalPeriodCheck } from "@/hooks/ppdb/santri"
 import { pengumumanService, type Pengumuman } from "@/lib/services/pengumuman.service"
 import { BookOpen, Users, GraduationCap, Star, Moon, Menu, Calendar, Bell, MapPin, Phone, Mail, Clock, CheckCircle2, Building2, ChevronDown, LogIn, UserPlus, Loader2 } from "lucide-react"
 
@@ -22,6 +22,8 @@ export default function LandingPage() {
   const [pengumuman, setPengumuman] = React.useState<Pengumuman[]>([])
   const [pengumumanLoading, setPengumumanLoading] = React.useState(true)
   const [pengumumanError, setPengumumanError] = React.useState<string | null>(null)
+
+  const { isOpen, period, loading: periodLoading } = usePpdbPortalPeriodCheck()
 
   React.useEffect(() => {
     let isMounted = true
@@ -66,7 +68,7 @@ export default function LandingPage() {
             </div>
 
             <div className="hidden md:flex items-center gap-8">
-              <Link href="ppdb/register" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <Link href="/ppdb/register" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 PPDB
               </Link>
               <Link href="#profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
@@ -117,9 +119,26 @@ export default function LandingPage() {
       {/* Hero Section */}
       <section className="py-20 md:py-32 bg-gradient-to-b from-sidebar/10 to-background">
         <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center space-y-6">
+          <div className="max-w-4xl mx-auto text-center space-y-6 flex flex-col items-center">
             
-            <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight">
+            {periodLoading ? (
+              <div className="inline-flex items-center gap-2 bg-muted px-4 py-1.5 rounded-full text-xs text-muted-foreground animate-pulse">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Mengecek status PPDB...
+              </div>
+            ) : isOpen && period ? (
+              <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-4 py-1.5 rounded-full text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                PPDB {period.nama_gelombang} TA {period.tahun_ajaran} Telah Dibuka!
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 bg-muted text-muted-foreground border border-border px-4 py-1.5 rounded-full text-xs font-medium">
+                <span className="w-2 h-2 rounded-full bg-muted-foreground" />
+                Pendaftaran PPDB Online Sedang Ditutup
+              </div>
+            )}
+
+            <h1 className="text-4xl md:text-6xl font-bold text-foreground leading-tight w-full">
               Sistem Informasi Digital{" "}
               <span className="text-primary">Pesantren Modern</span>
             </h1>
@@ -128,15 +147,15 @@ export default function LandingPage() {
               Menggabungkan sistem pendidikan formal dengan keagamaan. Menyediakan portal pendaftaran santri baru (PPDB) serta pengelolaan administrasi & e-Rapor secara terintegrasi.
             </p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <Link href="#ppdb">
-                <Button size="lg" className="w-full sm:w-auto bg-primary text-primary-foreground hover:bg-primary/90">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 w-full sm:w-auto">
+              <Link href="/ppdb/register" className="w-full sm:w-auto">
+                <Button size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
                   <Calendar className="w-4 h-4 mr-2" />
                   Daftar PPDB
                 </Button>
               </Link>
-              <Link href="/login">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto">
+              <Link href="/login" className="w-full sm:w-auto">
+                <Button size="lg" variant="outline" className="w-full">
                   <Users className="w-4 h-4 mr-2" />
                   Portal Login
                 </Button>
@@ -499,7 +518,7 @@ export default function LandingPage() {
             <div>
               <h4 className="font-semibold mb-4 text-sidebar-foreground">Menu</h4>
               <ul className="space-y-2 text-sm text-sidebar-foreground/70">
-                <li><Link href="#ppdb" className="hover:text-sidebar-primary transition-colors">PPDB</Link></li>
+                <li><Link href="/ppdb/register" className="hover:text-sidebar-primary transition-colors">PPDB</Link></li>
                 <li><Link href="#profile" className="hover:text-sidebar-primary transition-colors">Profil</Link></li>
                 <li><Link href="#announcement" className="hover:text-sidebar-primary transition-colors">Pengumuman</Link></li>
                 <li><Link href="#education" className="hover:text-sidebar-primary transition-colors">Jenjang Pendidikan</Link></li>

@@ -1,2 +1,1 @@
-notulensi
-1. Nomor induk  huruf saja 
+ serta saaya melihat gap lagi dibagian soal tes yang sudah di nonaktifkan kenapa tbtb hidup lagi ya ?

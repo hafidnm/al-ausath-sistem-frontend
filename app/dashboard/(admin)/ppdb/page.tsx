@@ -21,6 +21,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 
 import {
   usePpdbList,
@@ -40,6 +46,7 @@ import { PpdbAddDialog } from "@/components/ppdb/admin/ppdb-add-dialog"
 import { PpdbDetailDialog } from "@/components/ppdb/admin/ppdb-detail-dialog"
 import { PpdbTable } from "@/components/ppdb/admin/ppdb-table"
 import { PpdbRekapCard } from "@/components/ppdb/admin/ppdb-rekap-card"
+import { PpdbPeriodsTab } from "@/components/ppdb/admin/ppdb-periods-tab"
 import {
   PpdbFormState,
   emptyPendaftarForm,
@@ -455,7 +462,7 @@ export default function PpdbPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">PPDB - Penerimaan Murid Baru</h1>
-          <p className="text-muted-foreground">Kelola pendaftaran dan proses seleksi murid baru</p>
+          <p className="text-muted-foreground">Kelola pendaftaran, gelombang masuk, dan proses seleksi murid baru</p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={isExportLoading}>
@@ -474,49 +481,91 @@ export default function PpdbPage() {
         </div>
       </div>
 
-      {/* Tes Konfigurasi */}
-      <PpdbTesKonfigurasiCard
-        selectedJenjang={selectedJenjangTes}
-        configByJenjang={tesConfigByJenjang}
-        isLoading={isTesConfigLoading}
-        isSaving={isTesConfigSaving}
-        onJenjangChange={setSelectedJenjangTes}
-        onToggle={(jenjang, checked) => updateTesConfigDraft(jenjang, { fiturSoalAktif: checked })}
-        onSoalChange={(jenjang, soal) => updateTesConfigDraft(jenjang, { soalTes: soal })}
-        onFormSchemaChange={(jenjang, schema) => updateTesConfigDraft(jenjang, { formSchema: schema })}
-        onSave={handleUpdateTesConfig}
-      />
+      <Tabs defaultValue="pendaftar" className="w-full space-y-6">
+        <TabsList className="grid w-full grid-cols-3 max-w-[500px]">
+          <TabsTrigger value="pendaftar">Pendaftar</TabsTrigger>
+          <TabsTrigger value="periods">Gelombang PPDB</TabsTrigger>
+          <TabsTrigger value="konfigurasi-tes">Konfigurasi Tes</TabsTrigger>
+        </TabsList>
 
-      {/* Stats */}
-      <PpdbStatsCards
-        totalPendaftar={totalPendaftar}
-        totalMenunggu={totalMenunggu}
-        totalDiterima={totalDiterima}
-        totalDitolak={totalDitolak}
-      />
+        <TabsContent value="pendaftar" className="space-y-6">
+          {/* Stats */}
+          <PpdbStatsCards
+            totalPendaftar={totalPendaftar}
+            totalMenunggu={totalMenunggu}
+            totalDiterima={totalDiterima}
+            totalDitolak={totalDitolak}
+          />
 
-      {/* Tabel */}
-      <PpdbTable
-        data={ppdbData}
-        loading={loading}
-        searchQuery={searchQuery}
-        selectedStatus={selectedStatus}
-        selectedProgram={selectedProgram}
-        programOptions={programOptions}
-        verificationLoading={verificationLoading}
-        deleteLoading={deleteLoading}
-        onSearchChange={setSearchQuery}
-        onStatusChange={setSelectedStatus}
-        onProgramChange={setSelectedProgram}
-        onDetail={handleOpenDetail}
-        onVerifikasi={handleVerifikasi}
-        onDelete={handleDeletePendaftar}
-        onCreateTagihan={handleCreateTagihan}
-        tagihanLoading={isTagihanLoading}
-      />
+          {/* Tabel */}
+          <PpdbTable
+            data={ppdbData}
+            loading={loading}
+            searchQuery={searchQuery}
+            selectedStatus={selectedStatus}
+            selectedProgram={selectedProgram}
+            programOptions={programOptions}
+            verificationLoading={verificationLoading}
+            deleteLoading={deleteLoading}
+            onSearchChange={setSearchQuery}
+            onStatusChange={setSelectedStatus}
+            onProgramChange={setSelectedProgram}
+            onDetail={handleOpenDetail}
+            onVerifikasi={handleVerifikasi}
+            onDelete={handleDeletePendaftar}
+            onCreateTagihan={handleCreateTagihan}
+            tagihanLoading={isTagihanLoading}
+          />
 
-      {/* Rekap Diterima & Ditolak */}
-      <PpdbRekapCard data={ppdbData} />
+          {/* Rekap Diterima & Ditolak */}
+          <PpdbRekapCard data={ppdbData} />
+        </TabsContent>
+
+        <TabsContent value="periods">
+          <PpdbPeriodsTab />
+        </TabsContent>
+
+        <TabsContent value="konfigurasi-tes" className="space-y-6">
+          {/* Tes Konfigurasi */}
+          <PpdbTesKonfigurasiCard
+            selectedJenjang={selectedJenjangTes}
+            configByJenjang={tesConfigByJenjang}
+            isLoading={isTesConfigLoading}
+            isSaving={isTesConfigSaving}
+            onJenjangChange={setSelectedJenjangTes}
+            onToggle={async (jenjang, checked) => {
+              updateTesConfigDraft(jenjang, { fiturSoalAktif: checked })
+              // Auto-save toggle change immediately to prevent "ghost reactivation" bug
+              const draft = { ...tesConfigByJenjang[jenjang], fiturSoalAktif: checked }
+              const normalizedFormSchema = Array.isArray(draft.formSchema)
+                ? draft.formSchema.filter((q) => (q.question || '').trim().length > 0)
+                : []
+              setIsTesConfigSaving(true)
+              try {
+                const updated = await ppdbAdminApi.updateTesKonfigurasiPerJenjang(jenjang, {
+                  fiturSoalAktif: checked,
+                  soalTes: draft.soalTes.trim(),
+                  formSchema: normalizedFormSchema,
+                })
+                updateTesConfigDraft(jenjang, {
+                  fiturSoalAktif: Boolean(updated.fiturSoalAktif),
+                  soalTes: updated.soalTes || "",
+                  formSchema: updated.formSchema || normalizedFormSchema,
+                })
+              } catch (err) {
+                // Revert on failure
+                updateTesConfigDraft(jenjang, { fiturSoalAktif: !checked })
+                alert(getErrorMessage(err, "Gagal memperbarui status tes"))
+              } finally {
+                setIsTesConfigSaving(false)
+              }
+            }}
+            onSoalChange={(jenjang, soal) => updateTesConfigDraft(jenjang, { soalTes: soal })}
+            onFormSchemaChange={(jenjang, schema) => updateTesConfigDraft(jenjang, { formSchema: schema })}
+            onSave={handleUpdateTesConfig}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Detail Dialog — now deprecated in favor of dedicated detail page */}
       {/* <PpdbDetailDialog
