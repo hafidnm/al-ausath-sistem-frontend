@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,6 +38,7 @@ import { dataKelasService } from "@/lib/services/kelas.service"
 import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -169,6 +170,9 @@ export default function MapelPage() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -311,43 +315,39 @@ export default function MapelPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [kelasResult, mapelResult, tahunResult, petugasResult] = await Promise.all([
-          dataKelasService.getAll({ page: 1, per_page: 500 }),
-          dataMataPelajaranService.getAll({ page: 1, per_page: 500 }),
-          tahunAjaranService.getAll({ page: 1, per_page: 200 }),
-          dataPetugasService.getAll({ page: 1, per_page: 200 }),
-        ])
+        const initData = await dataMasterService.getInitOptions()
 
         const kelas: KelasOption[] = []
         const units: UnitOption[] = []
         const unitSeen = new Set<string>()
-        for (const item of kelasResult.data) {
+        for (const item of (initData.kelas || [])) {
           const kode = toText(item.kode_kelas).trim()
-          const kodeUnit = toText(item.kode_unit || item.unit?.kode_unit).trim().toUpperCase()
-          const tahunAjaran = toText(
-            item.tahun_ajaran ?? item.tahun_ajaran_relasi?.kode_tahun ?? item.tahunAjaranRelasi?.kode_tahun,
-          ).trim()
+          const kodeUnit = toText(item.kode_unit).trim().toUpperCase()
+          const tahunAjaran = toText(item.tahun_ajaran).trim()
+          
           if (!kode) continue
           kelas.push({ value: kode, label: toText(item.nama_kelas).trim() || kode, kodeUnit, tahunAjaran })
-
-          if (kodeUnit && !unitSeen.has(kodeUnit)) {
-            unitSeen.add(kodeUnit)
-            units.push({
-              value: kodeUnit,
-              label: toText(item.unit?.nama_unit).trim() || kodeUnit,
-            })
-          }
+        }
+        
+        for (const item of (initData.unit || [])) {
+          const kodeUnit = toText(item.kode_unit).trim().toUpperCase()
+          if (!kodeUnit || unitSeen.has(kodeUnit)) continue
+          unitSeen.add(kodeUnit)
+          units.push({
+            value: kodeUnit,
+            label: toText(item.nama_unit).trim() || kodeUnit,
+          })
         }
 
         const years: TahunAjaranOption[] = []
-        for (const item of tahunResult.data) {
+        for (const item of (initData.tahun_ajaran || [])) {
           const kode = toText(item.kode_tahun).trim()
           if (!kode) continue
           years.push({ value: kode, label: toText(item.nama_tahun).trim() || kode })
         }
 
         const mapel: MapelOption[] = []
-        for (const item of mapelResult.data) {
+        for (const item of (initData.mapel || [])) {
           const kode = toText(item.kode_mapel).trim().toUpperCase()
           if (!kode) continue
           mapel.push({
@@ -358,8 +358,8 @@ export default function MapelPage() {
         }
 
         const petugas: PetugasOption[] = []
-        for (const item of petugasResult.data) {
-          const idPetugas = toNumber(item.id_petugas ?? item.id, 0)
+        for (const item of (initData.petugas_list || [])) {
+          const idPetugas = toNumber(item.id_petugas, 0)
           if (idPetugas <= 0) continue
           petugas.push({
             value: String(idPetugas),
@@ -372,19 +372,23 @@ export default function MapelPage() {
         setUnitOptions(units)
         setTahunOptions(years)
         setPetugasOptions(petugas)
-      } catch {
-        setKelasOptions([])
-        setMapelOptions([])
-        setUnitOptions([])
-        setTahunOptions([])
-        setPetugasOptions([])
+        
+        initDoneRef.current = true
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
       }
     }
 
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void loadOptions()
   }, [])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     if (kelasFilter !== "all" && !kelasByUnit.some((option) => option.value === kelasFilter)) {
       setKelasFilter("all")
       setCurrentPage(1)

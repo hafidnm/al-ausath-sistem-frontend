@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -82,6 +82,10 @@ export default function SantriPanelPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isAbsensiLoading, setIsAbsensiLoading] = useState(true)
 
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   /* Filter riwayat */
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPeriode, setFilterPeriode] = useState("all")
@@ -150,8 +154,7 @@ export default function SantriPanelPage() {
         return
       }
 
-
-      // Load tahun ajaran options dan rekap
+      // Load tahun ajaran options
       try {
         const tahunRes = await tahunAjaranService.getAll({ per_page: 100 })
         const tahunList = tahunRes.data || []
@@ -159,29 +162,28 @@ export default function SantriPanelPage() {
         const activeTahun = tahunList.find((t) => t.status === "AKTIF")
         if (activeTahun?.kode_tahun) {
           setSelectedTahunAjaran(activeTahun.kode_tahun)
-          await fetchRekap(nomorInduk, activeTahun.kode_tahun)
-          await fetchRiwayat(nomorInduk, filterPeriode, activeTahun.kode_tahun)
-        } else {
-          await fetchRekap(nomorInduk)
-          await fetchRiwayat(nomorInduk, filterPeriode)
         }
-      } catch {
-        await fetchRekap(nomorInduk)
-        await fetchRiwayat(nomorInduk, filterPeriode)
+      } catch (error) {
+        console.error("Gagal memuat tahun ajaran", error)
       } finally {
+        initDoneRef.current = true
         setIsLoading(false)
       }
     }
+    
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void init()
   }, [])
 
   // Trigger ulang riwayat saat filter periode atau tahun ajaran berubah
   useEffect(() => {
+    if (!initDoneRef.current) return
     if (user?.nomor_induk) {
       void fetchRiwayat(user.nomor_induk, filterPeriode)
       void fetchRekap(user.nomor_induk)
     }
-  }, [filterPeriode, selectedTahunAjaran])
+  }, [filterPeriode, selectedTahunAjaran, user?.nomor_induk])
 
   /* ─── Computed ─────────────────────────────────────────────── */
   const hadir = Number(rekap?.jumlah_hadir ?? 0)

@@ -106,6 +106,38 @@ export interface AdminUpsertAbsensiSantriPayload {
   }>
 }
 
+export interface LogAktivitasItem {
+  id_log_aktivitas: number
+  id_petugas: number
+  jenis_aksi: string
+  modul: string
+  deskripsi: string
+  ip_address?: string
+  user_agent?: string
+  created_at: string
+  nama_admin?: string
+}
+
+export interface LogAuditItem {
+  id_log: number
+  tabel_terkait: string
+  id_record: number
+  field_diubah: string
+  nilai_lama: string
+  nilai_baru: string
+  alasan_perubahan: string
+  diubah_oleh: number
+  diubah_pada: string
+  ip_address?: string
+  nama_admin?: string
+}
+
+export interface LogAktivitasResponse {
+  status: string
+  log_aktivitas: LogAktivitasItem[]
+  log_audit: LogAuditItem[]
+}
+
 const SESI_ABSENSI_BASE_PATH = "/akademik/sesi-absensi"
 
 const extractList = (payload: unknown): SesiAbsensiApiItem[] => {
@@ -213,6 +245,44 @@ export const sesiAbsensiService = {
   async adminGetBelumDiabsen(params?: { tanggal?: string; kode_unit?: string; kode_kelas?: string }) {
     const response = await api.get<{ data: any[] }>(`${SESI_ABSENSI_BASE_PATH}/admin/belum-diabsen`, { params })
     return response.data.data
+  },
+
+  async adminGetLogAktivitas() {
+    const response = await api.get<LogAktivitasResponse>(`${SESI_ABSENSI_BASE_PATH}/admin/log-aktivitas`)
+    return response.data
+  },
+
+  /** Endpoint konsolidasi admin presensi-guru: ganti 5 request terpisah (petugas, jadwal, unit, kelas, tahun_ajaran) dengan 1 call. */
+  async adminPresensiGuruInit(): Promise<{
+    petugas: any[]
+    jadwal: any[]
+    unit: any[]
+    kelas: any[]
+    tahun_ajaran: any[]
+  }> {
+    const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/admin/presensi-guru/init`)
+    return response.data
+  },
+
+  /** Endpoint konsolidasi admin presensi-santri: ganti 3 request terpisah (unit, kelas, tahun_ajaran) dengan 1 call. */
+  async adminPresensiSantriInit(): Promise<{
+    unit: any[]
+    kelas: any[]
+    tahun_ajaran: any[]
+  }> {
+    const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/admin/presensi-santri/init`)
+    return response.data
+  },
+
+  /** Endpoint konsolidasi: ganti 4 request terpisah (jadwal, petugas, tahun_ajaran, sesi_hari_ini) dengan 1 call. */
+  async guruPanelInit(): Promise<{
+    jadwal: any[]
+    petugas: any[]
+    tahun_ajaran: any[]
+    sesi_hari_ini: any[]
+  }> {
+    const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/guru-panel/init`)
+    return response.data
   },
 
   // --- Export URL Helpers ---

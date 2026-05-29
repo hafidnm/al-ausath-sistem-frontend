@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
-import { Search, Download, Calendar, History, FileSpreadsheet, FileIcon as FilePdf, Eye, Check, CheckCircle, Clock } from "lucide-react"
+import { Search, Download, Calendar, History, FileSpreadsheet, FileIcon as FilePdf, Eye, Check, CheckCircle, Clock, RefreshCw } from "lucide-react"
 import { sesiAbsensiService, SesiAbsensiApiItem } from "@/lib/services/sesiabsensi.service"
 import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
@@ -35,6 +35,10 @@ type SantriStatus = "hadir" | "izin" | "sakit" | "alfa"
 
 export default function PresensiSantriPage() {
   const [activeTab, setActiveTab] = useState("rekap")
+  
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
   
   // States for Rekap
   const [rekapRows, setRekapRows] = useState<RekapSantriRow[]>([])
@@ -74,54 +78,74 @@ export default function PresensiSantriPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
 
-  // Initialization
+  // States for Log Aktivitas
+  const [logs, setLogs] = useState<any[]>([])
+  const [auditLogs, setAuditLogs] = useState<any[]>([])
+  const [logLoading, setLogLoading] = useState(false)
+  const [activeLogSubTab, setActiveLogSubTab] = useState("aktivitas")
+
+  const loadLogs = async () => {
+    setLogLoading(true)
+    try {
+      const res = await sesiAbsensiService.adminGetLogAktivitas()
+      setLogs(res.log_aktivitas || [])
+      setAuditLogs(res.log_audit || [])
+    } catch (e) {
+      console.error("Gagal memuat log aktivitas", e)
+      toast({
+        title: "Gagal memuat log",
+        description: "Terjadi kesalahan saat memuat log aktivitas absensi.",
+        variant: "destructive"
+      })
+    } finally {
+      setLogLoading(false)
+    }
+  }
+
   useEffect(() => {
-    loadOptions()
+    if (activeTab === "log_aktivitas") {
+      void loadLogs()
+    }
+  }, [activeTab])
+
+  useEffect(() => {
+    if (initCalledRef.current) return
+    initCalledRef.current = true
+    void loadOptions()
   }, [])
 
-  // Auto load Rekap when filters change
+  // Tab: Rekap (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
+    if (!initDoneRef.current || activeTab !== "rekap") return
     void loadRekap()
-  }, [
-    selectedTahunAjaranRekap,
-    selectedUnit,
-    filterRekap.tanggal_mulai,
-    filterRekap.tanggal_selesai,
-    filterRekap.kode_kelas,
-    filterRekap.q
-  ])
+  }, [activeTab, selectedTahunAjaranRekap, selectedUnit, filterRekap.tanggal_mulai, filterRekap.tanggal_selesai, filterRekap.kode_kelas, filterRekap.q])
 
-  // Auto load Riwayat Sesi when filters change
+  // Tab: Riwayat Sesi (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
+    if (!initDoneRef.current || activeTab !== "riwayat") return
     void loadRiwayatSesi()
-  }, [
-    selectedTahunAjaran,
-    selectedUnitSesi,
-    selectedKelasSesi,
-    filterSesi.tanggal,
-    filterSesi.status_sesi,
-    filterSesi.q
-  ])
+  }, [activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.status_sesi, filterSesi.q])
 
   const loadOptions = async () => {
     try {
-      const [unitRes, kelasRes, tahunRes] = await Promise.all([
-        dataUnitService.getAll({ per_page: 100, status: "AKTIF" }),
-        kelasService.getAll({ per_page: "500", status: "AKTIF" }),
-        tahunAjaranService.getAll({ per_page: 100 })
-      ])
-      setUnitOptions(unitRes.data || [])
-      setKelasOptions(kelasRes || [])
-      setKelasSesiOptions(kelasRes || [])
+      const initData = await sesiAbsensiService.adminPresensiSantriInit()
+      
+      setUnitOptions(initData.unit || [])
+      setKelasOptions(initData.kelas || [])
+      setKelasSesiOptions(initData.kelas || [])
 
-      const tahunList = tahunRes.data || []
+      const tahunList = initData.tahun_ajaran || []
       setTahunAjaranOptions(tahunList)
 
-      const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+      const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
       if (activeTahun?.kode_tahun) {
         setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
         setSelectedTahunAjaran(activeTahun.kode_tahun)
       }
+      
+      initDoneRef.current = true
+      // Hanya load data untuk tab yang sedang aktif (default: rekap)
+      void loadRekap()
     } catch (e) {
       console.error("Gagal memuat filter options", e)
     }
@@ -325,6 +349,10 @@ export default function PresensiSantriPage() {
           <TabsTrigger value="riwayat" className="data-[state=active]:bg-card">
             <History className="w-4 h-4 mr-2" />
             Riwayat Sesi (Edit)
+          </TabsTrigger>
+          <TabsTrigger value="log_aktivitas" className="data-[state=active]:bg-card">
+            <Clock className="w-4 h-4 mr-2 text-indigo-500" />
+            Log Aktivitas
           </TabsTrigger>
         </TabsList>
 
@@ -601,6 +629,174 @@ export default function PresensiSantriPage() {
                   </TableBody>
                 </Table>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab Log Aktivitas */}
+        <TabsContent value="log_aktivitas" className="space-y-4">
+          <Card className="border-border/50">
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2 text-indigo-600">
+                    <History className="w-5 h-5" /> 
+                    Audit Trail & Log Aktivitas Absensi
+                  </CardTitle>
+                  <CardDescription>
+                    Pencatatan riwayat pembukaan sesi dan perubahan status kehadiran absensi ustadz/santri secara realtime.
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" className="gap-2" onClick={loadLogs} disabled={logLoading}>
+                    <RefreshCw className={`w-4 h-4 ${logLoading ? "animate-spin" : ""}`} /> Segarkan Log
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <Tabs value={activeLogSubTab} onValueChange={setActiveLogSubTab} className="space-y-4">
+                <TabsList className="bg-muted/50 p-1 w-fit">
+                  <TabsTrigger value="aktivitas" className="text-xs data-[state=active]:bg-card">
+                    Aktivitas Utama Admin
+                  </TabsTrigger>
+                  <TabsTrigger value="audit" className="text-xs data-[state=active]:bg-card">
+                    Detail Perubahan Sel Absensi
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Sub Tab: Aktivitas Utama */}
+                <TabsContent value="aktivitas" className="space-y-4">
+                  <div className="overflow-x-auto rounded-md border border-border/50">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="w-48">Waktu Kejadian</TableHead>
+                          <TableHead className="w-36">Aksi</TableHead>
+                          <TableHead className="w-36">Modul</TableHead>
+                          <TableHead className="w-48">Operator (Admin)</TableHead>
+                          <TableHead>Deskripsi Aktivitas</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {logLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              Memuat log aktivitas...
+                            </TableCell>
+                          </TableRow>
+                        ) : logs.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                              Belum ada catatan aktivitas admin di modul absensi.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          logs.map((log, idx) => (
+                            <TableRow key={log.id_log_aktivitas || idx} className="hover:bg-muted/30">
+                              <TableCell className="text-xs text-muted-foreground font-mono">
+                                {new Date(log.created_at).toLocaleString("id-ID")}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={
+                                  log.jenis_aksi === "CREATE" 
+                                    ? "bg-emerald-500/10 text-emerald-700 border-0 hover:bg-emerald-500/15" 
+                                    : log.jenis_aksi === "UPDATE"
+                                    ? "bg-indigo-500/10 text-indigo-700 border-0 hover:bg-indigo-500/15"
+                                    : "bg-destructive/10 text-destructive border-0 hover:bg-destructive/15"
+                                }>
+                                  {log.jenis_aksi}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="font-semibold text-xs border-slate-200">
+                                  {log.modul}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="font-medium text-xs">
+                                {log.nama_admin || `ID Petugas: ${log.id_petugas}`}
+                              </TableCell>
+                              <TableCell className="text-xs font-medium max-w-md break-words">
+                                {log.deskripsi}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+
+                {/* Sub Tab: Detail Perubahan */}
+                <TabsContent value="audit" className="space-y-4">
+                  <div className="overflow-x-auto rounded-md border border-border/50">
+                    <Table>
+                      <TableHeader className="bg-muted/30">
+                        <TableRow>
+                          <TableHead className="w-44">Waktu Perubahan</TableHead>
+                          <TableHead className="w-64">Jadwal (Sesi)</TableHead>
+                          <TableHead className="w-48">Nama (Subjek)</TableHead>
+                          <TableHead className="w-32">Tabel Absensi</TableHead>
+                          <TableHead className="w-28">Kolom</TableHead>
+                          <TableHead className="text-center w-24">Nilai Lama</TableHead>
+                          <TableHead className="text-center w-24">Nilai Baru</TableHead>
+                          <TableHead>Pengubah</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {logLoading ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                              Memuat detail audit...
+                            </TableCell>
+                          </TableRow>
+                        ) : auditLogs.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                              Belum ada catatan perubahan sel status kehadiran yang dilakukan admin.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          auditLogs.map((audit, idx) => (
+                            <TableRow key={audit.id_log || idx} className="hover:bg-muted/30">
+                              <TableCell className="text-xs text-muted-foreground font-mono">
+                                {new Date(audit.diubah_pada).toLocaleString("id-ID")}
+                              </TableCell>
+                              <TableCell className="text-xs font-semibold text-indigo-900 max-w-[240px] truncate">
+                                {audit.info_jadwal || "-"}
+                              </TableCell>
+                              <TableCell className="text-xs font-medium text-slate-700 max-w-[180px] truncate">
+                                {audit.nama_subjek || "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="font-normal text-xs uppercase bg-slate-100 border-0">
+                                  {audit.tabel_terkait?.replace("absensi_", "")}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-xs font-mono text-muted-foreground">
+                                {audit.field_diubah}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="line-through text-xs text-destructive bg-destructive/5 px-2 py-0.5 rounded font-bold">
+                                  {audit.nilai_lama}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="text-xs text-emerald-600 bg-emerald-500/5 px-2 py-0.5 rounded font-bold">
+                                  {audit.nilai_baru}
+                                </span>
+                              </TableCell>
+                              <TableCell className="font-medium text-xs">
+                                {audit.nama_admin || `ID Petugas: ${audit.diubah_oleh}`}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </TabsContent>

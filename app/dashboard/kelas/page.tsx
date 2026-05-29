@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,7 @@ import { useToast } from "@/hooks/use-toast"
 import { BackendStatus, dataUnitService } from "@/lib/services/unit.service"
 import { dataKelasService, DataKelasApiItem } from "@/lib/services/kelas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { ArrowUpDown, ChevronDown, Download, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -162,6 +163,10 @@ export default function KelasPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
@@ -251,21 +256,17 @@ export default function KelasPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [unitResult, tahunResult, kelasResult] = await Promise.all([
-          dataUnitService.getAll({ page: 1, per_page: 200 }),
-          tahunAjaranService.getAll({ page: 1, per_page: 200 }),
-          dataKelasService.getAll({ page: 1, per_page: 500 }),
-        ])
+        const initData = await dataMasterService.getInitOptions()
 
         const units: UnitOption[] = []
-        for (const item of unitResult.data) {
+        for (const item of (initData.unit || [])) {
           const code = toText(item.kode_unit).trim()
           if (!code) continue
           units.push({ value: code, label: toText(item.nama_unit).trim() || code })
         }
 
         const years: TahunAjaranOption[] = []
-        for (const item of tahunResult.data) {
+        for (const item of (initData.tahun_ajaran || [])) {
           const code = toText(item.kode_tahun).trim()
           if (!code) continue
           years.push({ value: code, label: toText(item.nama_tahun).trim() || code })
@@ -273,27 +274,33 @@ export default function KelasPage() {
 
         const kelasSeen = new Set<string>()
         const mappedKelas: KelasOption[] = []
-        for (const item of kelasResult.data) {
+        for (const item of (initData.kelas || [])) {
           const kodeKelas = toText(item.kode_kelas).trim()
           if (!kodeKelas || kelasSeen.has(kodeKelas)) continue
           kelasSeen.add(kodeKelas)
           mappedKelas.push({
             value: kodeKelas,
             label: toText(item.nama_kelas).trim() || kodeKelas,
-            kodeUnit: toText(item.kode_unit || item.unit?.kode_unit).trim(),
+            kodeUnit: toText(item.kode_unit).trim(),
           })
         }
 
         setUnitOptions(units)
         setTahunOptions(years)
         setKelasOptions(mappedKelas)
-      } catch {
-        setUnitOptions([])
-        setTahunOptions([])
-        setKelasOptions([])
+        
+        initDoneRef.current = true
+        // Langsung panggil fetch pertama
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
       }
     }
 
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void loadOptions()
   }, [])
 
@@ -307,6 +314,7 @@ export default function KelasPage() {
   }, [kelasFilter, kelasFilterOptions])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     void fetchRows()
   }, [currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
 

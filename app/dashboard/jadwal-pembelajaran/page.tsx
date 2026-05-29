@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -39,6 +39,7 @@ import {
 import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -300,6 +301,9 @@ export default function JadwalPembelajaranPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
@@ -493,28 +497,25 @@ export default function JadwalPembelajaranPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [kelasMapelResult, kelasResult, mapelResult, petugasResult, tahunResult] = await Promise.all([
+        const [initData, kelasMapelResult] = await Promise.all([
+          dataMasterService.getInitOptions(),
           dataKelasMapelService.getAll({ page: 1, per_page: 500 }),
-          dataKelasService.getAll({ page: 1, per_page: 500 }),
-          dataMataPelajaranService.getAll({ page: 1, per_page: 500 }),
-          dataPetugasService.getAll({ page: 1, per_page: 200 }),
-          tahunAjaranService.getAll({ page: 1, per_page: 200 }),
         ])
 
         const kelasUnitByKode = new Map(
-          kelasResult.data
-            .map((item) => {
+          (initData.kelas || [])
+            .map((item: any) => {
               const kodeKelas = toText(item.kode_kelas).trim()
               if (!kodeKelas) return null
               return [
                 kodeKelas,
                 {
-                  kodeUnit: toText(item.kode_unit || item.unit?.kode_unit).trim().toUpperCase(),
-                  namaUnit: toText(item.unit?.nama_unit).trim(),
+                  kodeUnit: toText(item.kode_unit).trim().toUpperCase(),
+                  namaUnit: toText(item.kode_unit).trim(), // Using kode_unit as fallback for nama_unit
                 },
               ] as const
             })
-            .filter((entry): entry is readonly [string, { kodeUnit: string; namaUnit: string }] => entry !== null),
+            .filter((entry: any): entry is readonly [string, { kodeUnit: string; namaUnit: string }] => entry !== null),
         )
 
         const kelasMapel = kelasMapelResult.data
@@ -540,26 +541,26 @@ export default function JadwalPembelajaranPage() {
           }))
           .filter((item) => item.value && item.kodeKelas && item.kodeMapel)
 
-        const kelas = kelasResult.data
-          .map((item) => ({
+        const kelas = (initData.kelas || [])
+          .map((item: any) => ({
             value: toText(item.kode_kelas).trim(),
             label: toText(item.nama_kelas).trim() || toText(item.kode_kelas).trim(),
           }))
-          .filter((item) => item.value)
+          .filter((item: any) => item.value)
 
-        const mapel = mapelResult.data
-          .map((item) => ({
+        const mapel = (initData.mapel || [])
+          .map((item: any) => ({
             value: toText(item.kode_mapel).trim(),
             label: toText(item.nama_mapel).trim() || toText(item.kode_mapel).trim(),
             kelompokMapel: toText(item.kelompok_mapel).trim(),
           }))
-          .filter((item) => item.value)
+          .filter((item: any) => item.value)
 
-        const kelompokMapel = Array.from(new Set(mapel.map((item) => item.kelompokMapel).filter(Boolean))).map((value) => ({
+        const kelompokMapel = Array.from(new Set(mapel.map((item: any) => item.kelompokMapel).filter(Boolean))).map((value) => ({
           value,
           label: value,
         }))
-        const kelompokByKodeMapel = new Map(mapel.map((item) => [item.value, item.kelompokMapel]))
+        const kelompokByKodeMapel = new Map(mapel.map((item: any) => [item.value, item.kelompokMapel]))
         const enrichedKelasMapel = kelasMapel.map((item) => ({
           ...item,
           idPetugas: item.idPetugas,
@@ -570,22 +571,22 @@ export default function JadwalPembelajaranPage() {
           semester: item.semester,
         }))
 
-        const petugas = petugasResult.data
-          .map((item) => {
-            const idPetugas = toNumber(item.id_petugas ?? item.id, 0)
+        const petugas = (initData.petugas_list || [])
+          .map((item: any) => {
+            const idPetugas = toNumber(item.id_petugas, 0)
             return {
               value: idPetugas > 0 ? String(idPetugas) : "",
               label: toText(item.nama_lengkap).trim() || `Petugas #${idPetugas}`,
             }
           })
-          .filter((item) => item.value)
+          .filter((item: any) => item.value)
 
-        const tahun = tahunResult.data
-          .map((item) => ({
+        const tahun = (initData.tahun_ajaran || [])
+          .map((item: any) => ({
             value: toText(item.kode_tahun).trim(),
             label: toText(item.nama_tahun).trim() || toText(item.kode_tahun).trim(),
           }))
-          .filter((item) => item.value)
+          .filter((item: any) => item.value)
 
         setKelasMapelOptions(enrichedKelasMapel)
         setKelasOptions(kelas)
@@ -593,20 +594,23 @@ export default function JadwalPembelajaranPage() {
         setKelompokMapelOptions(kelompokMapel)
         setPetugasOptions(petugas)
         setTahunOptions(tahun)
-      } catch {
-        setKelasMapelOptions([])
-        setKelasOptions([])
-        setMapelOptions([])
-        setKelompokMapelOptions([])
-        setPetugasOptions([])
-        setTahunOptions([])
+        
+        initDoneRef.current = true
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
       }
     }
 
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void loadOptions()
   }, [])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     void fetchRows()
   }, [
     currentPage,

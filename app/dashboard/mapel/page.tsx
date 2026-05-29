@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -35,6 +35,7 @@ import {
   DataMataPelajaranApiItem,
 } from "@/lib/services/mata-pelajaran.service"
 import { dataUnitService } from "@/lib/services/unit.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -138,6 +139,10 @@ export default function MapelPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+  const [allMapelOptions, setAllMapelOptions] = useState<any[]>([])
+
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
@@ -148,7 +153,6 @@ export default function MapelPage() {
   const [formData, setFormData] = useState<MapelFormData>(defaultFormState)
   const [editingFormData, setEditingFormData] = useState<MapelFormData>(defaultFormState)
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
-  const [kelompokMapelOptions, setKelompokMapelOptions] = useState<string[]>([])
 
   const [keyword, setKeyword] = useState("")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
@@ -203,12 +207,12 @@ export default function MapelPage() {
   }
 
   useEffect(() => {
-    const loadUnitOptions = async () => {
+    const loadOptions = async () => {
       try {
-        const result = await dataUnitService.getAll({ page: 1, per_page: 200 })
-
+        const initData = await dataMasterService.getInitOptions()
+        
         const options: UnitOption[] = []
-        for (const item of result.data) {
+        for (const item of (initData.unit || [])) {
           const code = toText(item.kode_unit).trim()
           if (!code) continue
           options.push({
@@ -216,42 +220,32 @@ export default function MapelPage() {
             label: toText(item.nama_unit).trim() || code,
           })
         }
-
         setUnitOptions(options)
-      } catch {
-        setUnitOptions([])
+        setAllMapelOptions(initData.mapel || [])
+        
+        initDoneRef.current = true
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
       }
     }
 
-    void loadUnitOptions()
+    if (initCalledRef.current) return
+    initCalledRef.current = true
+    void loadOptions()
   }, [])
 
-  useEffect(() => {
-    const loadKelompokMapelOptions = async () => {
-      try {
-        const params: { page: number; per_page: number; kode_unit?: string } = {
-          page: 1,
-          per_page: 500,
-        }
-
-        if (kodeUnitFilter !== "all") params.kode_unit = kodeUnitFilter
-
-        const result = await dataMataPelajaranService.getAll(params)
-        const values = new Set<string>()
-
-        for (const item of result.data) {
-          const name = toText(item.kelompok_mapel).trim()
-          if (name) values.add(name)
-        }
-
-        setKelompokMapelOptions(Array.from(values).sort((a, b) => a.localeCompare(b, "id")))
-      } catch {
-        setKelompokMapelOptions([])
-      }
+  const kelompokMapelOptions = useMemo(() => {
+    const values = new Set<string>()
+    for (const item of allMapelOptions) {
+      if (kodeUnitFilter !== "all" && item.kode_unit !== kodeUnitFilter) continue
+      const name = toText(item.kelompok_mapel).trim()
+      if (name) values.add(name)
     }
-
-    void loadKelompokMapelOptions()
-  }, [kodeUnitFilter])
+    return Array.from(values).sort((a, b) => a.localeCompare(b, "id"))
+  }, [allMapelOptions, kodeUnitFilter])
 
   useEffect(() => {
     if (kodeUnitFilter === "all") return
@@ -272,6 +266,7 @@ export default function MapelPage() {
   }, [kelompokMapelFilter, kelompokMapelOptions])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     void fetchRows()
   }, [currentPage, rowsPerPage, keyword, statusFilter, kodeUnitFilter, kelompokMapelFilter])
 
