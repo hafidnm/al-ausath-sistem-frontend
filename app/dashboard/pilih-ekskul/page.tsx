@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { ekskulService, EkskulApiItem, PendaftaranApiItem } from "@/lib/services/ekskul.service"
-import { CheckCircle2, Users, Lock, Trophy, Star } from "lucide-react"
+import { CheckCircle2, Users, Lock, Trophy, Star, AlertTriangle } from "lucide-react"
 
 export default function PilihEkskulPage() {
   const { toast } = useToast()
@@ -17,6 +17,8 @@ export default function PilihEkskulPage() {
   const [pilihanSaya, setPilihanSaya] = useState<PendaftaranApiItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [loadingId, setLoadingId] = useState<number | null>(null)
+  // Inline confirmation state — true = tampilkan tombol konfirmasi di banner
+  const [isKonfirmasi, setIsKonfirmasi] = useState(false)
 
   const fetchAll = async () => {
     setIsLoading(true)
@@ -29,7 +31,9 @@ export default function PilihEkskulPage() {
       setPilihanSaya(pilihanRes.data ?? null)
     } catch {
       toast({ title: "Gagal memuat data ekskul", variant: "destructive" })
-    } finally { setIsLoading(false) }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   useEffect(() => {
@@ -50,12 +54,13 @@ export default function PilihEkskulPage() {
         description: e?.response?.data?.message ?? "Terjadi kesalahan",
         variant: "destructive",
       })
-    } finally { setLoadingId(null) }
+    } finally {
+      setLoadingId(null)
+    }
   }
 
-  const handleBatal = async () => {
-    if (!pilihanSaya) return
-    if (!confirm("Batalkan pilihan ekskul kamu?")) return
+  const handleBatalKonfirmasi = async () => {
+    setIsKonfirmasi(false)
     setLoadingId(-1)
     try {
       await ekskulService.batal()
@@ -67,7 +72,9 @@ export default function PilihEkskulPage() {
         description: e?.response?.data?.message ?? "Terjadi kesalahan",
         variant: "destructive",
       })
-    } finally { setLoadingId(null) }
+    } finally {
+      setLoadingId(null)
+    }
   }
 
   const sudahDaftar = (id: number) => pilihanSaya?.id_ekskul === id
@@ -93,30 +100,59 @@ export default function PilihEkskulPage() {
         <Skeleton className="h-24 rounded-xl" />
       ) : pilihanSaya ? (
         <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 p-5 text-white shadow-lg">
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-10">
+          <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-10 pointer-events-none">
             <Trophy className="w-24 h-24" />
           </div>
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-full p-2.5">
+
+          {/* Info ekskul + tombol */}
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="bg-white/20 rounded-full p-2.5 shrink-0">
               <CheckCircle2 className="w-6 h-6" />
             </div>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-white/80">Ekskul pilihanmu saat ini</p>
-              <p className="text-xl font-bold">{pilihanSaya.ekskul?.nama_ekskul}</p>
+              <p className="text-xl font-bold truncate">{pilihanSaya.ekskul?.nama_ekskul}</p>
               {pilihanSaya.ekskul?.deskripsi && (
-                <p className="text-sm text-white/70 mt-0.5">{pilihanSaya.ekskul.deskripsi}</p>
+                <p className="text-sm text-white/70 mt-0.5 line-clamp-1">{pilihanSaya.ekskul.deskripsi}</p>
               )}
             </div>
-            {pilihanSaya.ekskul?.status_pendaftaran === "BUKA" && (
+            {!isKonfirmasi && pilihanSaya.ekskul?.status_pendaftaran === "BUKA" && (
               <button
-                onClick={handleBatal}
+                type="button"
                 disabled={loadingId === -1}
-                className="ml-auto text-xs bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-lg px-3 py-1.5 transition-colors"
+                onClick={() => setIsKonfirmasi(true)}
+                className="shrink-0 text-xs bg-white/20 hover:bg-white/30 active:bg-white/40 text-white border border-white/30 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loadingId === -1 ? "Membatalkan..." : "Batalkan Pilihan"}
               </button>
             )}
           </div>
+
+          {/* Konfirmasi inline — hanya tampil kalau pendaftaran masih BUKA */}
+          {isKonfirmasi && pilihanSaya.ekskul?.status_pendaftaran === "BUKA" && (
+            <div className="mt-3 relative z-10 flex items-center gap-3 bg-white/15 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/20">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-yellow-200" />
+              <p className="text-sm text-white flex-1">
+                Yakin ingin membatalkan pilihan ekskul <strong>{pilihanSaya.ekskul?.nama_ekskul}</strong>?
+              </p>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsKonfirmasi(false)}
+                  className="text-xs bg-white/20 hover:bg-white/30 text-white border border-white/20 rounded-md px-3 py-1.5 transition-colors"
+                >
+                  Tidak
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBatalKonfirmasi}
+                  className="text-xs bg-red-500 hover:bg-red-600 active:bg-red-700 text-white rounded-md px-3 py-1.5 transition-colors font-medium"
+                >
+                  Ya, Batalkan
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="rounded-xl border-2 border-dashed border-muted p-5 text-center text-muted-foreground text-sm">
@@ -143,6 +179,8 @@ export default function PilihEkskulPage() {
             const isTutup = ekskul.status_pendaftaran !== "BUKA"
             const isPenuh = kuota?.penuh === true
             const isBusy = loadingId === ekskul.id_ekskul
+            // Santri sudah punya pilihan lain — tidak bisa daftar lagi sebelum batal
+            const sudahAdaPilihan = pilihanSaya !== null && !isMyChoice
 
             return (
               <Card
@@ -195,6 +233,10 @@ export default function PilihEkskulPage() {
                   {isMyChoice ? (
                     <Button variant="outline" className="w-full text-emerald-600 border-emerald-300" disabled>
                       <CheckCircle2 className="w-4 h-4 mr-2" /> Sudah Terpilih
+                    </Button>
+                  ) : sudahAdaPilihan ? (
+                    <Button variant="secondary" className="w-full" disabled>
+                      <Lock className="w-4 h-4 mr-2" /> Batalkan Pilihan Dulu
                     </Button>
                   ) : isTutup ? (
                     <Button variant="secondary" className="w-full" disabled>

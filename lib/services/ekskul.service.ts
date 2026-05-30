@@ -88,6 +88,6 @@ export const ekskulService = {
 
   /** Santri batalkan pilihan */
   batal() {
-    return api.delete("/akademik/ekskul/batal").then((r) => r.data)
+    return api.post("/akademik/ekskul/batal").then((r) => r.data)
   },
 }
