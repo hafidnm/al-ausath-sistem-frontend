@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Dispatch, SetStateAction, useEffect, useMemo, useState } from "react"
+import { Dispatch, SetStateAction, useEffect, useMemo, useState, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -45,6 +45,7 @@ import { useToast } from "@/hooks/use-toast"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataUnitService } from "@/lib/services/unit.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { DataSantriApiItem, DataSantriListParams, DataSantriPayload, dataSantriService } from "@/lib/services/santri.service"
 import {
   Plus,
@@ -225,6 +226,10 @@ export default function SantriPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
 
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   const [isLoading, setIsLoading] = useState(false)
   const [isBulkActionLoading, setIsBulkActionLoading] = useState(false)
   const [rowsPerPage, setRowsPerPage] = useState("10")
@@ -338,80 +343,44 @@ export default function SantriPage() {
     }
   }
 
-  const loadKelasOptions = async () => {
-    try {
-      const result = await dataKelasService.getAll({ page: 1, per_page: 300 })
-      const kelasSeen = new Set<string>()
-      const tahunSeen = new Set<string>()
-      const mappedKelas: KelasOption[] = []
-      const mappedTahun: TahunAjaranOption[] = []
-
-      for (const item of result.data) {
-        const kodeKelas = toText(item.kode_kelas).trim()
-        if (kodeKelas && !kelasSeen.has(kodeKelas)) {
-          kelasSeen.add(kodeKelas)
-          mappedKelas.push({
-            value: kodeKelas,
-            label: toText(item.nama_kelas).trim() || kodeKelas,
-            kodeUnit: toText(item.kode_unit || item.unit?.kode_unit).trim(),
-          })
-        }
-
-        const tahun = toText(item.tahun_ajaran).trim()
-        if (tahun && !tahunSeen.has(tahun)) {
-          tahunSeen.add(tahun)
-          mappedTahun.push({ value: tahun, label: tahun })
-        }
-      }
-
-      setKelasOptions(mappedKelas)
-      if (mappedTahun.length > 0) {
-        setTahunAjaranOptions(mappedTahun)
-      }
-    } catch {
-      setKelasOptions([])
-    }
-  }
-
-  const loadUnitOptions = async () => {
-    try {
-      const result = await dataUnitService.getAll({ page: 1, per_page: 300 })
-      const mapped = result.data
-        .map((item) => {
-          const code = toText(item.kode_unit).trim()
-          const label = toText(item.nama_unit).trim() || code
-          return { value: code, label }
-        })
-        .filter((item) => item.value)
-
-      setUnitOptions(mapped)
-    } catch {
-      setUnitOptions([])
-    }
-  }
-
-  const loadTahunAjaranOptions = async () => {
-    try {
-      const result = await tahunAjaranService.getAll({ page: 1, per_page: 200 })
-      const mapped = result.data
-        .map((item) => {
-          const value = toText(item.nama_tahun).trim() || toText(item.kode_tahun).trim()
-          return { value, label: value }
-        })
-        .filter((item) => item.value)
-
-      if (mapped.length > 0) {
-        setTahunAjaranOptions(mapped)
-      }
-    } catch {
-      setTahunAjaranOptions((prev) => prev)
-    }
-  }
-
   useEffect(() => {
-    void loadKelasOptions()
-    void loadUnitOptions()
-    void loadTahunAjaranOptions()
+    const loadOptions = async () => {
+      try {
+        const initData = await dataMasterService.getInitOptions()
+
+        const mappedKelas: KelasOption[] = (initData.kelas || []).map((k: any) => ({
+          value: k.kode_kelas,
+          label: k.nama_kelas || k.kode_kelas,
+          kodeUnit: k.kode_unit
+        }))
+
+        const mappedUnit: UnitOption[] = (initData.unit || []).map((u: any) => ({
+          value: u.kode_unit,
+          label: u.nama_unit || u.kode_unit
+        }))
+
+        const mappedTahun: TahunAjaranOption[] = (initData.tahun_ajaran || []).map((t: any) => ({
+          value: t.kode_tahun,
+          label: t.nama_tahun || t.kode_tahun
+        }))
+
+        setKelasOptions(mappedKelas)
+        setUnitOptions(mappedUnit)
+        setTahunAjaranOptions(mappedTahun)
+        
+        initDoneRef.current = true
+        // Langsung eksekusi fetch pertama agar aman
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
+      }
+    }
+
+    if (initCalledRef.current) return
+    initCalledRef.current = true
+    void loadOptions()
   }, [])
 
   useEffect(() => {
@@ -431,6 +400,7 @@ export default function SantriPage() {
   }, [displayedRows])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     void fetchRows()
   }, [currentPage, rowsPerPage, searchQuery, selectedUnit, selectedKelas, selectedTahunAjaran, selectedStatus])
 

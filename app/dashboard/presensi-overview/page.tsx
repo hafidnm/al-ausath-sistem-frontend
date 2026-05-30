@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useRef, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import api from "@/lib/axios"
 import { dataUnitService } from "@/lib/services/unit.service"
 import { kelasService } from "@/lib/services/kelas.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
+import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import {
   Table,
   TableBody,
@@ -82,6 +83,10 @@ export default function PresensiOverviewPage() {
   const [data, setData] = useState<OverviewData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   // Memoize filtered kelas options based on selectedUnit
   const filteredKelasOptions = useMemo(() => {
     if (selectedUnit === "ALL") {
@@ -93,28 +98,34 @@ export default function PresensiOverviewPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [unitRes, allKelas, tahunRes] = await Promise.all([
-          dataUnitService.getAll({ per_page: 100, status: "AKTIF" }),
-          kelasService.getAll({ per_page: "500", status: "AKTIF" }),
-          tahunAjaranService.getAll({ per_page: 100 })
-        ])
-        setUnitOptions(unitRes.data || [])
-        setKelasOptions(allKelas)
+        const initData = await sesiAbsensiService.adminPresensiSantriInit()
         
-        const tahunList = tahunRes.data || []
+        setUnitOptions(initData.unit || [])
+        setKelasOptions(initData.kelas || [])
+        
+        const tahunList = initData.tahun_ajaran || []
         setTahunAjaranOptions(tahunList)
-        const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+        
+        const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
         if (activeTahun?.kode_tahun) {
           setSelectedTahunAjaran(activeTahun.kode_tahun)
         }
+        
+        initDoneRef.current = true
+        // Langsung panggil fetchData pertama kali agar tidak bergantung sepenuhnya ke useEffect
+        void fetchData(activeTahun?.kode_tahun)
       } catch (error) {
         console.error("Gagal memuat filter options", error)
+        initDoneRef.current = true // fallback agar fetchData tetap bisa jalan walau error
       }
     }
+
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void loadOptions()
   }, [])
 
-  const fetchData = async () => {
+  const fetchData = async (tahunAjaranOverride?: string) => {
     setIsLoading(true)
     try {
       const params: any = { periode }
@@ -124,8 +135,10 @@ export default function PresensiOverviewPage() {
       }
       if (selectedUnit !== "ALL") params.kode_unit = selectedUnit
       if (selectedKelas !== "ALL") params.kode_kelas = selectedKelas
-      if (selectedTahunAjaran && selectedTahunAjaran !== "ALL") {
-        params.tahun_ajaran = selectedTahunAjaran
+      
+      const activeTahun = tahunAjaranOverride !== undefined ? tahunAjaranOverride : selectedTahunAjaran
+      if (activeTahun && activeTahun !== "ALL") {
+        params.tahun_ajaran = activeTahun
       }
 
       const res = await api.get("/akademik/presensi/overview", { params })
@@ -138,6 +151,7 @@ export default function PresensiOverviewPage() {
   }
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     void fetchData()
   }, [selectedDate, periode, selectedUnit, selectedKelas, selectedTahunAjaran])
 

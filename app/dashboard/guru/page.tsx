@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, useRef } from "react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -37,6 +37,7 @@ import {
   dataPetugasService,
 } from "@/lib/services/petugas.service"
 import { dataUnitService } from "@/lib/services/unit.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
 import { ArrowUpDown, ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type GuruStatus = "Aktif" | "Nonaktif"
@@ -166,6 +167,10 @@ export default function GuruPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Guard: cegah double-invoke & cascade re-fetch
+  const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
+
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -234,36 +239,35 @@ export default function GuruPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const options = await dataPetugasService.getPeranAkunOptions()
-        if (options.length > 0) {
-          setPeranOptions(options)
+        const initData = await dataMasterService.getInitOptions()
+        
+        if (initData.peran && initData.peran.length > 0) {
+          setPeranOptions(initData.peran)
         }
-      } catch {
-        setPeranOptions(fallbackPeranOptions)
-      }
-
-      try {
-        const result = await dataUnitService.getAll({ per_page: 200, page: 1 })
-        const seen = new Set<string>()
-        const mapped: UnitOption[] = [{ value: "SEMUA", label: "SEMUA" }]
-
-        for (const item of result.data) {
+        
+        const mappedUnit: UnitOption[] = [{ value: "SEMUA", label: "SEMUA" }]
+        for (const item of (initData.unit || [])) {
           const code = toText(item.kode_unit).trim()
-          if (!code || seen.has(code)) continue
-
-          seen.add(code)
-          mapped.push({
+          if (!code) continue
+          mappedUnit.push({
             value: code,
             label: toText(item.nama_unit).trim() || code,
           })
         }
-
-        setUnitOptions(mapped)
-      } catch {
-        setUnitOptions([{ value: "SEMUA", label: "SEMUA" }])
+        setUnitOptions(mappedUnit)
+        
+        initDoneRef.current = true
+        // Langsung panggil fetch pertama
+        void fetchRows()
+      } catch (error) {
+        console.error("Gagal memuat opsi filter awal", error)
+        initDoneRef.current = true
+        void fetchRows()
       }
     }
 
+    if (initCalledRef.current) return
+    initCalledRef.current = true
     void loadOptions()
   }, [])
 
@@ -272,6 +276,7 @@ export default function GuruPage() {
   }, [searchKeyword, statusFilter, roleFilter, rowsPerPage])
 
   useEffect(() => {
+    if (!initDoneRef.current) return
     setSelectedIds([])
     void fetchRows()
   }, [currentPage, rowsPerPage, searchKeyword, statusFilter, roleFilter])

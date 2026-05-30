@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,11 +18,8 @@ import {
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
-import { santriService } from "@/lib/services/santri.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
-import { dataPetugasService } from "@/lib/services/petugas.service"
-import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajaran.service"
-import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
+import type { TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import {
   Dialog,
   DialogContent,
@@ -310,6 +307,8 @@ const mapGuruStatusToApi = (status: GuruStatus): "HADIR" | "IZIN" | "SAKIT" => {
 
 export default function GuruPanelPage() {
   const { toast } = useToast()
+  // Guard: cegah double-invocation dari React StrictMode (development)
+  const initCalledRef = useRef(false)
 
   const [loadingJadwal, setLoadingJadwal] = useState(false)
   const [jadwalMengajar, setJadwalMengajar] = useState<JadwalItem[]>([])
@@ -321,6 +320,8 @@ export default function GuruPanelPage() {
   const [rekapPetugasRows, setRekapPetugasRows] = useState<RekapPetugasRow[]>([])
   const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
   const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
+  const [activeTab, setActiveTab] = useState("jadwal")
+  const [riwayatLoaded, setRiwayatLoaded] = useState(false)
 
   const [step, setStep] = useState(1)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -524,12 +525,82 @@ export default function GuruPanelPage() {
     return typeof message === "string" && message.length > 0 ? message : fallback
   }
 
+  // ---------- Load functions ----------
+
+  /**
+   * Init: HANYA 2 HTTP request paralel.
+   * 1. authService.me()           — untuk identitas user
+   * 2. sesiAbsensiService.guruPanelInit() — 1 endpoint yang mengembalikan
+   *    jadwal + petugas + tahun_ajaran + sesi_hari_ini sekaligus dari backend.
+   */
+  const loadInitData = async () => {
+    setLoadingJadwal(true)
+    setIsLoadingUser(true)
+    setIsLoadingPetugas(true)
+    try {
+      const [userRes, initRes] = await Promise.all([
+        authService.me(),
+        sesiAbsensiService.guruPanelInit(),
+      ])
+
+      // --- User ---
+      const user = userRes?.user
+      if (user) {
+        setCurrentUser({
+          id: normalizeNumber(user.id),
+          id_petugas: normalizeNumber((user as any).id_petugas ?? (user as any).petugas?.id_petugas ?? 0) || null,
+          nama_lengkap: String(user.nama_lengkap || ""),
+          peran_akun: String(user.peran_akun || ""),
+        })
+      }
+
+      // --- Jadwal aktif ---
+      const jadwalMapped = toArray(initRes.jadwal).map(mapJadwalToDisplay).filter((r) => r.id_jadwal > 0)
+      setJadwalMengajar(jadwalMapped)
+
+      // --- Tahun Ajaran ---
+      const tahunList = toArray(initRes.tahun_ajaran) as TahunAjaranApiItem[]
+      setTahunAjaranOptions(tahunList)
+      const activeTahun = tahunList.find((t) => t.status === "AKTIF")
+      if (activeTahun?.kode_tahun) setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
+
+      // --- Petugas ---
+      const petugasMapped = toArray(initRes.petugas)
+        .map((item: any) => {
+          const id = normalizeNumber(item.id_petugas ?? item.id ?? 0)
+          if (id <= 0) return null
+          const nama = String(item.nama_lengkap || "").trim() || `Petugas #${id}`
+          return { id, label: `${nama} (ID: ${id})` }
+        })
+        .filter((item): item is PetugasOption => item !== null)
+      setPetugasOptions(petugasMapped)
+
+      // --- Sesi hari ini → set aktivitasSesi untuk jadwalSelesaiHariIniSet & jadwalDilimpahkan ---
+      const sesiMapped = toArray(initRes.sesi_hari_ini).map(mapSesiToJadwal).filter((r) => r.id_sesi > 0)
+      setAktivitasSesi(sesiMapped)
+    } catch (error: any) {
+      toast({
+        title: "Gagal memuat data",
+        description: extractApiErrorMessage(error, "Terjadi kesalahan saat memuat data halaman."),
+        variant: "destructive",
+      })
+    } finally {
+      setLoadingJadwal(false)
+      setIsLoadingUser(false)
+      setIsLoadingPetugas(false)
+    }
+  }
+
+  /** Dipanggil saat tab Jadwal perlu refresh (setelah submit absensi, cancel dialog, dll). */
   const loadJadwal = async () => {
     setLoadingJadwal(true)
     try {
-      const result = await dataJadwalPembelajaranService.getAll({ per_page: 300, status: "AKTIF" })
-      const mapped = toArray(result.data).map(mapJadwalToDisplay).filter((r) => r.id_jadwal > 0)
-      setJadwalMengajar(mapped)
+      const initRes = await sesiAbsensiService.guruPanelInit()
+      const jadwalMapped = toArray(initRes.jadwal).map(mapJadwalToDisplay).filter((r) => r.id_jadwal > 0)
+      setJadwalMengajar(jadwalMapped)
+      // Refresh sesi hari ini sekaligus agar jadwalSelesaiHariIniSet up-to-date
+      const sesiMapped = toArray(initRes.sesi_hari_ini).map(mapSesiToJadwal).filter((r) => r.id_sesi > 0)
+      setAktivitasSesi(sesiMapped)
     } catch (error: any) {
       toast({
         title: "Gagal memuat jadwal pembelajaran",
@@ -541,26 +612,7 @@ export default function GuruPanelPage() {
     }
   }
 
-  const loadCurrentUser = async () => {
-    setIsLoadingUser(true)
-    try {
-      const response = await authService.me()
-      const user = response?.user
-      if (user) {
-        setCurrentUser({
-          id: normalizeNumber(user.id),
-          id_petugas: normalizeNumber((user as { id_petugas?: number | null; petugas?: { id_petugas?: number | null } }).id_petugas ?? (user as { petugas?: { id_petugas?: number | null } }).petugas?.id_petugas ?? 0) || null,
-          nama_lengkap: String(user.nama_lengkap || ""),
-          peran_akun: String(user.peran_akun || ""),
-        })
-      }
-    } catch {
-      setCurrentUser(null)
-    } finally {
-      setIsLoadingUser(false)
-    }
-  }
-
+  /** Dipanggil hanya saat tab Jadwal perlu refresh (setelah submit/cancel). */
   const loadAktivitasSesi = async () => {
     try {
       const rows = await sesiAbsensiService.getAll({ per_page: 100 })
@@ -572,60 +624,6 @@ export default function GuruPanelPage() {
         description: extractApiErrorMessage(error, "Terjadi kesalahan saat mengambil aktivitas sesi absensi."),
         variant: "destructive",
       })
-    }
-  }
-
-  const loadPetugasPengajar = async () => {
-    setIsLoadingPetugas(true)
-    try {
-      let result = await dataPetugasService.getAll({
-        per_page: 300,
-        status: "AKTIF",
-        peran_akun: "Petugas Pengajar",
-      })
-
-      // Fallback in case role naming differs on backend.
-      if (!result.data || result.data.length === 0) {
-        result = await dataPetugasService.getAll({ per_page: 300, status: "AKTIF" })
-      }
-
-      const mapped = result.data
-        .map((item) => {
-          const id = normalizeNumber(item.id_petugas ?? item.id ?? 0)
-          if (id <= 0) return null
-
-          const nama = String(item.nama_lengkap || "").trim() || `Petugas #${id}`
-          return {
-            id,
-            label: `${nama} (ID: ${id})`,
-          }
-        })
-        .filter((item): item is PetugasOption => item !== null)
-
-      setPetugasOptions(mapped)
-    } catch (error: any) {
-      setPetugasOptions([])
-      toast({
-        title: "Gagal memuat daftar petugas",
-        description: extractApiErrorMessage(error, "Dropdown pengganti belum bisa dimuat."),
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoadingPetugas(false)
-    }
-  }
-
-  const loadTahunAjaran = async () => {
-    try {
-      const res = await tahunAjaranService.getAll({ per_page: 100 })
-      const list = res.data || []
-      setTahunAjaranOptions(list)
-      const active = list.find((t) => t.status === "AKTIF")
-      if (active?.kode_tahun) {
-        setSelectedTahunAjaranRekap(active.kode_tahun)
-      }
-    } catch (e) {
-      console.error("Gagal memuat tahun ajaran", e)
     }
   }
 
@@ -656,19 +654,30 @@ export default function GuruPanelPage() {
     }
   }
 
+  // Mount: 2 call paralel (me + guru-panel/init), dengan guard untuk cegah double-invoke
   useEffect(() => {
-    void loadCurrentUser()
-    void loadJadwal()
-    void loadAktivitasSesi()
-    void loadPetugasPengajar()
-    void loadTahunAjaran()
+    if (initCalledRef.current) return
+    initCalledRef.current = true
+    void loadInitData()
   }, [])
 
+  // Lazy load: data sesi historis & rekap baru diambil saat tab Riwayat pertama kali dibuka
   useEffect(() => {
-    if (currentPetugasId) {
+    if (activeTab === "riwayat" && !riwayatLoaded && currentPetugasId !== undefined) {
+      setRiwayatLoaded(true)
+      void Promise.all([
+        loadAktivitasSesi(),
+        loadRekap(currentPetugasId, selectedTahunAjaranRekap),
+      ])
+    }
+  }, [activeTab, riwayatLoaded, currentPetugasId])
+
+  // Re-fetch rekap saat filter tahun ajaran berubah (hanya jika tab Riwayat sudah pernah dibuka)
+  useEffect(() => {
+    if (riwayatLoaded && currentPetugasId) {
       void loadRekap(currentPetugasId, selectedTahunAjaranRekap)
     }
-  }, [currentPetugasId, selectedTahunAjaranRekap])
+  }, [selectedTahunAjaranRekap])
 
   const resetDialogState = () => {
     setStep(1)
@@ -948,7 +957,7 @@ export default function GuruPanelPage() {
 
 
 
-      <Tabs defaultValue="jadwal" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/50">
           <TabsTrigger value="jadwal" className="data-[state=active]:bg-card">
             <Calendar className="w-4 h-4 mr-2" />
