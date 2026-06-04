@@ -63,7 +63,6 @@ export default function LandingPage() {
               </div>
               <div>
                 <h1 className="text-lg font-bold text-foreground">Pesantren Al Ausath</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Portal & e-Rapor Digital</p>
               </div>
             </div>
 
