@@ -78,5 +78,15 @@ export const authService = {
     } catch (error) {
       return null
     }
+  },
+
+  updateBiodata: async (data: { nama_lengkap: string; alamat_email?: string; nomor_telepon?: string }) => {
+    const response = await api.put('/profile/biodata', data);
+    return response.data;
+  },
+
+  updatePassword: async (data: { password_lama: string; password_baru: string; password_baru_confirmation: string }) => {
+    const response = await api.put('/profile/password', data);
+    return response.data;
   }
 };

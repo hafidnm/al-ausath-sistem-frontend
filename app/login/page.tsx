@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,7 +14,41 @@ import { useToast } from "@/hooks/use-toast"
 export default function LoginPage() {
   const [userType, setUserType] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const { toast } = useToast()
+
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      try {
+        const userData = await authService.me()
+        if (userData) {
+          const role = localStorage.getItem('role')
+          const userStr = localStorage.getItem('user')
+          let userObj = null
+          if (userStr) {
+            try { userObj = JSON.parse(userStr) } catch (e) {}
+          }
+          
+          if (role === 'petugas' || userData?.peran_akun) {
+             const peran = userObj?.peran_akun || userData?.peran_akun
+             if (peran === 'admin') {
+               window.location.href = '/dashboard/admin-panel'
+             } else {
+               window.location.href = '/dashboard/guru-panel'
+             }
+          } else {
+            window.location.href = '/dashboard/santri-panel'
+          }
+        } else {
+          setIsCheckingAuth(false)
+        }
+      } catch (e) {
+        setIsCheckingAuth(false)
+      }
+    }
+    
+    checkExistingSession()
+  }, [])
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -170,7 +204,14 @@ export default function LoginPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <form onSubmit={handleLogin} className="space-y-5">
+              {isCheckingAuth ? (
+                <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                  <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                  <p className="text-sm text-muted-foreground">Memeriksa sesi Anda...</p>
+                </div>
+              ) : (
+                <>
+                  <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
                   <Label htmlFor="userType" className="text-foreground">Masuk Sebagai</Label>
                   <Select value={userType} onValueChange={setUserType} required>
@@ -254,6 +295,8 @@ export default function LoginPage() {
                   </Link>
                 </p>
               </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
