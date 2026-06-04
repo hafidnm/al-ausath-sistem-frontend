@@ -2,7 +2,11 @@
 
 **Endpoint:** `GET /api/akademik/analytics/class-statistics`
 
-**Purpose:** Menampilkan statistik nilai rata-rata keseluruhan per kelas yang diajar oleh pengajar yang sedang login.
+**Purpose:** Menampilkan statistik nilai rata-rata keseluruhan per kelas-mapel yang diajar oleh pengajar yang sedang login. Setiap kombinasi kelas + mapel ditampilkan sebagai row terpisah.
+
+**Method:** GET  
+**Auth Required:** ✅ Sanctum Token (Pengajar)  
+**Latest Updated:** June 4, 2026
 
 ---
 
@@ -125,9 +129,33 @@ Authorization: Bearer {pengajar_token}
 
 ---
 
-## Notes
+## Error Handling
 
-- Menampilkan kombinasi kode_kelas + kode_mapel (per kelas per mapel yang diajar)
-- Jika pengajar mengajar beberapa mapel di satu kelas, masing-masing mapel akan punya row tersendiri
-- Auth required: token pengajar (DataPetugas)
-- Data difilter dari `DataKelasMapel` berdasarkan `id_petugas` dari token yang login
+### 400 Bad Request
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "semester": [
+      "The semester field must be either 1 or 2."
+    ]
+  }
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "message": "Unauthenticated."
+}
+```
+
+---
+
+## Implementation Notes
+
+- **Kombinasi per Kelas-Mapel:** Data dikelompokkan per kode_kelas + kode_mapel. Jika pengajar mengajar beberapa mapel di satu kelas, masing-masing mapel akan punya row terpisah.
+- **Query Performance:** Menggunakan JOIN dengan `DataKelasMapel` untuk filter mapel berdasarkan `id_petugas` yang login
+- **Aggregation:** Nilai dihitung dari `DataNilaiSiswa.nilai_akhir_mapel` (sudah normalisasi dan bobot)
+- **Zero Handling:** Jika tidak ada nilai untuk kombinasi kelas-mapel, rata_rata akan 0, tertinggi/terendah akan null
+- **Auth Validation:** Token harus milik DataPetugas (guru/pengajar), bukan santri atau role lain

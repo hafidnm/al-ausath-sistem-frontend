@@ -2,7 +2,11 @@
 
 **Endpoint:** `GET /api/akademik/analytics/subject-recap`
 
-**Purpose:** Menampilkan breakdown nilai Harian, UTS, dan UAS per mata pelajaran yang diampu oleh pengajar yang sedang login.
+**Purpose:** Menampilkan breakdown nilai Harian (nilai_harian), UTS (nilai_uts), UAS (nilai_uas), dan Akhir (nilai_akhir_mapel) per mata pelajaran yang diampu oleh pengajar yang sedang login.
+
+**Method:** GET  
+**Auth Required:** ✅ Sanctum Token (Pengajar)  
+**Latest Updated:** June 4, 2026
 
 ---
 
@@ -134,9 +138,38 @@ Authorization: Bearer {pengajar_token}
 
 ---
 
-## Notes
+## Error Handling
 
-- Data difilter dari `DataKelasMapel` berdasarkan `id_petugas` (pengajar yang login)
-- Jika pengajar mengajar mapel yang sama di beberapa kelas, data aggregated semua kelas
-- Gunakan `kode_kelas` filter jika ingin melihat breakdown per kelas spesifik
-- Auth required: token pengajar (DataPetugas)
+### 400 Bad Request
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "semester": ["The semester field must be either 1 or 2."]
+  }
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "message": "Unauthenticated."
+}
+```
+
+---
+
+## Implementation Notes
+
+- **Aggregation Method:** Data dari `DataNilaiSiswa` yang di-JOIN dengan `DataKelasMapel` berdasarkan `id_petugas` yang login
+- **Group By:** Hasil dikelompokkan per `kode_mapel`, aggregating semua nilai dari semua kelas yang mengajar mapel tersebut
+- **Nilai Components:**
+  - `rata_harian`: AVG(nilai_harian)
+  - `rata_uts`: AVG(nilai_uts)
+  - `rata_uas`: AVG(nilai_uas)
+  - `rata_akhir`: AVG(nilai_akhir_mapel) — sudah merupakan nilai final setelah bobot dan normalisasi
+- **Kelas Filter:** Saat `kode_kelas` diisi, hanya nilai dari kelas tersebut yang di-aggregate
+- **Multi-Class Teaching:** Jika pengajar mengajar mapel yang sama di kelas berbeda:
+  - Tanpa filter `kode_kelas`: menampilkan aggregate dari semua kelas (gabungan santri dari semua kelas)
+  - Dengan filter `kode_kelas`: hanya santri dari kelas spesifik
+- **Empty Result:** Jika tidak ada nilai untuk filter yang diberikan, API return `data: []` dengan status 200

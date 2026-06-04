@@ -2,7 +2,11 @@
 
 **Endpoint:** `GET /api/akademik/analytics/score-distribution`
 
-**Purpose:** Menampilkan jumlah santri yang masuk dalam rentang nilai tertentu (90-100, 80-89, 70-79, 60-69, <60) di kelas/mapel yang diampu pengajar.
+**Purpose:** Menampilkan jumlah santri yang masuk dalam rentang nilai tertentu (90-100, 80-89, 70-79, 60-69, 0-59) di kelas/mapel yang diampu pengajar. Memberikan overview kurva distribusi nilai untuk analisis pembelajaran.
+
+**Method:** GET  
+**Auth Required:** ✅ Sanctum Token (Pengajar)  
+**Latest Updated:** June 4, 2026
 
 ---
 
@@ -138,20 +142,69 @@ Authorization: Bearer {pengajar_token}
 
 ---
 
+## Implementation Notes
+
+- **Data Source:** Menggunakan `DataNilaiSiswa.nilai_akhir_mapel` (nilai sudah normalisasi dan di-bobot)
+- **Filtering:** Hanya mengambil nilai dari mapel yang diajar oleh pengajar yang login (via `DataKelasMapel.id_petugas`)
+- **Range Calculation:** Setiap nilai dicek ke dalam 5 range predefined, kemudian dihitung count dan percentage
+- **Percentage Formula:** (count dalam range / total_santri) × 100
+- **Zero Handling:** Jika tidak ada nilai (`total_santri = 0`), semua percentage akan 0
+- **Distribution Shape:** 
+  - **Normal Distribution**: Mayoritas di tengah (C-range) dengan taper di kedua ujung
+  - **Left-Skewed**: Mayoritas nilai tinggi (A-B range) = good learning outcome
+  - **Right-Skewed**: Mayoritas nilai rendah (D-E range) = perlu intervention
+- **Multi-filter Combination:** Semua filter bersifat AND (tahun_ajaran AND semester AND kode_kelas AND kode_mapel)
+
+---
+
+## Error Handling
+
+### 400 Bad Request
+```json
+{
+  "message": "The given data was invalid.",
+  "errors": {
+    "semester": ["The semester field must be either 1 or 2."]
+  }
+}
+```
+
+### 401 Unauthorized
+```json
+{
+  "message": "Unauthenticated."
+}
+```
+
+---
+
 ## Filter Explanation
 
 ### `tahun_ajaran`
 - Optional
 - Format: string (e.g., "2024-2025")
-- Jika kosong: menggunakan semua tahun ajaran
+- Jika kosong: menggunakan semua tahun ajaran yang tersedia
+- Case-sensitive
 
 ### `semester`
 - Optional
-- Value: 1 atau 2
+- Value: 1 atau 2 (integer)
+- Jika kosong: menggunakan semua semester
 - Jika kosong: menggunakan semua semester
 
 ### `kode_kelas`
 - Optional
+- Format: string (e.g., "9-PA")
+- Filter untuk kelas spesifik
+- Jika kosong: menggunakan semua kelas yang diampu pengajar
+- Kombinasi dengan `kode_mapel` untuk filter lebih detail
+
+### `kode_mapel`
+- Optional
+- Format: string (e.g., "MAT001")
+- Filter untuk mapel spesifik
+- Hanya berlaku untuk mapel yang diampu pengajar
+- Jika kosong: menggunakan semua mapel yang diampu pengajar
 - Kode unik kelas
 - Jika kosong: distribusi aggregated dari semua kelas
 - Berguna untuk melihat distribusi per kelas
