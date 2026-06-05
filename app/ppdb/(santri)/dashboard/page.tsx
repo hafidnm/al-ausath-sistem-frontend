@@ -196,8 +196,15 @@ export default function PpdbDashboardPage() {
       return;
     }
 
-    if (data.step === 'pembayaran-ppdb' || data.step === 'siap-menjadi-santri') {
+    if (data.step === 'siap-menjadi-santri') {
       router.replace('/ppdb/dashboard/pembayaran');
+      return;
+    }
+
+    if (data.step === 'pembayaran-ppdb') {
+      const infaqAcknowledged =
+        typeof window !== 'undefined' && sessionStorage.getItem('ppdb_infaq_acknowledged');
+      router.replace(infaqAcknowledged ? '/ppdb/dashboard/pembayaran' : '/ppdb/dashboard/infaq');
       return;
     }
 

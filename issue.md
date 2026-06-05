@@ -1,1 +1,0 @@
- serta saaya melihat gap lagi dibagian soal tes yang sudah di nonaktifkan kenapa tbtb hidup lagi ya ?
