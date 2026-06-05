@@ -50,6 +50,7 @@ import {
   Award,
   Star,
   ListChecks,
+  CreditCard,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
 
@@ -81,7 +82,7 @@ const adminMenuItems = [
   { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
   { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
   { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
-  { icon: Settings, label: "Pengaturan", href: "/dashboard/pengaturan" },
+  { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
 ]
 
 const guruMenuItems = [
