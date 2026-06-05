@@ -48,6 +48,8 @@ import {
   Megaphone,
   Receipt,
   Award,
+  Star,
+  ListChecks,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
 
@@ -57,12 +59,14 @@ const adminMenuItems = [
   { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
   { icon: GraduationCap, label: "Santri Lulus", href: "/dashboard/santri/lulus" },
   { icon: UserCheck, label: "Data Akun Santri", href: "/dashboard/akun-santri" },
-  { icon: GraduationCap, label: "Data Guru", href: "/dashboard/guru" },
+  { icon: GraduationCap, label: "Data Petugas", href: "/dashboard/guru" },
   { icon: School, label: "Data Kelas", href: "/dashboard/kelas" },
   { icon: Building2, label: "Data Unit", href: "/dashboard/unit" },
   { icon: BookOpen, label: "Data Kelas Mapel", href: "/dashboard/kelas-mapel" },
   { icon: BookOpen, label: "Data Mata Pelajaran", href: "/dashboard/mapel" },
   { icon: Calendar, label: "Data Jadwal Pembelajaran", href: "/dashboard/jadwal-pembelajaran" },
+  { icon: Star, label: "Ekstrakurikuler", href: "/dashboard/ekskul" },
+  { icon: ListChecks, label: "Rekap Pendaftar Ekskul", href: "/dashboard/ekskul-rekap" },
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
   { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
   { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
@@ -116,6 +120,7 @@ const santriMenuItems = [
   { icon: Award, label: "Nilai Mapel", href: "/dashboard/santri-panel/nilai-mapel" },
   { icon: TrendingUp, label: "Analitik Santri", href: "/dashboard/santri-panel/analitik" },
   { icon: Calendar, label: "Jadwal Pembelajaran", href: "/dashboard/santri-panel/jadwal-pembelajaran" },
+  { icon: Star, label: "Ekstrakurikuler", href: "/dashboard/pilih-ekskul" },
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/santri-panel/pengumuman" },
 ]
@@ -202,7 +207,7 @@ export default function DashboardLayout({
                 <Moon className="w-6 h-6 text-sidebar-primary-foreground" />
               </div>
               <div>
-                <h1 className="font-bold text-sidebar-foreground">e-Rapor</h1>
+                <h1 className="font-bold text-sidebar-foreground">Al-Ausath </h1>
                 <p className="text-xs text-sidebar-foreground/60">Pesantren</p>
               </div>
             </Link>
@@ -309,7 +314,6 @@ export default function DashboardLayout({
                 <h2 className="font-semibold text-foreground">
                   {[...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
                 </h2>
-                <p className="text-xs text-muted-foreground">Tahun Ajaran 2024/2025 - Semester Ganjil</p>
               </div>
             </div>
 
@@ -335,10 +339,12 @@ export default function DashboardLayout({
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel>Akun Saya</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
-            <User className="w-4 h-4 mr-2" />
-            Profil
-          </DropdownMenuItem>
+          <Link href="/dashboard/profile" className="w-full">
+            <DropdownMenuItem className="cursor-pointer">
+              <User className="w-4 h-4 mr-2" />
+              Profil
+            </DropdownMenuItem>
+          </Link>
           <DropdownMenuItem>
             <Settings className="w-4 h-4 mr-2" />
             Pengaturan
