@@ -84,34 +84,35 @@ export default function TagihanPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // Pagination Logic
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [searchQuery, selectedStatus, selectedSumber, selectedKelas, selectedTahunAjaran])
-
+  // ── Debounce search + reset page on filter change (single effect) ───────────
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 500)
+    setCurrentPage(1)
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400)
     return () => clearTimeout(timer)
-  }, [searchQuery])
+  }, [searchQuery, selectedStatus, selectedSumber, selectedKelas, selectedTahunAjaran])
 
+  // ── Single stable fetch effect ─────────────────────────────────────────────
+  // fetchTagihan & fetchRingkasan are stable useCallback refs — safe to exclude
+  // from deps to prevent duplicate requests on every render cycle.
   useEffect(() => {
     void fetchTagihan({
       page: currentPage,
       per_page: itemsPerPage,
-      q: debouncedQuery,
+      q: debouncedQuery || undefined,
       status: selectedStatus !== "all" ? selectedStatus : undefined,
       sumber: selectedSumber !== "all" ? selectedSumber : undefined,
     })
     void fetchRingkasan()
-  }, [fetchTagihan, fetchRingkasan, currentPage, debouncedQuery, selectedStatus, selectedSumber])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, debouncedQuery, selectedStatus, selectedSumber])
 
   const refreshAll = async () => {
     await Promise.all([
       fetchTagihan({
         page: currentPage,
         per_page: itemsPerPage,
-        q: debouncedQuery,
+        q: debouncedQuery || undefined,
         status: selectedStatus !== "all" ? selectedStatus : undefined,
         sumber: selectedSumber !== "all" ? selectedSumber : undefined,
       }),
