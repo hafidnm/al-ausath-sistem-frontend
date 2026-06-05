@@ -24,6 +24,10 @@ type CatatanFormState = {
   keseharian_kebersihan: string
   keseharian_kerapian: string
   keseharian_keterampilan: string
+  keseharian_kelakuan: string
+  keseharian_kerajinan: string
+  keseharian_kedisiplinan: string
+  keseharian_ketaatan: string
 }
 
 const initialCatatanForm: CatatanFormState = {
@@ -36,6 +40,10 @@ const initialCatatanForm: CatatanFormState = {
   keseharian_kebersihan: "",
   keseharian_kerapian: "",
   keseharian_keterampilan: "",
+  keseharian_kelakuan: "",
+  keseharian_kerajinan: "",
+  keseharian_kedisiplinan: "",
+  keseharian_ketaatan: "",
 }
 
 const firstNonEmpty = (...values: Array<string | number | null | undefined>) => {
@@ -117,6 +125,10 @@ export default function AdminPanelRaporPage() {
       keseharian_kebersihan: firstNonEmpty(current.keseharian_kebersihan, catatan.keseharian_kebersihan, source.keseharian_kebersihan),
       keseharian_kerapian: firstNonEmpty(current.keseharian_kerapian, catatan.keseharian_kerapian, source.keseharian_kerapian),
       keseharian_keterampilan: firstNonEmpty(current.keseharian_keterampilan, catatan.keseharian_keterampilan, source.keseharian_keterampilan),
+      keseharian_kelakuan: firstNonEmpty(current.keseharian_kelakuan, catatan.keseharian_kelakuan, source.keseharian_kelakuan),
+      keseharian_kerajinan: firstNonEmpty(current.keseharian_kerajinan, catatan.keseharian_kerajinan, source.keseharian_kerajinan),
+      keseharian_kedisiplinan: firstNonEmpty(current.keseharian_kedisiplinan, catatan.keseharian_kedisiplinan, source.keseharian_kedisiplinan),
+      keseharian_ketaatan: firstNonEmpty(current.keseharian_ketaatan, catatan.keseharian_ketaatan, source.keseharian_ketaatan),
     }))
   }, [])
 
@@ -381,6 +393,10 @@ export default function AdminPanelRaporPage() {
         keseharian_kebersihan: catatanForm.keseharian_kebersihan.trim() || undefined,
         keseharian_kerapian: catatanForm.keseharian_kerapian.trim() || undefined,
         keseharian_keterampilan: catatanForm.keseharian_keterampilan.trim() || undefined,
+        keseharian_kelakuan: catatanForm.keseharian_kelakuan.trim() || undefined,
+        keseharian_kerajinan: catatanForm.keseharian_kerajinan.trim() || undefined,
+        keseharian_kedisiplinan: catatanForm.keseharian_kedisiplinan.trim() || undefined,
+        keseharian_ketaatan: catatanForm.keseharian_ketaatan.trim() || undefined,
       })
 
       setDetail(saved)

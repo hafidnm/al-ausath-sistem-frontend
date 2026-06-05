@@ -21,6 +21,10 @@ interface CatatanFormState {
   keseharian_kebersihan: string
   keseharian_kerapian: string
   keseharian_keterampilan: string
+  keseharian_kelakuan: string
+  keseharian_kerajinan: string
+  keseharian_kedisiplinan: string
+  keseharian_ketaatan: string
 }
 
 interface RaporCatatanCardProps {
@@ -81,18 +85,34 @@ export function RaporCatatanCard({
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-4">
             <div>
               <Label>Kebersihan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kebersihan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_kebersihan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
             <div>
               <Label>Kerapian</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kerapian} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_kerapian ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
             <div>
               <Label>Keterampilan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_keterampilan} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Input className="mt-2" value={catatanForm.keseharian_keterampilan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+            </div>
+            <div>
+              <Label>Kelakuan</Label>
+              <Input className="mt-2" value={catatanForm.keseharian_kelakuan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kelakuan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+            </div>
+            <div>
+              <Label>Kerajinan</Label>
+              <Input className="mt-2" value={catatanForm.keseharian_kerajinan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerajinan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+            </div>
+            <div>
+              <Label>Kedisiplinan</Label>
+              <Input className="mt-2" value={catatanForm.keseharian_kedisiplinan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kedisiplinan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+            </div>
+            <div>
+              <Label>Ketaatan</Label>
+              <Input className="mt-2" value={catatanForm.keseharian_ketaatan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_ketaatan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
             </div>
           </div>
 

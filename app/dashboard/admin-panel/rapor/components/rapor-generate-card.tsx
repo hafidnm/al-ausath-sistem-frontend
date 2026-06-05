@@ -17,6 +17,10 @@ interface CatatanFormState {
   keseharian_kebersihan: string
   keseharian_kerapian: string
   keseharian_keterampilan: string
+  keseharian_kelakuan: string
+  keseharian_kerajinan: string
+  keseharian_kedisiplinan: string
+  keseharian_ketaatan: string
 }
 
 interface SantriOption {

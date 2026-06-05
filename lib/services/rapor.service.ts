@@ -38,6 +38,10 @@ export interface RaporDetail extends RaporItem {
   keseharian_kebersihan?: string | null
   keseharian_kerapian?: string | null
   keseharian_keterampilan?: string | null
+  keseharian_kelakuan?: string | null
+  keseharian_kerajinan?: string | null
+  keseharian_kedisiplinan?: string | null
+  keseharian_ketaatan?: string | null
 }
 
 export interface GetRaporParams {
@@ -73,6 +77,10 @@ export interface UpsertCatatanWaliPayload extends GetRaporCatatanParams {
   keseharian_kebersihan?: string
   keseharian_kerapian?: string
   keseharian_keterampilan?: string
+  keseharian_kelakuan?: string
+  keseharian_kerajinan?: string
+  keseharian_kedisiplinan?: string
+  keseharian_ketaatan?: string
 }
 
 export interface PublishRaporPayload {
@@ -264,6 +272,10 @@ export const raporService = {
     keseharian_kebersihan?: string | null
     keseharian_kerapian?: string | null
     keseharian_keterampilan?: string | null
+    keseharian_kelakuan?: string | null
+    keseharian_kerajinan?: string | null
+    keseharian_kedisiplinan?: string | null
+    keseharian_ketaatan?: string | null
   }> {
     const response = await api.get("/akademik/raport/catatan-wali", { params })
     const data = response.data?.data ?? response.data ?? {}
@@ -274,6 +286,10 @@ export const raporService = {
       keseharian_kebersihan: data?.keseharian_kebersihan != null ? toText(data.keseharian_kebersihan) ?? null : null,
       keseharian_kerapian: data?.keseharian_kerapian != null ? toText(data.keseharian_kerapian) ?? null : null,
       keseharian_keterampilan: data?.keseharian_keterampilan != null ? toText(data.keseharian_keterampilan) ?? null : null,
+      keseharian_kelakuan: data?.keseharian_kelakuan != null ? toText(data.keseharian_kelakuan) ?? null : null,
+      keseharian_kerajinan: data?.keseharian_kerajinan != null ? toText(data.keseharian_kerajinan) ?? null : null,
+      keseharian_kedisiplinan: data?.keseharian_kedisiplinan != null ? toText(data.keseharian_kedisiplinan) ?? null : null,
+      keseharian_ketaatan: data?.keseharian_ketaatan != null ? toText(data.keseharian_ketaatan) ?? null : null,
     }
   },
 
