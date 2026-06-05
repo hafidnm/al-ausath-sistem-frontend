@@ -81,6 +81,7 @@ export interface UpsertCatatanWaliPayload extends GetRaporCatatanParams {
   keseharian_kerajinan?: string
   keseharian_kedisiplinan?: string
   keseharian_ketaatan?: string
+  ekstrakurikuler?: Array<{ nama: string; nilai: string }>
 }
 
 export interface PublishRaporPayload {
@@ -276,6 +277,7 @@ export const raporService = {
     keseharian_kerajinan?: string | null
     keseharian_kedisiplinan?: string | null
     keseharian_ketaatan?: string | null
+    ekstrakurikuler?: Array<{ nama: string; nilai: string }> | null
   }> {
     const response = await api.get("/akademik/raport/catatan-wali", { params })
     const data = response.data?.data ?? response.data ?? {}
@@ -290,6 +292,7 @@ export const raporService = {
       keseharian_kerajinan: data?.keseharian_kerajinan != null ? toText(data.keseharian_kerajinan) ?? null : null,
       keseharian_kedisiplinan: data?.keseharian_kedisiplinan != null ? toText(data.keseharian_kedisiplinan) ?? null : null,
       keseharian_ketaatan: data?.keseharian_ketaatan != null ? toText(data.keseharian_ketaatan) ?? null : null,
+      ekstrakurikuler: Array.isArray(data?.ekstrakurikuler) ? data.ekstrakurikuler : null,
     }
   },
 

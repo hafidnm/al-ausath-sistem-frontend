@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { raporService, type RaporDetail, type RaporItem } from "@/lib/services/rapor.service"
 import { santriService } from "@/lib/services/santri.service"
 import { RaporCatatanCard } from "./components/rapor-catatan-card"
+import { RaporEkstraCard, type EkstraItem } from "./components/rapor-ekstra-card"
 import { RaporFeedbackAlert } from "./components/rapor-feedback-alert"
 import { RaporFiltersCard } from "./components/rapor-filters-card"
 import { RaporGenerateCard } from "./components/rapor-generate-card"
@@ -98,6 +99,7 @@ export default function AdminPanelRaporPage() {
   const [santriSearch, setSantriSearch] = useState("")
   const [isSearchingSantri, setIsSearchingSantri] = useState(false)
   const [santriOptions, setSantriOptions] = useState<Array<{ nomor_induk: string; nama_lengkap?: string; kode_kelas?: string }>>([])
+  const [ekstraList, setEkstraList] = useState<EkstraItem[]>([])
   const selectedIdentity = selected ? getRaporIdentity(selected) : null
 
   const selectedParams = useMemo(() => {
@@ -130,6 +132,11 @@ export default function AdminPanelRaporPage() {
       keseharian_kedisiplinan: firstNonEmpty(current.keseharian_kedisiplinan, catatan.keseharian_kedisiplinan, source.keseharian_kedisiplinan),
       keseharian_ketaatan: firstNonEmpty(current.keseharian_ketaatan, catatan.keseharian_ketaatan, source.keseharian_ketaatan),
     }))
+
+    // Hydrate ekstra list from API response
+    if (Array.isArray(catatan.ekstrakurikuler) && catatan.ekstrakurikuler.length > 0) {
+      setEkstraList(catatan.ekstrakurikuler)
+    }
   }, [])
 
   const loadReportDetail = useCallback(async (item: RaporItem) => {
@@ -409,6 +416,46 @@ export default function AdminPanelRaporPage() {
     }
   }
 
+  async function handleSaveEkstra() {
+    if (!isReportReady) {
+      setError("Generate rapor dulu sebelum bisa menyimpan ekstrakurikuler")
+      return
+    }
+
+    if (isPublishedReport) {
+      setError("Rapor sudah berstatus TERBIT, nilai ekstrakurikuler tidak dapat diubah")
+      return
+    }
+
+    const validList = ekstraList.filter((item) => item.nama.trim())
+    if (validList.length === 0) {
+      setError("Isi minimal satu nama kegiatan ekstrakurikuler")
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      setError("")
+      setSuccess("")
+
+      await raporService.upsertCatatanWali({
+        nomor_induk: catatanForm.nomor_induk.trim(),
+        kode_kelas: catatanForm.kode_kelas.trim(),
+        tahun_ajaran: catatanForm.tahun_ajaran.trim(),
+        semester: Number(catatanForm.semester),
+        catatan_wali: catatanForm.catatan_wali.trim() || "-",
+        ekstrakurikuler: validList,
+      })
+
+      setSuccess("Nilai ekstrakurikuler berhasil disimpan")
+      await fetchReports()
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menyimpan nilai ekstrakurikuler")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const openPdfPreview = async () => {
     if (!isReportReady) {
       setError("Preview PDF hanya tersedia setelah rapor di-generate")
@@ -612,6 +659,16 @@ export default function AdminPanelRaporPage() {
             onCatatanFormChange={setCatatanForm}
             onSaveCatatan={handleSaveCatatan}
             onReloadDetail={() => selected && loadReportDetail(selected)}
+          />
+
+          <RaporEkstraCard
+            selected={selected}
+            ekstraList={ekstraList}
+            isReportReady={isReportReady}
+            isPublishedReport={isPublishedReport}
+            isSaving={isSaving}
+            onEkstraListChange={setEkstraList}
+            onSaveEkstra={handleSaveEkstra}
           />
 
           <RaporPublishCard
