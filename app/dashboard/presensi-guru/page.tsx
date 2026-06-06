@@ -20,6 +20,7 @@ import { dataPetugasService } from "@/lib/services/petugas.service"
 import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface RekapPetugasRow {
   id_petugas: number
@@ -40,10 +41,11 @@ type JadwalOption = { id: number; label: string; mapel: string; kelas: string; h
 
 export default function PresensiGuruPage() {
   const [activeTab, setActiveTab] = useState("rekap")
+  const { selectedKodeTahun } = useTahunAjaran()
   
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
-  const initDoneRef = useRef(false)
+  const [isInitDone, setIsInitDone] = useState(false)
 
   // States for Rekap
   const [rekapRows, setRekapRows] = useState<RekapPetugasRow[]>([])
@@ -54,6 +56,14 @@ export default function PresensiGuruPage() {
     q: "",
   })
   const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setSelectedTahunAjaranRekap(selectedKodeTahun)
+      setSelectedTahunAjaran(selectedKodeTahun)
+    }
+  }, [selectedKodeTahun])
 
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
@@ -146,21 +156,21 @@ export default function PresensiGuruPage() {
 
   // Tab: Rekap (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!initDoneRef.current || activeTab !== "rekap") return
+    if (!isInitDone || activeTab !== "rekap") return
     void loadRekap()
-  }, [activeTab, selectedTahunAjaranRekap, filterRekap.tanggal_mulai, filterRekap.tanggal_selesai, filterRekap.q])
+  }, [isInitDone, activeTab, selectedTahunAjaranRekap, filterRekap.tanggal_mulai, filterRekap.tanggal_selesai, filterRekap.q])
 
   // Tab: Riwayat Sesi (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!initDoneRef.current || activeTab !== "riwayat") return
+    if (!isInitDone || activeTab !== "riwayat") return
     void loadRiwayatSesi()
-  }, [activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.q, filterSesi.id_petugas_hadir])
+  }, [isInitDone, activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.q, filterSesi.id_petugas_hadir])
 
   // Tab: Belum Diabsen (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!initDoneRef.current || activeTab !== "belum_diabsen") return
+    if (!isInitDone || activeTab !== "belum_diabsen") return
     void loadBelumDiabsen()
-  }, [activeTab, selectedUnitBelum, selectedKelasBelum, filterBelumDiabsen.tanggal])
+  }, [isInitDone, activeTab, selectedUnitBelum, selectedKelasBelum, filterBelumDiabsen.tanggal])
 
   const loadOptions = async () => {
     try {
@@ -196,16 +206,15 @@ export default function PresensiGuruPage() {
       setTahunAjaranOptions(tahunList)
 
       const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
-      if (activeTahun?.kode_tahun) {
+      if (activeTahun?.kode_tahun && !selectedKodeTahun) {
         setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
         setSelectedTahunAjaran(activeTahun.kode_tahun)
       }
 
-      initDoneRef.current = true
-      // Hanya load data untuk tab yang sedang aktif (default: rekap)
-      void loadRekap()
+      setIsInitDone(true)
     } catch (error) {
       console.error("Gagal memuat options", error)
+      setIsInitDone(true)
     }
   }
 

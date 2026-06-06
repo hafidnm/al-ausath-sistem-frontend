@@ -39,6 +39,7 @@ import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -165,6 +166,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 
 export default function MapelPage() {
   const { toast } = useToast()
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [rows, setRows] = useState<KelasMapelRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -172,7 +174,7 @@ export default function MapelPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const initCalledRef = useRef(false)
-  const initDoneRef = useRef(false)
+  const [isInitDone, setIsInitDone] = useState(false)
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -197,6 +199,13 @@ export default function MapelPage() {
   const [tahunFilter, setTahunFilter] = useState("all")
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setTahunFilter(selectedKodeTahun)
+    }
+  }, [selectedKodeTahun])
   const [formUnitFilter, setFormUnitFilter] = useState("all")
   const [editUnitFilter, setEditUnitFilter] = useState("all")
 
@@ -373,12 +382,10 @@ export default function MapelPage() {
         setTahunOptions(years)
         setPetugasOptions(petugas)
         
-        initDoneRef.current = true
-        void fetchRows()
+        setIsInitDone(true)
       } catch (error) {
         console.error("Gagal memuat opsi filter awal", error)
-        initDoneRef.current = true
-        void fetchRows()
+        setIsInitDone(true)
       }
     }
 
@@ -388,7 +395,7 @@ export default function MapelPage() {
   }, [])
 
   useEffect(() => {
-    if (!initDoneRef.current) return
+    if (!isInitDone) return
     if (kelasFilter !== "all" && !kelasByUnit.some((option) => option.value === kelasFilter)) {
       setKelasFilter("all")
       setCurrentPage(1)
@@ -396,7 +403,7 @@ export default function MapelPage() {
     }
 
     void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, petugasFilter, tahunFilter, semesterFilter, statusFilter, kelasByUnit])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, petugasFilter, tahunFilter, semesterFilter, statusFilter, kelasByUnit])
 
   useEffect(() => {
     if (!formData.kodeKelas) return

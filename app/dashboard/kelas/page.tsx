@@ -34,6 +34,7 @@ import { BackendStatus, dataUnitService } from "@/lib/services/unit.service"
 import { dataKelasService, DataKelasApiItem } from "@/lib/services/kelas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ArrowUpDown, ChevronDown, Download, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -156,6 +157,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 
 export default function KelasPage() {
   const { toast } = useToast()
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [rows, setRows] = useState<KelasRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -165,7 +167,7 @@ export default function KelasPage() {
 
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
-  const initDoneRef = useRef(false)
+  const [isInitDone, setIsInitDone] = useState(false)
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -183,6 +185,14 @@ export default function KelasPage() {
   const [kelasFilter, setKelasFilter] = useState("all")
   const [tahunFilter, setTahunFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setTahunFilter(selectedKodeTahun)
+      setCurrentPage(1)
+    }
+  }, [selectedKodeTahun])
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -289,13 +299,10 @@ export default function KelasPage() {
         setTahunOptions(years)
         setKelasOptions(mappedKelas)
         
-        initDoneRef.current = true
-        // Langsung panggil fetch pertama
-        void fetchRows()
+        setIsInitDone(true)
       } catch (error) {
         console.error("Gagal memuat opsi filter awal", error)
-        initDoneRef.current = true
-        void fetchRows()
+        setIsInitDone(true)
       }
     }
 
@@ -314,9 +321,9 @@ export default function KelasPage() {
   }, [kelasFilter, kelasFilterOptions])
 
   useEffect(() => {
-    if (!initDoneRef.current) return
+    if (!isInitDone) return
     void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
 
   const resetFilter = () => {
     setKeyword("")

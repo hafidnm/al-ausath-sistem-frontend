@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { authService } from "@/lib/services/auth.service"
 import { getCachedUser } from "@/lib/auth-cache"
+import { TahunAjaranProvider, useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,8 +52,52 @@ import {
   Star,
   ListChecks,
   CreditCard,
+  BookMarked,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
+
+function TahunAjaranSelector() {
+  const { allTahunAjaran, selectedTahunAjaran, setSelectedTahunAjaran, isLoading } = useTahunAjaran()
+
+  if (isLoading || allTahunAjaran.length === 0) return null
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium hidden sm:flex">
+          <BookMarked className="w-3.5 h-3.5 text-primary" />
+          <span className="max-w-[120px] truncate">
+            {selectedTahunAjaran?.nama_tahun ?? "Tahun Ajaran"}
+          </span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Pilih Tahun Ajaran</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {allTahunAjaran.map((ta) => {
+          const id = ta.id_tahun_ajaran ?? ta.id
+          const selectedId = selectedTahunAjaran?.id_tahun_ajaran ?? selectedTahunAjaran?.id
+          const isActive = id === selectedId
+          return (
+            <DropdownMenuItem
+              key={id}
+              className={cn("cursor-pointer text-sm", isActive && "font-semibold text-primary")}
+              onClick={() => setSelectedTahunAjaran(ta)}
+            >
+              {ta.nama_tahun}
+              {ta.status === "AKTIF" && (
+                <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+                  Aktif
+                </span>
+              )}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
 
 const adminMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
@@ -183,6 +228,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <TahunAjaranProvider>
     <div className="min-h-screen bg-background">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -291,7 +337,8 @@ export default function DashboardLayout({
         {/* Top Header */}
         <header className="sticky top-0 z-30 bg-card border-b border-border">
           <div className="flex items-center justify-between px-4 py-3 lg:px-6">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              {/* Sidebar toggle */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -316,6 +363,8 @@ export default function DashboardLayout({
                   {[...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
                 </h2>
               </div>
+              {/* Tahun Ajaran Global Selector */}
+              <TahunAjaranSelector />
             </div>
 
             <div className="flex items-center gap-2">
@@ -368,5 +417,6 @@ export default function DashboardLayout({
         <main className="p-4 lg:p-6">{children}</main>
       </div>
     </div>
+    </TahunAjaranProvider>
   )
 }
