@@ -92,6 +92,8 @@ export interface ProsesRow {
   nomorInduk: string;
   unitSaatIni: string;
   kelasSaatIni: string;
+  kodeKelas?: string;
+  kodeUnit?: string;
   status: StatusPembayaran;
   daftarInvoice: InvoiceItem[];
 }
@@ -361,6 +363,8 @@ const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
     nomorInduk: toStr(item.nomor_induk ?? item.nomorInduk ?? item.nis ?? '-'),
     unitSaatIni: toStr(item.unit_sekarang ?? item.unit_saat_ini ?? item.unitSaatIni ?? item.unit ?? '-'),
     kelasSaatIni: toStr(item.kelas_sekarang ?? item.kelas_saat_ini ?? item.kelasSaatIni ?? item.kelas ?? '-'),
+    kodeKelas: toStr(item.kode_kelas ?? ''),
+    kodeUnit: toStr(item.kode_unit ?? ''),
     status: normalizeStatus(item.status ?? ''),
     daftarInvoice: rawInvoices.map((inv) => ({
       id: toStr(inv.id_pembayaran ?? inv.id ?? ''),
@@ -435,11 +439,11 @@ export const pembayaranService = {
   },
 
   /** GET /api/administrasi/pembayaran/proses — proses pembayaran per santri */
-  async getProses(params?: { kode_unit?: string; kode_kelas?: string; search?: string }): Promise<{ data: ProsesRow[] }> {
+  async getProses(params?: { kode_unit?: string; kode_kelas?: string; search?: string; status?: string; page?: number; per_page?: number }): Promise<{ data: ProsesRow[]; meta?: any }> {
     try {
       const response = await api.get(`${BASE}/proses`, { params });
       const data = extractList(response.data).map(normalizeProsesRow);
-      return { data };
+      return { data, meta: response.data?.meta };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat data proses pembayaran'));
     }

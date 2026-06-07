@@ -8,6 +8,10 @@ export type PpdbPortalStep =
   | 'menunggu-pengumuman'
   | 'pengumuman'
   | 'pembayaran-ppdb'
+  | 'pembayaran-uang-pangkal'
+  | 'pembayaran-spp'
+  | 'gagal-bayar-uang-pangkal'
+  | 'gagal-bayar-spp'
   | 'siap-menjadi-santri';
 
 export interface PpdbPortalRegisterRequest {
@@ -96,6 +100,11 @@ export interface PpdbPortalFormRequest {
   idAkun?: string;
   idPendaftaran?: string;
   id_pendaftaran?: string;
+  bukti_uang_pangkal?: File | null;
+  bukti_spp?: File | null;
+  is_anak_guru?: boolean;
+  pilihan_uang_gedung?: number;
+  pilihan_infaq_bulanan?: number;
 }
 
 export interface PpdbPortalDashboard {
@@ -151,8 +160,20 @@ export interface PpdbPortalDashboard {
     has_tagihan: boolean;
   } | null;
   statusVerifikasi: string;
+  isAnakGuru?: boolean;
+  pilihanUangGedung?: number | null;
+  pilihanInfaqBulanan?: number | null;
+  tanggalDiterima?: string;
+  batasBayarUangPangkal?: string;
+  batasBayarSpp?: string;
+  statusUangPangkal?: string;
+  statusSpp?: string;
   namaGelombang?: string;
   tahunAjaran?: string;
+  buktiUangPangkalUrl?: string;
+  buktiSppUrl?: string;
+  nomorIndukGenerated?: string;
+  kodeKelasDiterima?: string;
 }
 
 export interface PpdbPortalTesStatus {

@@ -9,3 +9,4 @@ export { useUploadPpdbFile } from './use-upload-ppdb-file';
 export { useUpdatePpdbTestResult } from './use-update-ppdb-test-result';
 export { useUpdatePpdbVerification } from './use-update-ppdb-verification';
 export { useAddPpdbNotification } from './use-add-ppdb-notification';
+export { useVerifyPpdbPayments } from './use-verify-ppdb-payments';

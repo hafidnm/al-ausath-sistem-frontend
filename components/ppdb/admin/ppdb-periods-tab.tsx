@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api";
+import { toErrorMessage } from "@/hooks/shared/react-query-helpers";
 
 interface PpdbPeriod {
   id: number;
@@ -91,7 +92,7 @@ export function PpdbPeriodsTab() {
     } catch (err) {
       toast({
         title: "Gagal memuat data",
-        description: err instanceof Error ? err.message : "Terjadi kesalahan saat memuat gelombang PPDB",
+        description: toErrorMessage(err, "Terjadi kesalahan saat memuat gelombang PPDB"),
         variant: "destructive",
       });
     } finally {
@@ -164,7 +165,7 @@ export function PpdbPeriodsTab() {
     } catch (err) {
       toast({
         title: "Gagal menyimpan",
-        description: err instanceof Error ? err.message : "Terjadi kesalahan pada server",
+        description: toErrorMessage(err, "Terjadi kesalahan pada server"),
         variant: "destructive",
       });
     } finally {
@@ -196,7 +197,7 @@ export function PpdbPeriodsTab() {
     } catch (err) {
       toast({
         title: "Gagal menghapus",
-        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        description: toErrorMessage(err, "Terjadi kesalahan saat menghapus gelombang"),
         variant: "destructive",
       });
     }

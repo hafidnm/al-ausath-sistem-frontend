@@ -187,7 +187,7 @@ export default function PpdbDashboardPage() {
     hasHydratedFromServerRef.current = true;
     setAutoSaveStatus('idle');
 
-    // Auto-redirect ke halaman tes sesuai flow
+    // Auto-redirect ke halaman sesuai flow
     const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
     const shouldGoTes = data.step === 'tes' && !hasSubmittedTesAnswer;
 
@@ -196,8 +196,18 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    if (data.step === 'pembayaran-uang-pangkal' || data.step === 'gagal-bayar-uang-pangkal') {
+      router.replace('/ppdb/dashboard/uang-pangkal');
+      return;
+    }
+
+    if (data.step === 'pembayaran-spp' || data.step === 'gagal-bayar-spp') {
+      router.replace('/ppdb/dashboard/spp');
+      return;
+    }
+
     if (data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/pembayaran');
+      router.replace('/ppdb/dashboard/siap-menjadi-santri');
       return;
     }
 
@@ -375,8 +385,26 @@ export default function PpdbDashboardPage() {
         return;
       }
 
-      if (refreshedDashboard?.step === 'pembayaran-ppdb' || refreshedDashboard?.step === 'siap-menjadi-santri') {
-        router.replace('/ppdb/dashboard/pembayaran');
+      if (refreshedDashboard?.step === 'pembayaran-uang-pangkal' || refreshedDashboard?.step === 'gagal-bayar-uang-pangkal') {
+        router.replace('/ppdb/dashboard/uang-pangkal');
+        return;
+      }
+
+      if (refreshedDashboard?.step === 'pembayaran-spp' || refreshedDashboard?.step === 'gagal-bayar-spp') {
+        router.replace('/ppdb/dashboard/spp');
+        return;
+      }
+
+      if (refreshedDashboard?.step === 'pembayaran-ppdb') {
+        // Go through infaq info page first before payment
+        const infaqAcknowledged =
+          typeof window !== 'undefined' && sessionStorage.getItem('ppdb_infaq_acknowledged');
+        router.replace(infaqAcknowledged ? '/ppdb/dashboard/pembayaran' : '/ppdb/dashboard/infaq');
+        return;
+      }
+
+      if (refreshedDashboard?.step === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/siap-menjadi-santri');
         return;
       }
 
@@ -502,7 +530,7 @@ export default function PpdbDashboardPage() {
               <p className="text-xs text-muted-foreground">Status Verifikasi</p>
               <div className="mt-1.5">
                 <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  data?.status === 'Diterima' || data?.status === 'Lulus'
+                  data?.status === 'Diterima'
                     ? 'bg-emerald-500/10 text-emerald-600'
                     : data?.status === 'Ditolak'
                       ? 'bg-destructive/10 text-destructive'
@@ -621,41 +649,35 @@ export default function PpdbDashboardPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Nama Ayah</Label>
+                <Label>Nama Ayah <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.namaAyah}
                   onChange={(event) => setForm((prev) => ({ ...prev, namaAyah: event.target.value }))}
+                  placeholder="Nama lengkap ayah kandung"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Penghasilan Ayah</Label>
-                <Input
-                  value={form.penghasilanAyah}
-                  onChange={(event) =>
-                    setForm((prev) => ({ ...prev, penghasilanAyah: event.target.value }))
-                  }
-                  placeholder="Contoh: 2.500.000 / bulan"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>No HP</Label>
+                <Label>No. Telepon Ayah <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.noHpAyah}
                   onChange={(event) => setForm((prev) => ({ ...prev, noHpAyah: event.target.value }))}
+                  placeholder="08xxxxxxxxxx"
                 />
               </div>
               <div className="space-y-2">
-                <Label>Nama Ibu</Label>
+                <Label>Nama Ibu <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.namaIbu}
                   onChange={(event) => setForm((prev) => ({ ...prev, namaIbu: event.target.value }))}
+                  placeholder="Nama lengkap ibu kandung"
                 />
               </div>
               <div className="space-y-2">
-                <Label>No HP Ibu</Label>
+                <Label>No. Telepon Ibu <span className="text-destructive">*</span></Label>
                 <Input
                   value={form.noHpIbu}
                   onChange={(event) => setForm((prev) => ({ ...prev, noHpIbu: event.target.value }))}
+                  placeholder="08xxxxxxxxxx"
                 />
               </div>
             </div>

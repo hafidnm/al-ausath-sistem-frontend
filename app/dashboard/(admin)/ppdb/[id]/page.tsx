@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
-import { usePpdbDetail, useUpdatePpdbTestResult } from "@/hooks/ppdb/admin"
+import { usePpdbDetail, useUpdatePpdbTestResult, useVerifyPpdbPayments } from "@/hooks/ppdb/admin"
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
 import type { PpdbDetail } from "@/types/ppdb/admin"
 
@@ -67,11 +67,49 @@ export default function PpdbDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   const { updateTestResult, loading: testResultLoading } = useUpdatePpdbTestResult()
+  const { verifyUangPangkal, verifySpp, uangPangkalLoading, sppLoading } = useVerifyPpdbPayments()
+
   const [testForm, setTestForm] = useState({
     nilai: "",
     statusTes: "",
     catatanTes: "",
   })
+
+  const handleVerifyUangPangkal = async (status: string) => {
+    if (!pendaftar) return
+    try {
+      await verifyUangPangkal(pendaftar.id, status)
+      toast({
+        title: "Berhasil",
+        description: `Status pembayaran Uang Pangkal diperbarui menjadi ${status}`,
+      })
+      void fetchDetail()
+    } catch (err) {
+      toast({
+        title: "Gagal memperbarui",
+        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleVerifySpp = async (status: string) => {
+    if (!pendaftar) return
+    try {
+      await verifySpp(pendaftar.id, status)
+      toast({
+        title: "Berhasil",
+        description: `Status pembayaran SPP diperbarui menjadi ${status}`,
+      })
+      void fetchDetail()
+    } catch (err) {
+      toast({
+        title: "Gagal memperbarui",
+        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        variant: "destructive",
+      })
+    }
+  }
 
   const fetchDetail = useCallback(async () => {
     if (!idParam) return
@@ -275,6 +313,52 @@ export default function PpdbDetailPage() {
           </CardContent>
         </Card>
 
+        {/* Pilihan Infaq */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Pilihan Infaq Pendidikan</CardTitle>
+            <CardDescription className="text-xs">
+              Pilihan infaq yang diisi oleh calon santri pada halaman informasi infaq.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid md:grid-cols-3 gap-4">
+            <div className="border rounded-lg p-4 space-y-1">
+              <p className="text-xs text-muted-foreground">Status Anak Guru</p>
+              {pendaftar.isAnakGuru ? (
+                <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+                  Ya — Anak Guru (Diskon 50%)
+                </Badge>
+              ) : (
+                <Badge variant="outline">Tidak</Badge>
+              )}
+            </div>
+            <div className="border rounded-lg p-4 space-y-1">
+              <p className="text-xs text-muted-foreground">Pilihan Uang Gedung</p>
+              {pendaftar.pilihanUangGedung === 1 && (
+                <p className="font-semibold text-sm">Pilihan A — Rp 1.500.000</p>
+              )}
+              {pendaftar.pilihanUangGedung === 2 && (
+                <p className="font-semibold text-sm">Pilihan B — Rp 2.000.000</p>
+              )}
+              {!pendaftar.pilihanUangGedung && (
+                <p className="text-sm text-muted-foreground italic">Belum dipilih</p>
+              )}
+            </div>
+            <div className="border rounded-lg p-4 space-y-1">
+              <p className="text-xs text-muted-foreground">Infaq Bulanan (SPP)</p>
+              {pendaftar.pilihanInfaqBulanan === 1 && (
+                <p className="font-semibold text-sm">Pilihan A — Rp 650.000/bln</p>
+              )}
+              {pendaftar.pilihanInfaqBulanan === 2 && (
+                <p className="font-semibold text-sm">Pilihan B — Rp 700.000/bln</p>
+              )}
+              {!pendaftar.pilihanInfaqBulanan && (
+                <p className="text-sm text-muted-foreground italic">Belum dipilih</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Document Assets Gallery */}
         <Card>
           <CardHeader>
@@ -396,6 +480,120 @@ export default function PpdbDetailPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Verification of Uang Pangkal & SPP Payments */}
+        {pendaftar.status === "Diterima" && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Verifikasi Pembayaran Post-Acceptance</CardTitle>
+              <CardDescription>
+                Koreksi dan verifikasi bukti transfer Uang Pangkal dan SPP Bulan Pertama.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Uang Pangkal Section */}
+                <div className="border rounded-lg p-4 space-y-4 bg-muted/10">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-sm">Uang Pangkal</h3>
+                    <Badge variant={pendaftar.statusUangPangkal === "lunas" || pendaftar.statusUangPangkal === "dp" ? "default" : "outline"}>
+                      {pendaftar.statusUangPangkal?.toUpperCase() || "MENUNGGU"}
+                    </Badge>
+                  </div>
+
+                  {pendaftar.buktiUangPangkalPath ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Bukti Upload:</p>
+                      <a
+                        href={getDocumentUrl(pendaftar.buktiUangPangkalPath) || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Lihat Bukti Pembayaran
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Belum ada bukti yang diunggah.</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    <Button
+                      size="sm"
+                      onClick={() => handleVerifyUangPangkal("lunas")}
+                      disabled={uangPangkalLoading}
+                    >
+                      Setujui Lunas
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleVerifyUangPangkal("dp")}
+                      disabled={uangPangkalLoading}
+                      className="border-emerald-600 text-emerald-600 hover:bg-emerald-50"
+                    >
+                      Setujui DP (50%)
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleVerifyUangPangkal("gagal")}
+                      disabled={uangPangkalLoading}
+                    >
+                      Tolak
+                    </Button>
+                  </div>
+                </div>
+
+                {/* SPP Section */}
+                <div className="border rounded-lg p-4 space-y-4 bg-muted/10">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-semibold text-sm">SPP Bulan Pertama</h3>
+                    <Badge variant={pendaftar.statusSpp === "lunas" ? "default" : "outline"}>
+                      {pendaftar.statusSpp?.toUpperCase() || "MENUNGGU"}
+                    </Badge>
+                  </div>
+
+                  {pendaftar.buktiSppPath ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">Bukti Upload:</p>
+                      <a
+                        href={getDocumentUrl(pendaftar.buktiSppPath) || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        Lihat Bukti Pembayaran
+                      </a>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground italic">Belum ada bukti yang diunggah.</p>
+                  )}
+
+                  <div className="flex flex-wrap gap-2 pt-2 border-t">
+                    <Button
+                      size="sm"
+                      onClick={() => handleVerifySpp("lunas")}
+                      disabled={sppLoading}
+                    >
+                      Setujui Lunas
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleVerifySpp("gagal")}
+                      disabled={sppLoading}
+                    >
+                      Tolak
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

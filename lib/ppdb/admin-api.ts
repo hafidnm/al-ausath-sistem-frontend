@@ -384,6 +384,19 @@ const normalizePpdbDetail = (item: Rec): PpdbDetail => {
     email: pickText(records, ['email', 'email_ppdb']) || undefined,
     tanggalDaftar: pickText(records, ['tanggal_daftar', 'tanggalDaftar', 'created_at']) || '',
     status,
+    statusUangPangkal: pickText(records, ['status_uang_pangkal', 'statusUangPangkal']) || undefined,
+    statusSpp: pickText(records, ['status_spp', 'statusSpp']) || undefined,
+    buktiUangPangkalPath: pickText(records, ['bukti_uang_pangkal_path', 'buktiUangPangkalPath']) || undefined,
+    buktiSppPath: pickText(records, ['bukti_spp_path', 'buktiSppPath']) || undefined,
+    isAnakGuru: toBool(pickValue(records, ['is_anak_guru', 'isAnakGuru'])) || false,
+    pilihanUangGedung: (() => {
+      const v = pickValue(records, ['pilihan_uang_gedung', 'pilihanUangGedung']);
+      return v !== null && v !== undefined ? Number(v) : null;
+    })(),
+    pilihanInfaqBulanan: (() => {
+      const v = pickValue(records, ['pilihan_infaq_bulanan', 'pilihanInfaqBulanan']);
+      return v !== null && v !== undefined ? Number(v) : null;
+    })(),
   };
 };
 
@@ -470,8 +483,15 @@ const extractTesKonfigurasiList = (payload: unknown): TesKonfigurasiJenjang[] =>
   );
 };
 
+export interface PaginationMeta {
+  current_page: number;
+  last_page: number;
+  per_page: number;
+  total: number;
+}
+
 export const ppdbAdminApi = {
-  async getList(query?: PpdbListQuery): Promise<{ data: PpdbDetail[] }> {
+  async getList(query?: PpdbListQuery): Promise<{ data: PpdbDetail[], meta?: PaginationMeta }> {
     const response = await requestWithBasePathFallback((basePath) =>
       api.get(basePath, {
         params: query,
@@ -483,7 +503,17 @@ export const ppdbAdminApi = {
     );
 
     const list = extractList(response.data).map(normalizePpdbDetail);
-    return { data: list };
+    const meta = response.data?.meta || response.data;
+    
+    return { 
+      data: list,
+      meta: meta?.current_page ? {
+        current_page: meta.current_page,
+        last_page: meta.last_page,
+        per_page: meta.per_page,
+        total: meta.total,
+      } : undefined
+    };
   },
 
   async getDetail(id: string): Promise<PpdbDetail> {
@@ -634,7 +664,7 @@ export const ppdbAdminApi = {
     return response.data;
   },
 
-  async exportPendaftar(query?: { jenjang?: string; tahun_masuk?: string; status_verifikasi?: string }): Promise<Blob> {
+  async exportPendaftar(query?: { jenjang?: string; tahun_masuk?: string; status_verifikasi?: string; q?: string }): Promise<Blob> {
     const response = await requestWithBasePathFallback((basePath) =>
       api.get(buildPath(basePath, '/export'), {
         params: query,
@@ -737,6 +767,20 @@ export const ppdbAdminApi = {
 
   async deletePeriod(id: number | string): Promise<any> {
     const response = await api.delete(`/administrasi/ppdb/periods/${id}`);
+    return response.data;
+  },
+
+  async updateUangPangkalVerification(id: string, status: string): Promise<unknown> {
+    const response = await requestWithBasePathFallback((basePath) =>
+      api.put(buildPath(basePath, `/${id}/verifikasi-uang-pangkal`), { status }),
+    );
+    return response.data;
+  },
+
+  async updateSppVerification(id: string, status: string): Promise<unknown> {
+    const response = await requestWithBasePathFallback((basePath) =>
+      api.put(buildPath(basePath, `/${id}/verifikasi-spp`), { status }),
+    );
     return response.data;
   },
 };

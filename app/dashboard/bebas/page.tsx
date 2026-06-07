@@ -30,6 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { useToast } from "@/hooks/use-toast"
 import {
   RefreshCw,
@@ -46,6 +51,8 @@ import {
   FileDown,
   Calendar,
   Layers,
+  ChevronDown,
+  Filter,
 } from "lucide-react"
 
 // Types matching backend Eloquent structure
@@ -99,8 +106,16 @@ export default function AdministrasiBebasPage() {
   const [selectedGender, setSelectedGender] = useState("")
 
   // Filters & Searches
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [filterUnit, setFilterUnit] = useState("all")
+  const [filterKelas, setFilterKelas] = useState("all")
+
+  const [appliedSearch, setAppliedSearch] = useState("")
+  const [appliedStatus, setAppliedStatus] = useState("all")
+  const [appliedUnit, setAppliedUnit] = useState("all")
+  const [appliedKelas, setAppliedKelas] = useState("all")
 
   // Modals
   const [createOpen, setCreateOpen] = useState(false)
@@ -196,6 +211,35 @@ export default function AdministrasiBebasPage() {
     fetchUnits()
   }, [])
 
+  // Derived options from data
+  const filterUnitOptions = useMemo(() => {
+    const set = new Set(data.map((r) => r.santri?.kode_kelas?.split("-")[0] ?? "").filter(Boolean))
+    return Array.from(set).sort()
+  }, [data])
+
+  const filterKelasOptions = useMemo(() => {
+    const set = new Set(data.map((r) => r.santri?.kode_kelas ?? "").filter(Boolean))
+    return Array.from(set).sort()
+  }, [data])
+
+  const handleApplyFilter = () => {
+    setAppliedSearch(search)
+    setAppliedStatus(filterStatus)
+    setAppliedUnit(filterUnit)
+    setAppliedKelas(filterKelas)
+  }
+
+  const handleResetFilter = () => {
+    setSearch("")
+    setFilterStatus("all")
+    setFilterUnit("all")
+    setFilterKelas("all")
+    setAppliedSearch("")
+    setAppliedStatus("all")
+    setAppliedUnit("all")
+    setAppliedKelas("all")
+  }
+
   // Derived filtered metrics
   const filtered = useMemo(() => {
     return data.filter((item) => {
@@ -203,18 +247,27 @@ export default function AdministrasiBebasPage() {
       const nis = item.santri?.nomor_induk || ""
       const label = item.nama_tagihan || ""
       const matchesSearch =
-        nama.toLowerCase().includes(search.toLowerCase()) ||
-        nis.toLowerCase().includes(search.toLowerCase()) ||
-        label.toLowerCase().includes(search.toLowerCase())
+        !appliedSearch ||
+        nama.toLowerCase().includes(appliedSearch.toLowerCase()) ||
+        nis.toLowerCase().includes(appliedSearch.toLowerCase()) ||
+        label.toLowerCase().includes(appliedSearch.toLowerCase())
 
       const matchesStatus =
-        filterStatus === "all" ||
-        (filterStatus === "lunas" && item.status_lunas === "lunas") ||
-        (filterStatus === "belum_lunas" && item.status_lunas === "belum_lunas")
+        appliedStatus === "all" ||
+        (appliedStatus === "lunas" && item.status_lunas === "lunas") ||
+        (appliedStatus === "belum_lunas" && item.status_lunas === "belum_lunas")
 
-      return matchesSearch && matchesStatus
+      const matchesUnit =
+        appliedUnit === "all" ||
+        (item.santri?.kode_kelas ?? "").startsWith(appliedUnit)
+
+      const matchesKelas =
+        appliedKelas === "all" ||
+        item.santri?.kode_kelas === appliedKelas
+
+      return matchesSearch && matchesStatus && matchesUnit && matchesKelas
     })
-  }, [data, search, filterStatus])
+  }, [data, appliedSearch, appliedStatus, appliedUnit, appliedKelas])
 
   // Total outstanding amounts
   const metrics = useMemo(() => {
@@ -394,6 +447,95 @@ export default function AdministrasiBebasPage() {
         </Card>
       </div>
 
+      {/* Collapsible Filter Bar */}
+      <Card className="border">
+        <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-14 w-full justify-between rounded-none bg-white px-5 text-base font-semibold text-foreground shadow-none hover:bg-white hover:text-foreground animate-none"
+            >
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Data
+              </span>
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="border-t p-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Kata Kunci</Label>
+                  <Input
+                    placeholder="Cari nama, NIS, atau tagihan..."
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pilih Unit/Jenjang</Label>
+                  <Select value={filterUnit} onValueChange={setFilterUnit}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jenjang" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Jenjang</SelectItem>
+                      {filterUnitOptions.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pilih Kelas</Label>
+                  <Select value={filterKelas} onValueChange={setFilterKelas}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {filterKelasOptions.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status Pembayaran</Label>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="lunas">Lunas</SelectItem>
+                      <SelectItem value="belum_lunas">Belum Lunas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleApplyFilter}>
+                  Terapkan Filter
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter}>
+                  Reset Filter
+                </Button>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
       {/* Main card with high fidelity table */}
       <Card className="border-border/50">
         <CardHeader>
@@ -401,28 +543,6 @@ export default function AdministrasiBebasPage() {
             <div>
               <CardTitle>Daftar Administrasi Bebas</CardTitle>
               <CardDescription>Menampilkan tagihan mandiri dan iuran non-bulanan santri.</CardDescription>
-            </div>
-            {/* Realtime filters */}
-            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari santri atau nama tagihan..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-full sm:w-[180px]">
-                  <SelectValue placeholder="Status Pembayaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Status</SelectItem>
-                  <SelectItem value="lunas">Lunas</SelectItem>
-                  <SelectItem value="belum_lunas">Belum Lunas</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardHeader>

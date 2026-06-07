@@ -40,9 +40,14 @@ import {
   Wallet,
 } from "lucide-react"
 import type { PpdbDetail } from "@/types/ppdb/admin"
+import type { PaginationMeta } from "@/lib/ppdb/admin-api"
+import { ChevronLeft, ChevronRight } from "lucide-react"
 
 interface PpdbTableProps {
   data: PpdbDetail[]
+  meta?: PaginationMeta
+  currentPage: number
+  onPageChange: (page: number) => void
   loading: boolean
   searchQuery: string
   selectedStatus: string
@@ -97,6 +102,9 @@ const getInitials = (name: string) =>
 
 export function PpdbTable({
   data,
+  meta,
+  currentPage,
+  onPageChange,
   loading,
   searchQuery,
   selectedStatus,
@@ -113,18 +121,8 @@ export function PpdbTable({
   onCreateTagihan,
   tagihanLoading,
 }: PpdbTableProps) {
-  const filtered = data.filter((p) => {
-    const kw = searchQuery.toLowerCase()
-    const matchSearch =
-      p.name.toLowerCase().includes(kw) ||
-      p.noPendaftaran.toLowerCase().includes(kw)
-    const matchStatus = selectedStatus === "all" || p.status === selectedStatus
-    const prog = p.programPendaftaran || p.jenjang
-    const matchProgram =
-      selectedProgram === "all" ||
-      (prog && prog.toLowerCase() === selectedProgram.toLowerCase())
-    return matchSearch && matchStatus && matchProgram
-  })
+  // We use server-side filtering and pagination now, so data is already filtered for the current page
+  const filtered = data;
 
   return (
     <Card className="border-border/50">
@@ -290,6 +288,36 @@ export function PpdbTable({
                 )}
               </TableBody>
             </Table>
+          )}
+
+          {/* Pagination Controls */}
+          {meta && meta.last_page > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t">
+              <div className="text-sm text-muted-foreground">
+                Menampilkan {filtered.length} dari {meta.total} pendaftar 
+                (Halaman {meta.current_page} dari {meta.last_page})
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage <= 1 || loading}
+                  onClick={() => onPageChange(currentPage - 1)}
+                >
+                  <ChevronLeft className="w-4 h-4 mr-1" />
+                  Sebelumnya
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage >= meta.last_page || loading}
+                  onClick={() => onPageChange(currentPage + 1)}
+                >
+                  Selanjutnya
+                  <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </CardContent>

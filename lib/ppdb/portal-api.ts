@@ -145,6 +145,10 @@ const normalizeStep = (value: unknown): PpdbPortalStep => {
   if (step.includes('tes')) return 'tes';
   if (step === 'pengumuman' || step === 'announcement') return 'pengumuman';
   if (step === 'pembayaran-ppdb' || step === 'pembayaran_ppdb' || step === 'pembayaran') return 'pembayaran-ppdb';
+  if (step === 'pembayaran-uang-pangkal' || step === 'pembayaran_uang_pangkal') return 'pembayaran-uang-pangkal';
+  if (step === 'pembayaran-spp' || step === 'pembayaran_spp') return 'pembayaran-spp';
+  if (step === 'gagal-bayar-uang-pangkal' || step === 'gagal_bayar_uang_pangkal') return 'gagal-bayar-uang-pangkal';
+  if (step === 'gagal-bayar-spp' || step === 'gagal_bayar_spp') return 'gagal-bayar-spp';
   if (step === 'siap-menjadi-santri' || step === 'siap_menjadi_santri' || step === 'diterima' || step === 'accepted') return 'siap-menjadi-santri';
   if (
     step === 'menunggu-pengumuman'
@@ -278,6 +282,24 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     } : null,
     namaGelombang: pickText(sources, ['nama_gelombang', 'namaGelombang']) || undefined,
     tahunAjaran: pickText(sources, ['tahun_ajaran', 'tahunAjaran']) || undefined,
+    isAnakGuru: asBool(pickValue(sources, ['is_anak_guru', 'isAnakGuru'])),
+    pilihanUangGedung: (() => {
+      const v = pickValue(sources, ['pilihan_uang_gedung', 'pilihanUangGedung']);
+      return v !== null && v !== undefined ? Number(v) : null;
+    })(),
+    pilihanInfaqBulanan: (() => {
+      const v = pickValue(sources, ['pilihan_infaq_bulanan', 'pilihanInfaqBulanan']);
+      return v !== null && v !== undefined ? Number(v) : null;
+    })(),
+    tanggalDiterima: pickText(sources, ['tanggal_diterima', 'tanggalDiterima']) || undefined,
+    batasBayarUangPangkal: pickText(sources, ['batas_bayar_uang_pangkal', 'batasBayarUangPangkal']) || undefined,
+    batasBayarSpp: pickText(sources, ['batas_bayar_spp', 'batasBayarSpp']) || undefined,
+    statusUangPangkal: pickText(sources, ['status_uang_pangkal', 'statusUangPangkal']) || undefined,
+    statusSpp: pickText(sources, ['status_spp', 'statusSpp']) || undefined,
+    buktiUangPangkalUrl: pickText(sources, ['bukti_uang_pangkal_url', 'buktiUangPangkalUrl', 'bukti_uang_pangkal_path', 'buktiUangPangkalPath']),
+    buktiSppUrl: pickText(sources, ['bukti_spp_url', 'buktiSppUrl', 'bukti_spp_path', 'buktiSppPath']),
+    nomorIndukGenerated: pickText(sources, ['nomor_induk_generated', 'nomorIndukGenerated', 'nis_generated', 'nis']),
+    kodeKelasDiterima: pickText(sources, ['kode_kelas_diterima', 'kodeKelasDiterima', 'kelas_diterima']),
   };
 };
 

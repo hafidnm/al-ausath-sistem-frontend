@@ -43,6 +43,11 @@ import {
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
   useProsesPembayaran,
   useVerifikasiPembayaran,
   useDetailPembayaran,
@@ -56,7 +61,9 @@ import { dataKelasService } from "@/lib/services/kelas.service"
 import {
   AlertCircle,
   BadgeCheck,
+  ChevronDown,
   Eye,
+  Filter,
   Loader2,
   MoreHorizontal,
   RefreshCw,
@@ -102,17 +109,27 @@ const STATUS_ACTIONS: Array<{ value: StatusPembayaran; label: string; danger?: b
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProsesPembayaranTab() {
-  const { data, loading, error, fetchProses } = useProsesPembayaran()
-  const [search, setSearch] = useState("")
+  const { data, meta, loading, error, fetchProses } = useProsesPembayaran()
+  const [currentPage, setCurrentPage] = useState(1)
+  const [rowsPerPage, setRowsPerPage] = useState("10")
+
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [selectedKeyword, setSelectedKeyword] = useState("")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
+  const [selectedStatus, setSelectedStatus] = useState("all")
+
+  const [appliedKeyword, setAppliedKeyword] = useState("")
+  const [appliedUnit, setAppliedUnit] = useState("all")
+  const [appliedKelas, setAppliedKelas] = useState("all")
+  const [appliedStatus, setAppliedStatus] = useState("all")
+
   const [kelasList, setKelasList] = useState<{ id: number; kode_kelas: string; nama_kelas?: string; tahun_ajaran?: string }[]>([])
   const [kelasLoading, setKelasLoading] = useState(false)
   const [unitList, setUnitList] = useState<string[]>([])
 
   // Load master data kelas saat mount
   useEffect(() => {
-    void fetchProses()
     const loadKelas = async () => {
       setKelasLoading(true)
       try {
@@ -136,7 +153,19 @@ function ProsesPembayaranTab() {
       }
     }
     void loadKelas()
-  }, [fetchProses])
+  }, [])
+
+  // Fetch data proses dari API setiap kali state filter/halaman berubah
+  useEffect(() => {
+    void fetchProses({
+      page: currentPage,
+      per_page: Number(rowsPerPage),
+      search: appliedKeyword || undefined,
+      kode_unit: appliedUnit !== "all" ? appliedUnit : undefined,
+      kode_kelas: appliedKelas !== "all" ? appliedKelas : undefined,
+      status: appliedStatus !== "all" ? appliedStatus : undefined,
+    })
+  }, [currentPage, rowsPerPage, appliedKeyword, appliedUnit, appliedKelas, appliedStatus, fetchProses])
 
   // Kelas yang difilter berdasarkan unit terpilih
   const filteredKelas = useMemo(() => {
@@ -144,107 +173,207 @@ function ProsesPembayaranTab() {
     return kelasList.filter(k => k.kode_kelas.startsWith(selectedUnit))
   }, [kelasList, selectedUnit])
 
-  const filtered = useMemo(() => {
-    const kw = search.toLowerCase().trim()
-    return data.filter((row: ProsesRow) => {
-      const matchSearch = !kw || row.namaLengkap.toLowerCase().includes(kw) || row.nomorInduk.toLowerCase().includes(kw)
-      const matchUnit = selectedUnit === "all" || row.unitSaatIni.toLowerCase().includes(selectedUnit.toLowerCase())
-      const matchKelas = selectedKelas === "all" || row.kelasSaatIni.toLowerCase().includes(selectedKelas.toLowerCase())
-      return matchSearch && matchUnit && matchKelas
-    })
-  }, [data, search, selectedUnit, selectedKelas])
-
-  const handleCari = () => {
-    void fetchProses({
-      kode_kelas: selectedKelas !== "all" ? selectedKelas : undefined,
-      search: search || undefined,
-    })
+  const handleApplyFilter = () => {
+    setAppliedKeyword(selectedKeyword)
+    setAppliedUnit(selectedUnit)
+    setAppliedKelas(selectedKelas)
+    setAppliedStatus(selectedStatus)
+    setCurrentPage(1)
   }
+
+  const handleResetFilter = () => {
+    setSelectedKeyword("")
+    setSelectedUnit("all")
+    setSelectedKelas("all")
+    setSelectedStatus("all")
+    setAppliedKeyword("")
+    setAppliedUnit("all")
+    setAppliedKelas("all")
+    setAppliedStatus("all")
+    setCurrentPage(1)
+  }
+
+  const totalPages = meta?.last_page || 1
+  const totalItems = meta?.total || 0
 
   return (
     <div className="space-y-4">
-      {/* Filter bar — dropdown dari master kelas */}
-      <div className="flex flex-col sm:flex-row gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input id="search-proses" placeholder="Cari nama / nomor induk..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
+      {/* Collapsible Filter Bar */}
+      <Card className="border">
+        <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-14 w-full justify-between rounded-none bg-white px-5 text-base font-semibold text-foreground shadow-none hover:bg-white hover:text-foreground animate-none"
+            >
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Data
+              </span>
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="border-t p-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Kata Kunci</Label>
+                  <Input
+                    placeholder="Masukan nama atau nomor induk"
+                    value={selectedKeyword}
+                    onChange={(event) => setSelectedKeyword(event.target.value)}
+                  />
+                </div>
 
-        <Select value={selectedUnit} onValueChange={(v) => { setSelectedUnit(v); setSelectedKelas("all") }}>
-          <SelectTrigger className="sm:w-36" id="filter-unit-proses">
-            <SelectValue placeholder="Filter Unit" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Unit</SelectItem>
-            {unitList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-          </SelectContent>
-        </Select>
+                <div className="space-y-2">
+                  <Label>Pilih Unit</Label>
+                  <Select value={selectedUnit} onValueChange={(v) => { setSelectedUnit(v); setSelectedKelas("all") }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitList.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        <Select value={selectedKelas} onValueChange={setSelectedKelas} disabled={kelasLoading}>
-          <SelectTrigger className="sm:w-48" id="filter-kelas-proses">
-            <SelectValue placeholder={kelasLoading ? "Memuat..." : "Filter Kelas"} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Kelas</SelectItem>
-            {filteredKelas.map(k => (
-              <SelectItem key={k.kode_kelas} value={k.kode_kelas}>
-                {k.kode_kelas}{k.nama_kelas ? ` — ${k.nama_kelas}` : ""}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+                <div className="space-y-2">
+                  <Label>Pilih Kelas</Label>
+                  <Select value={selectedKelas} onValueChange={setSelectedKelas} disabled={kelasLoading}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={kelasLoading ? "Memuat..." : "Pilih Kelas"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {filteredKelas.map((item) => (
+                        <SelectItem key={item.kode_kelas} value={item.kode_kelas}>
+                          {item.kode_kelas}{item.nama_kelas ? ` — ${item.nama_kelas}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        <Button variant="outline" size="sm" onClick={handleCari}>
-          <RefreshCw className="w-4 h-4 mr-1" /> Cari
-        </Button>
-      </div>
+                <div className="space-y-2">
+                  <Label>Status Pembayaran</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="menunggu_pembayaran">Menunggu Pembayaran</SelectItem>
+                      <SelectItem value="menunggu_konfirmasi">Menunggu Konfirmasi</SelectItem>
+                      <SelectItem value="lunas">Lunas</SelectItem>
+                      <SelectItem value="dibatalkan">Dibatalkan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-      {error && <p className="text-sm text-destructive">Gagal memuat: {error}</p>}
+              <div className="mt-4 flex items-center gap-2">
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleApplyFilter}>
+                  Terapkan Filter
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter}>
+                  Reset Filter
+                </Button>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
 
-      <div className="rounded-lg border overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nama Lengkap</TableHead>
-              <TableHead>Jenis Kelamin</TableHead>
-              <TableHead>Nomor Induk</TableHead>
-              <TableHead>Unit</TableHead>
-              <TableHead>Kelas</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Invoice</TableHead>
-              <TableHead className="text-right">Aksi</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Memuat...</TableCell></TableRow>
-            ) : filtered.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Tidak ada data.</TableCell></TableRow>
-            ) : filtered.map((row: ProsesRow) => (
-              <TableRow key={row.id}>
-                <TableCell className="font-medium">{row.namaLengkap}</TableCell>
-                <TableCell>{row.jenisKelamin || "-"}</TableCell>
-                <TableCell className="font-mono text-sm">{row.nomorInduk || "-"}</TableCell>
-                <TableCell>{row.unitSaatIni || "-"}</TableCell>
-                <TableCell>{row.kelasSaatIni || "-"}</TableCell>
-                <TableCell><StatusBadge status={row.status} /></TableCell>
-                <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {row.daftarInvoice.length > 0 ? `${row.daftarInvoice.length} invoice` : "Tidak ada"}
-                  </span>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={`/dashboard/pembayaran/santri/${row.id}`}>
-                      <Eye className="w-4 h-4 mr-1" /> Detail
-                    </a>
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <Card className="border-border/50">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tampilkan</span>
+              <Select value={rowsPerPage} onValueChange={(v) => { setRowsPerPage(v); setCurrentPage(1) }}>
+                <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10</SelectItem>
+                  <SelectItem value="25">25</SelectItem>
+                  <SelectItem value="50">50</SelectItem>
+                </SelectContent>
+              </Select>
+              <span className="text-sm text-muted-foreground">data per halaman</span>
+            </div>
+            <CardDescription>Menampilkan {data.length} dari {totalItems} santri</CardDescription>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-0">
+          {error && <p className="text-sm text-destructive mb-4">Gagal memuat: {error}</p>}
+
+          <div className="rounded-lg border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nama Lengkap</TableHead>
+                  <TableHead>Jenis Kelamin</TableHead>
+                  <TableHead>Nomor Induk</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Kelas</TableHead>
+                  <TableHead>Status Pembayaran</TableHead>
+                  <TableHead>Invoice</TableHead>
+                  <TableHead className="text-right">Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow><TableCell colSpan={8} className="text-center py-10"><Loader2 className="w-4 h-4 animate-spin inline mr-2" />Memuat...</TableCell></TableRow>
+                ) : data.length === 0 ? (
+                  <TableRow><TableCell colSpan={8} className="text-center py-10 text-muted-foreground">Tidak ada data.</TableCell></TableRow>
+                ) : data.map((row: ProsesRow) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="font-medium">{row.namaLengkap}</TableCell>
+                    <TableCell>{row.jenisKelamin || "-"}</TableCell>
+                    <TableCell className="font-mono text-sm">{row.nomorInduk || "-"}</TableCell>
+                    <TableCell>{row.unitSaatIni || "-"}</TableCell>
+                    <TableCell>{row.kelasSaatIni || "-"}</TableCell>
+                    <TableCell><StatusBadge status={row.status} /></TableCell>
+                    <TableCell>
+                      <span className="text-xs text-muted-foreground">
+                        {row.daftarInvoice.length > 0 ? `${row.daftarInvoice.length} invoice` : "Tidak ada"}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/dashboard/pembayaran/santri/${row.id}`}>
+                          <Eye className="w-4 h-4 mr-1" /> Detail
+                        </a>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
+            <p className="text-sm text-muted-foreground">Halaman {currentPage} dari {totalPages}</p>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="sm" disabled={currentPage <= 1} onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}>
+                Sebelumnya
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              >
+                Selanjutnya
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -258,11 +387,17 @@ function VerifikasiPembayaranTab() {
   const { hapus, loading: hapusLoading } = useHapusPembayaran()
   const { toast } = useToast()
 
-  const [search, setSearch] = useState("")
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [selectedKeyword, setSelectedKeyword] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedJenis, setSelectedJenis] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
-  const [selectedKelas, setSelectedKelas] = useState("all")
+
+  const [appliedKeyword, setAppliedKeyword] = useState("")
+  const [appliedStatus, setAppliedStatus] = useState("all")
+  const [appliedJenis, setAppliedJenis] = useState("all")
+  const [appliedUnit, setAppliedUnit] = useState("all")
+
   const [kelasList, setKelasList] = useState<{ id: number; kode_kelas: string; nama_kelas?: string; tahun_ajaran?: string }[]>([])
   const [unitList, setUnitList] = useState<string[]>([])
   const [detailOpen, setDetailOpen] = useState(false)
@@ -291,15 +426,33 @@ function VerifikasiPembayaranTab() {
   }, [fetchVerifikasi])
 
   const filtered = useMemo(() => {
-    const kw = search.toLowerCase().trim()
+    const kw = appliedKeyword.toLowerCase().trim()
     return data.filter((row: VerifikasiRow) => {
       const matchSearch = !kw || row.namaLengkap.toLowerCase().includes(kw) || row.nomorInduk.toLowerCase().includes(kw) || row.nomorInvoice.toLowerCase().includes(kw)
-      const matchStatus = selectedStatus === "all" || row.statusPembayaran === selectedStatus
-      const matchJenis = selectedJenis === "all" || row.jenisTransaksi === selectedJenis
-      const matchUnit = selectedUnit === "all" || row.namaUnit.toLowerCase().includes(selectedUnit.toLowerCase())
+      const matchStatus = appliedStatus === "all" || row.statusPembayaran === appliedStatus
+      const matchJenis = appliedJenis === "all" || row.jenisTransaksi === appliedJenis
+      const matchUnit = appliedUnit === "all" || row.namaUnit.toLowerCase().includes(appliedUnit.toLowerCase())
       return matchSearch && matchStatus && matchJenis && matchUnit
     })
-  }, [data, search, selectedStatus, selectedJenis, selectedUnit])
+  }, [data, appliedKeyword, appliedStatus, appliedJenis, appliedUnit])
+
+  const handleApplyFilter = () => {
+    setAppliedKeyword(selectedKeyword)
+    setAppliedUnit(selectedUnit)
+    setAppliedStatus(selectedStatus)
+    setAppliedJenis(selectedJenis)
+  }
+
+  const handleResetFilter = () => {
+    setSelectedKeyword("")
+    setSelectedUnit("all")
+    setSelectedStatus("all")
+    setSelectedJenis("all")
+    setAppliedKeyword("")
+    setAppliedUnit("all")
+    setAppliedStatus("all")
+    setAppliedJenis("all")
+  }
 
   const handleOpenDetail = async (row: VerifikasiRow) => {
     setSelectedRow(row)
@@ -356,51 +509,96 @@ function VerifikasiPembayaranTab() {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-wrap gap-2">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input id="search-verifikasi" placeholder="Cari nama, nomor induk, invoice..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
+      {/* Collapsible Filter Bar */}
+      <Card className="border">
+        <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-14 w-full justify-between rounded-none bg-white px-5 text-base font-semibold text-foreground shadow-none hover:bg-white hover:text-foreground animate-none"
+            >
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Data
+              </span>
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="border-t p-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="space-y-2">
+                  <Label>Kata Kunci</Label>
+                  <Input
+                    placeholder="Masukan nama, nomor induk, invoice..."
+                    value={selectedKeyword}
+                    onChange={(event) => setSelectedKeyword(event.target.value)}
+                  />
+                </div>
 
-        <Select value={selectedUnit} onValueChange={(v) => { setSelectedUnit(v); setSelectedKelas("all") }}>
-          <SelectTrigger className="w-36" id="filter-unit-verifikasi">
-            <SelectValue placeholder="Filter Unit" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Unit</SelectItem>
-            {unitList.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-          </SelectContent>
-        </Select>
+                <div className="space-y-2">
+                  <Label>Pilih Unit</Label>
+                  <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitList.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-52" id="filter-status-verifikasi">
-            <SelectValue placeholder="Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Status</SelectItem>
-            <SelectItem value="menunggu_pembayaran">Menunggu Pembayaran</SelectItem>
-            <SelectItem value="menunggu_konfirmasi">Menunggu Konfirmasi</SelectItem>
-            <SelectItem value="lunas">Lunas</SelectItem>
-            <SelectItem value="dibatalkan">Dibatalkan</SelectItem>
-          </SelectContent>
-        </Select>
+                <div className="space-y-2">
+                  <Label>Status Pembayaran</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Status</SelectItem>
+                      <SelectItem value="menunggu_pembayaran">Menunggu Pembayaran</SelectItem>
+                      <SelectItem value="menunggu_konfirmasi">Menunggu Konfirmasi</SelectItem>
+                      <SelectItem value="lunas">Lunas</SelectItem>
+                      <SelectItem value="dibatalkan">Dibatalkan</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        <Select value={selectedJenis} onValueChange={setSelectedJenis}>
-          <SelectTrigger className="w-36" id="filter-jenis-verifikasi">
-            <SelectValue placeholder="Jenis" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Semua Jenis</SelectItem>
-            <SelectItem value="SPP">SPP</SelectItem>
-            <SelectItem value="PPDB">PPDB</SelectItem>
-          </SelectContent>
-        </Select>
+                <div className="space-y-2">
+                  <Label>Jenis Transaksi</Label>
+                  <Select value={selectedJenis} onValueChange={setSelectedJenis}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Jenis" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Jenis</SelectItem>
+                      <SelectItem value="SPP">SPP</SelectItem>
+                      <SelectItem value="PPDB">PPDB</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-        <Button variant="outline" size="sm" onClick={() => void fetchVerifikasi()} disabled={loading}>
-          <RefreshCw className="w-4 h-4 mr-1" /> Refresh
-        </Button>
-      </div>
+              <div className="mt-4 flex items-center gap-2">
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleApplyFilter}>
+                  Terapkan Filter
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter}>
+                  Reset Filter
+                </Button>
+                <Button variant="outline" onClick={() => void fetchVerifikasi()} disabled={loading}>
+                  <RefreshCw className="w-4 h-4 mr-1" /> Refresh
+                </Button>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
 
       {error && <p className="text-sm text-destructive">Gagal memuat: {error}</p>}
 

@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
 import {
   Table,
   TableBody,
@@ -21,6 +22,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import {
   RefreshCw,
   Search,
   Receipt,
@@ -32,6 +38,7 @@ import {
   Eye,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from "lucide-react"
 import { useTagihan, useRingkasanPembayaran } from "@/hooks/use-pembayaran"
 import type { TagihanRow, StatusPembayaran } from "@/hooks/use-pembayaran"
@@ -74,50 +81,69 @@ export default function TagihanPage() {
   const { data: tagihanData, meta, loading, error, fetchTagihan } = useTagihan()
   const { data: ringkasan, loading: ringkasanLoading, fetchRingkasan } = useRingkasanPembayaran()
 
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedSumber, setSelectedSumber] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
   const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
+
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState("")
+  const [appliedStatus, setAppliedStatus] = useState("all")
+  const [appliedSumber, setAppliedSumber] = useState("all")
+  const [appliedKelas, setAppliedKelas] = useState("all")
+  const [appliedTahunAjaran, setAppliedTahunAjaran] = useState("all")
   
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
 
-  // ── Debounce search + reset page on filter change (single effect) ───────────
-  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery)
-  useEffect(() => {
-    setCurrentPage(1)
-    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 400)
-    return () => clearTimeout(timer)
-  }, [searchQuery, selectedStatus, selectedSumber, selectedKelas, selectedTahunAjaran])
-
   // ── Single stable fetch effect ─────────────────────────────────────────────
-  // fetchTagihan & fetchRingkasan are stable useCallback refs — safe to exclude
-  // from deps to prevent duplicate requests on every render cycle.
   useEffect(() => {
     void fetchTagihan({
       page: currentPage,
       per_page: itemsPerPage,
-      q: debouncedQuery || undefined,
-      status: selectedStatus !== "all" ? selectedStatus : undefined,
-      sumber: selectedSumber !== "all" ? selectedSumber : undefined,
+      q: appliedSearchQuery || undefined,
+      status: appliedStatus !== "all" ? appliedStatus : undefined,
+      sumber: appliedSumber !== "all" ? appliedSumber : undefined,
     })
     void fetchRingkasan()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, debouncedQuery, selectedStatus, selectedSumber])
+  }, [currentPage, appliedSearchQuery, appliedStatus, appliedSumber, fetchTagihan, fetchRingkasan])
 
   const refreshAll = async () => {
     await Promise.all([
       fetchTagihan({
         page: currentPage,
         per_page: itemsPerPage,
-        q: debouncedQuery || undefined,
-        status: selectedStatus !== "all" ? selectedStatus : undefined,
-        sumber: selectedSumber !== "all" ? selectedSumber : undefined,
+        q: appliedSearchQuery || undefined,
+        status: appliedStatus !== "all" ? appliedStatus : undefined,
+        sumber: appliedSumber !== "all" ? appliedSumber : undefined,
       }),
       fetchRingkasan()
     ])
+  }
+
+  const handleApplyFilter = () => {
+    setAppliedSearchQuery(searchQuery)
+    setAppliedStatus(selectedStatus)
+    setAppliedSumber(selectedSumber)
+    setAppliedKelas(selectedKelas)
+    setAppliedTahunAjaran(selectedTahunAjaran)
+    setCurrentPage(1)
+  }
+
+  const handleResetFilter = () => {
+    setSearchQuery("")
+    setSelectedStatus("all")
+    setSelectedSumber("all")
+    setSelectedKelas("all")
+    setSelectedTahunAjaran("all")
+    setAppliedSearchQuery("")
+    setAppliedStatus("all")
+    setAppliedSumber("all")
+    setAppliedKelas("all")
+    setAppliedTahunAjaran("all")
+    setCurrentPage(1)
   }
 
   // ── Derived stats ─────────────────────────────────────────────────────────
@@ -154,11 +180,11 @@ export default function TagihanPage() {
   // But we still apply local filters for kelas and tahunAjaran since backend doesn't support them yet
   const filteredData = useMemo(() => {
     return tagihanData.filter((row) => {
-      const matchesKelas = selectedKelas === "all" || row.kelasSaatIni === selectedKelas
-      const matchesTahunAjaran = selectedTahunAjaran === "all" || row.tahunAjaran === selectedTahunAjaran
+      const matchesKelas = appliedKelas === "all" || row.kelasSaatIni === appliedKelas
+      const matchesTahunAjaran = appliedTahunAjaran === "all" || row.tahunAjaran === appliedTahunAjaran
       return matchesKelas && matchesTahunAjaran
     })
-  }, [tagihanData, selectedKelas, selectedTahunAjaran])
+  }, [tagihanData, appliedKelas, appliedTahunAjaran])
 
   const totalTunggakanFiltered = filteredData.reduce((s, r) => s + r.totalTunggakan, 0)
   
@@ -275,6 +301,111 @@ export default function TagihanPage() {
         </Card>
       </div>
 
+      {/* Collapsible Filter Bar */}
+      <Card className="border">
+        <Collapsible open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              className="h-14 w-full justify-between rounded-none bg-white px-5 text-base font-semibold text-foreground shadow-none hover:bg-white hover:text-foreground animate-none"
+            >
+              <span className="flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filter Data
+              </span>
+              <ChevronDown className="h-5 w-5" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="border-t p-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <div className="space-y-2">
+                  <Label>Kata Kunci</Label>
+                  <Input
+                    placeholder="Masukan nama atau nomor induk"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pilih Unit/Sumber</Label>
+                  <Select value={selectedSumber} onValueChange={setSelectedSumber}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Sumber" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Sumber</SelectItem>
+                      <SelectItem value="santri">Santri</SelectItem>
+                      <SelectItem value="ppdb">PPDB</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Pilih Kelas</Label>
+                  <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Kelas</SelectItem>
+                      {kelasOptions.map((k) => (
+                        <SelectItem key={k} value={k}>
+                          Kelas {k}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Tahun Ajaran</Label>
+                  <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Tahun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {tahunAjaranOptions.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          TA {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Status Pembayaran</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="mt-4 flex items-center gap-2">
+                <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={handleApplyFilter}>
+                  Terapkan Filter
+                </Button>
+                <Button variant="outline" onClick={handleResetFilter}>
+                  Reset Filter
+                </Button>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
       {/* Table Card */}
       <Card className="border-border/50">
         <CardHeader>
@@ -287,70 +418,6 @@ export default function TagihanPage() {
                   ? ` · Total Tunggakan: ${formatCurrency(totalTunggakanFiltered)}`
                   : ""}
               </CardDescription>
-            </div>
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-              <div className="relative w-full sm:w-60">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  id="search-tagihan"
-                  placeholder="Cari nama, nomor induk..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="w-full sm:w-[160px]" id="filter-status-tagihan">
-                  <Filter className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {sumberOptions.length > 0 && (
-                <Select value={selectedSumber} onValueChange={setSelectedSumber}>
-                  <SelectTrigger className="w-full sm:w-[110px]" id="filter-sumber-tagihan">
-                    <SelectValue placeholder="Sumber" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Semua</SelectItem>
-                    <SelectItem value="santri">Santri</SelectItem>
-                    <SelectItem value="ppdb">PPDB</SelectItem>
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={selectedKelas} onValueChange={setSelectedKelas}>
-                <SelectTrigger className="w-full sm:w-[130px]" id="filter-kelas-tagihan">
-                  <SelectValue placeholder="Semua Kelas" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Kelas</SelectItem>
-                  {kelasOptions.map((k) => (
-                    <SelectItem key={k} value={k}>
-                      Kelas {k}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
-                <SelectTrigger className="w-full sm:w-[130px]" id="filter-tahun-tagihan">
-                  <SelectValue placeholder="Semua Tahun" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Tahun</SelectItem>
-                  {tahunAjaranOptions.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      TA {t}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
         </CardHeader>

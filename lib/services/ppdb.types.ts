@@ -116,6 +116,7 @@ export interface PpdbListResponse {
 }
 
 export interface PpdbListQuery {
+  page?: number;
   per_page?: number;
   status_verifikasi?: string;
   status?: string;

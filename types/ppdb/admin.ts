@@ -99,6 +99,13 @@ export interface PpdbDetail {
   email?: string;
   tanggalDaftar: string;
   status: string;
+  statusUangPangkal?: string;
+  statusSpp?: string;
+  buktiUangPangkalPath?: string;
+  buktiSppPath?: string;
+  isAnakGuru?: boolean;
+  pilihanUangGedung?: number | null;
+  pilihanInfaqBulanan?: number | null;
 }
 
 export interface PpdbListResponse {
@@ -107,6 +114,7 @@ export interface PpdbListResponse {
 }
 
 export interface PpdbListQuery {
+  page?: number;
   per_page?: number;
   status_verifikasi?: string;
   status?: string;

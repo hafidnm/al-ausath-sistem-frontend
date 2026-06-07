@@ -5,17 +5,28 @@ import type { PpdbDetail } from '@/types/ppdb/admin';
 import { ppdbQueryKeys } from '@/hooks/ppdb/query-keys';
 import { toErrorMessage } from '@/hooks/shared/react-query-helpers';
 
-export function usePpdbList() {
+import type { PpdbListQuery } from '@/types/ppdb/admin';
+import type { PaginationMeta } from '@/lib/ppdb/admin-api';
+
+interface UsePpdbListParams extends PpdbListQuery {
+  enabled?: boolean;
+}
+
+export function usePpdbList(params?: UsePpdbListParams) {
   const queryClient = useQueryClient();
+  
+  const queryParams = { ...params };
+  delete queryParams.enabled;
+
   const { data, isFetching, error, refetch } = useQuery({
-    queryKey: ppdbQueryKeys.adminList,
+    queryKey: [...ppdbQueryKeys.adminList, queryParams],
     queryFn: async () => {
-      const response = await ppdbAdminApi.getList({ per_page: 1000 });
-      return response.data;
+      const response = await ppdbAdminApi.getList({ per_page: 15, ...queryParams });
+      return response;
     },
-    enabled: false,
-    initialData: [] as PpdbDetail[],
-    staleTime: 0,
+    enabled: params?.enabled ?? true,
+    initialData: { data: [] as PpdbDetail[], meta: undefined as PaginationMeta | undefined },
+    staleTime: 5000,
   });
 
   const fetchList = useCallback(async () => {
@@ -24,7 +35,7 @@ export function usePpdbList() {
     if (result.error) {
       throw result.error;
     }
-    return result.data || [];
+    return result.data?.data || [];
   }, [queryClient, refetch]);
 
   const updateStatusByIds = useCallback((ids: string[], status: string) => {
@@ -33,27 +44,28 @@ export function usePpdbList() {
 
     const idSet = new Set(validIds);
 
-    queryClient.setQueryData(ppdbQueryKeys.adminList, (prevData: PpdbDetail[] | undefined) => {
-      const prev = prevData || [];
-      return prev.map((item) => {
-        const itemIds = [item.pendaftaranId, item.id, item.userId, item.noPendaftaran].filter(
-          (id): id is string => Boolean(id && id.trim().length > 0),
-        );
+    queryClient.setQueryData([...ppdbQueryKeys.adminList, queryParams], (prevData: { data: PpdbDetail[], meta?: PaginationMeta } | undefined) => {
+      if (!prevData) return prevData;
+      return {
+        ...prevData,
+        data: prevData.data.map((item) => {
+          const itemIds = [item.pendaftaranId, item.id, item.userId, item.noPendaftaran].filter(
+            (id): id is string => Boolean(id && id.trim().length > 0),
+          );
 
-        if (!itemIds.some((id) => idSet.has(id))) {
-          return item;
-        }
+          if (!itemIds.some((id) => idSet.has(id))) {
+            return item;
+          }
 
-        return {
-          ...item,
-          status,
-        };
-      });
+          return { ...item, status };
+        })
+      };
     });
-  }, [queryClient]);
+  }, [queryClient, params]);
 
   return {
-    data,
+    data: data.data,
+    meta: data.meta,
     loading: isFetching,
     error: error ? toErrorMessage(error, 'Failed to fetch PPDB list') : null,
     fetchList,

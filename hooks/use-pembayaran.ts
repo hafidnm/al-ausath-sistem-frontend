@@ -60,21 +60,21 @@ export function useTagihanDetail() {
 
 export function useProsesPembayaran() {
   const query = useCallback(
-    (params?: { kode_unit?: string; kode_kelas?: string; search?: string }) =>
-      pembayaranService.getProses(params).then((r) => r.data),
+    (params?: { kode_unit?: string; kode_kelas?: string; search?: string; status?: string; page?: number; per_page?: number }) =>
+      pembayaranService.getProses(params),
     [],
   );
-  const { data, loading, error, run } = useAsyncQuery(query, [] as ProsesRow[], {
+  const { data: responseData, loading, error, run } = useAsyncQuery(query, { data: [] } as { data: ProsesRow[], meta?: any }, {
     fallbackError: 'Gagal memuat data proses pembayaran',
     logLabel: 'Error fetching proses pembayaran:',
   });
 
   const fetchProses = useCallback(
-    async (params?: { kode_unit?: string; kode_kelas?: string; search?: string }) => run(params),
+    async (params?: { kode_unit?: string; kode_kelas?: string; search?: string; status?: string; page?: number; per_page?: number }) => run(params),
     [run],
   );
 
-  return { data, loading, error, fetchProses };
+  return { data: responseData?.data || [], meta: responseData?.meta, loading, error, fetchProses };
 }
 
 // ─── Verifikasi Pembayaran ────────────────────────────────────────────────────

@@ -100,6 +100,7 @@ export default function PpdbPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedProgram, setSelectedProgram] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
 
   // Tes konfigurasi state
   const [selectedJenjangTes, setSelectedJenjangTes] = useState<TesKonfigurasiJenjangKey>("MI")
@@ -108,7 +109,13 @@ export default function PpdbPage() {
   const [isTesConfigSaving, setIsTesConfigSaving] = useState(false)
 
   // Hooks
-  const { data: ppdbData, loading, error, fetchList, updateStatusByIds } = usePpdbList()
+  const { data: ppdbData, meta: ppdbMeta, loading, error, fetchList, updateStatusByIds } = usePpdbList({
+    page: currentPage,
+    per_page: 15,
+    q: searchQuery || undefined,
+    status_verifikasi: selectedStatus === "all" ? undefined : selectedStatus.toLowerCase(),
+    jenjang: selectedProgram === "all" ? undefined : selectedProgram,
+  })
   const { create: createPendaftar, loading: createLoading } = useCreatePpdb()
   const { deleteItem: deletePendaftar, loading: deleteLoading } = useDeletePpdb()
   const { updateTestResult, loading: testResultLoading } = useUpdatePpdbTestResult()
@@ -137,10 +144,11 @@ export default function PpdbPage() {
     : null
 
   const programOptions = useMemo(() => {
-    const set = new Set<string>()
+    const defaultOptions = ['MI', 'MTS', 'MA']
+    const set = new Set<string>(defaultOptions)
     ppdbData.forEach((item) => {
       const c = item.programPendaftaran || item.jenjang
-      if (c?.trim()) set.add(c)
+      if (c?.trim()) set.add(c.toUpperCase())
     })
     return Array.from(set).sort((a, b) => a.localeCompare(b, "id"))
   }, [ppdbData])
@@ -374,12 +382,15 @@ export default function PpdbPage() {
     try {
       const blob = await ppdbAdminApi.exportPendaftar({
         jenjang: selectedProgram === "all" ? undefined : selectedProgram,
-        status_verifikasi: "diterima",
+        status_verifikasi: selectedStatus === "all" ? undefined : selectedStatus,
+        q: searchQuery || undefined,
       })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `ppdb-diterima-${new Date().toISOString().slice(0, 10)}.csv`
+      const statusSuffix = selectedStatus === "all" ? "semua" : selectedStatus.toLowerCase()
+      const programSuffix = selectedProgram === "all" ? "semua" : selectedProgram.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()
+      a.download = `ppdb-export-${statusSuffix}-${programSuffix}-${new Date().toISOString().slice(0, 10)}.csv`
       document.body.appendChild(a); a.click(); a.remove()
       window.URL.revokeObjectURL(url)
     } catch (err) {
@@ -442,7 +453,9 @@ export default function PpdbPage() {
   }
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  const totalPendaftar = ppdbData.length
+  // Note: For true global stats across all pages, consider updating backend to provide global counters.
+  // For now, these represent counts from the overall paginator (total) and the current page items.
+  const totalPendaftar = ppdbMeta?.total ?? ppdbData.length
   const totalMenunggu = ppdbData.filter((i) => i.status === "Menunggu").length
   const totalDiterima = ppdbData.filter((i) => i.status === "Diterima").length
   const totalDitolak = ppdbData.filter((i) => i.status === "Ditolak").length
@@ -467,7 +480,7 @@ export default function PpdbPage() {
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handleExport} disabled={isExportLoading}>
             {isExportLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-            {isExportLoading ? "Exporting..." : "Export Diterima"}
+            {isExportLoading ? "Exporting..." : "Export Excel"}
           </Button>
           <PpdbAddDialog
             open={isAddOpen}
@@ -500,6 +513,9 @@ export default function PpdbPage() {
           {/* Tabel */}
           <PpdbTable
             data={ppdbData}
+            meta={ppdbMeta}
+            currentPage={currentPage}
+            onPageChange={setCurrentPage}
             loading={loading}
             searchQuery={searchQuery}
             selectedStatus={selectedStatus}
@@ -507,9 +523,9 @@ export default function PpdbPage() {
             programOptions={programOptions}
             verificationLoading={verificationLoading}
             deleteLoading={deleteLoading}
-            onSearchChange={setSearchQuery}
-            onStatusChange={setSelectedStatus}
-            onProgramChange={setSelectedProgram}
+            onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1) }}
+            onStatusChange={(val) => { setSelectedStatus(val); setCurrentPage(1) }}
+            onProgramChange={(val) => { setSelectedProgram(val); setCurrentPage(1) }}
             onDetail={handleOpenDetail}
             onVerifikasi={handleVerifikasi}
             onDelete={handleDeletePendaftar}

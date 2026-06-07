@@ -5,19 +5,46 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, GraduationCap, Percent,
-  Info, Loader2, BookOpen, Home, CalendarDays,
+  Info, Loader2, CheckCircle2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
+import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+
+const OPSI_UANG_GEDUNG = [
+  { value: 1, label: 'Pilihan A', amount: 1_500_000, display: 'Rp 1.500.000' },
+  { value: 2, label: 'Pilihan B', amount: 2_000_000, display: 'Rp 2.000.000' },
+];
+
+const OPSI_INFAQ_BULANAN = [
+  { value: 1, label: 'Pilihan A', amount: 650_000, display: 'Rp 650.000' },
+  { value: 2, label: 'Pilihan B', amount: 700_000, display: 'Rp 700.000' },
+];
+
+const FIXED_UANG_PANGKAL_ITEMS = [
+  { label: 'Meja belajar', amount: 100_000, note: 'hak pakai 3 tahun' },
+  { label: 'Papan sekat tidur', amount: 100_000, note: 'hak pakai 3 tahun' },
+  { label: 'Almari (pakaian & buku)', amount: 300_000, note: 'hak pakai 3 tahun' },
+  { label: 'Kasur', amount: 375_000, note: 'hak milik' },
+];
+
+const UANG_MODUL = 250_000;
+
+const formatRupiah = (amount: number) =>
+  'Rp ' + amount.toLocaleString('id-ID');
 
 export default function PpdbInfoInfaqPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, loading, fetchDashboard } = usePpdbPortalDashboard();
-  const [isAnakGuru, setIsAnakGuru] = useState(false);
+
+  const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
+  const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
+  const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     void fetchDashboard().catch(() => {
@@ -25,23 +52,61 @@ export default function PpdbInfoInfaqPage() {
     });
   }, [fetchDashboard, toast]);
 
+  // Sync from backend data once loaded
   useEffect(() => {
     if (!data) return;
+
+    // Redirect guards
     if (data.step === 'siap-menjadi-santri') {
       router.replace('/ppdb/dashboard/pembayaran');
       return;
     }
     if (data.step !== 'pembayaran-ppdb') {
       router.replace('/ppdb/dashboard');
+      return;
+    }
+
+    // Pre-fill from previously saved choices
+    if (data.pilihanUangGedung === 1 || data.pilihanUangGedung === 2) {
+      setPilihanUangGedung(data.pilihanUangGedung);
+    }
+    if (data.pilihanInfaqBulanan === 1 || data.pilihanInfaqBulanan === 2) {
+      setPilihanInfaqBulanan(data.pilihanInfaqBulanan);
+    }
+    if (typeof data.isAnakGuru === 'boolean') {
+      setIsAnakGuru(data.isAnakGuru);
     }
   }, [data, router]);
 
-  const handleLanjut = () => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('ppdb_infaq_acknowledged', '1');
-      if (isAnakGuru) sessionStorage.setItem('ppdb_is_anak_guru', '1');
+  // Computed totals
+  const gedungAmount = OPSI_UANG_GEDUNG.find(o => o.value === pilihanUangGedung)!.amount;
+  const fixedTotal = FIXED_UANG_PANGKAL_ITEMS.reduce((s, i) => s + i.amount, 0);
+  const totalUangPangkal = gedungAmount + fixedTotal; // e.g. 2.375.000 or 2.875.000
+  const totalKeseluruhan = totalUangPangkal + UANG_MODUL;
+  const infaqBulananDisplay = OPSI_INFAQ_BULANAN.find(o => o.value === pilihanInfaqBulanan)!.display;
+
+  const handleLanjut = async () => {
+    setSubmitting(true);
+    try {
+      await ppdbPortalApi.updateForm({
+        is_anak_guru: isAnakGuru,
+        pilihan_uang_gedung: pilihanUangGedung,
+        pilihan_infaq_bulanan: pilihanInfaqBulanan,
+      });
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('ppdb_infaq_acknowledged', '1');
+        if (isAnakGuru) sessionStorage.setItem('ppdb_is_anak_guru', '1');
+      }
+      router.push('/ppdb/dashboard/pembayaran');
+    } catch (err) {
+      toast({
+        title: 'Gagal menyimpan pilihan',
+        description: err instanceof Error ? err.message : 'Silahkan coba lagi',
+        variant: 'destructive',
+      });
+    } finally {
+      setSubmitting(false);
     }
-    router.push('/ppdb/dashboard/pembayaran');
   };
 
   if (loading && !data) {
@@ -51,14 +116,6 @@ export default function PpdbInfoInfaqPage() {
       </div>
     );
   }
-
-  const feeItems = [
-    { label: 'Uang gedung dll', amount: 'Rp 1.500.000', alt: 'Rp 2.000.000', note: '' },
-    { label: 'Meja belajar', amount: 'Rp 100.000', note: 'hak pakai 3 tahun' },
-    { label: 'Papan sekat tidur', amount: 'Rp 100.000', note: 'hak pakai 3 tahun' },
-    { label: 'Almari (pakaian & buku)', amount: 'Rp 300.000', note: 'hak pakai 3 tahun' },
-    { label: 'Kasur', amount: 'Rp 375.000', note: 'hak milik' },
-  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8 px-4">
@@ -74,7 +131,7 @@ export default function PpdbInfoInfaqPage() {
           <p className="text-xs font-medium uppercase tracking-widest text-emerald-600">Langkah Berikutnya</p>
           <h1 className="text-2xl font-bold">Informasi Infaq Pendidikan</h1>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            Harap baca informasi di bawah sebelum melanjutkan ke halaman pembayaran administrasi PPDB.
+            Pilih opsi infaq sesuai kemampuan Anda, lalu lanjutkan ke pembayaran administrasi PPDB.
           </p>
         </div>
 
@@ -93,7 +150,7 @@ export default function PpdbInfoInfaqPage() {
           </CardContent>
         </Card>
 
-        {/* 1. Uang Pangkal */}
+        {/* 1. Uang Pangkal dengan pilihan uang gedung */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -102,20 +159,48 @@ export default function PpdbInfoInfaqPage() {
             </CardTitle>
             <CardDescription className="text-xs">Satu kali selama 3 tahun menjadi santri</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            {/* Uang Gedung — pilihan */}
+            <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 space-y-2">
+              <p className="text-sm font-medium">Uang gedung dll — pilih salah satu:</p>
+              <div className="flex gap-4">
+                {OPSI_UANG_GEDUNG.map((opsi) => (
+                  <button
+                    key={opsi.value}
+                    type="button"
+                    onClick={() => setPilihanUangGedung(opsi.value as 1 | 2)}
+                    className={`flex-1 rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-all focus:outline-none ${
+                      pilihanUangGedung === opsi.value
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-md'
+                        : 'border-border bg-white text-foreground hover:border-blue-400'
+                    }`}
+                  >
+                    <span className="block text-xs font-normal mb-0.5 opacity-80">{opsi.label}</span>
+                    {opsi.display}
+                    {pilihanUangGedung === opsi.value && (
+                      <CheckCircle2 className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Fixed items */}
             <div className="divide-y text-sm">
-              {feeItems.map((item) => (
+              {FIXED_UANG_PANGKAL_ITEMS.map((item) => (
                 <div key={item.label} className="flex justify-between items-center py-2">
                   <div>
                     <span>{item.label}</span>
                     {item.note && <span className="text-xs text-muted-foreground ml-1.5">({item.note})</span>}
                   </div>
-                  <div className="text-right font-medium text-primary">
-                    {item.amount}
-                    {item.alt && <span className="text-muted-foreground font-normal"> / {item.alt}</span>}
-                  </div>
+                  <span className="font-medium text-primary">{formatRupiah(item.amount)}</span>
                 </div>
               ))}
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t text-sm font-semibold">
+              <span>Subtotal Uang Pangkal</span>
+              <span className="text-blue-700">{formatRupiah(totalUangPangkal)}</span>
             </div>
           </CardContent>
         </Card>
@@ -131,12 +216,12 @@ export default function PpdbInfoInfaqPage() {
           <CardContent>
             <div className="flex justify-between text-sm">
               <span>Infaq modul semester ganjil</span>
-              <span className="font-medium text-primary">Rp 250.000</span>
+              <span className="font-medium text-primary">{formatRupiah(UANG_MODUL)}</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* 3. Bulanan */}
+        {/* 3. Bulanan dengan pilihan */}
         <Card className="shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -145,10 +230,26 @@ export default function PpdbInfoInfaqPage() {
             </CardTitle>
             <CardDescription className="text-xs">Pembayaran awal ketika santri sudah masuk KBM</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>Infaq bulanan santri asrama</span>
-              <span className="font-medium text-primary">Rp 650.000 / Rp 700.000</span>
+          <CardContent className="space-y-3">
+            <div className="flex gap-4">
+              {OPSI_INFAQ_BULANAN.map((opsi) => (
+                <button
+                  key={opsi.value}
+                  type="button"
+                  onClick={() => setPilihanInfaqBulanan(opsi.value as 1 | 2)}
+                  className={`flex-1 rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-all focus:outline-none ${
+                    pilihanInfaqBulanan === opsi.value
+                      ? 'border-amber-600 bg-amber-600 text-white shadow-md'
+                      : 'border-border bg-white text-foreground hover:border-amber-400'
+                  }`}
+                >
+                  <span className="block text-xs font-normal mb-0.5 opacity-80">{opsi.label}</span>
+                  {opsi.display}
+                  {pilihanInfaqBulanan === opsi.value && (
+                    <CheckCircle2 className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5" />
+                  )}
+                </button>
+              ))}
             </div>
             <p className="text-xs text-muted-foreground">
               Jika dalam waktu 2 bulan berturutan infaq ini tidak ditunaikan, Madrasah bisa
@@ -157,23 +258,27 @@ export default function PpdbInfoInfaqPage() {
           </CardContent>
         </Card>
 
-        {/* Summary */}
+        {/* Summary dinamis */}
         <Card className="shadow-sm bg-primary/5 border-primary/20">
           <CardContent className="pt-5 space-y-2">
             <p className="text-sm font-semibold">Jumlah Infaq Pendidikan Ananda:</p>
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">
                 <span>1. Uang Pangkal</span>
-                <span className="font-medium">Rp 2.375.000</span>
+                <span className="font-medium">{formatRupiah(totalUangPangkal)}</span>
               </div>
               <div className="flex justify-between">
                 <span>2. Infaq Uang Modul</span>
-                <span className="font-medium">Rp 250.000</span>
+                <span className="font-medium">{formatRupiah(UANG_MODUL)}</span>
               </div>
               <div className="flex justify-between border-t pt-2 font-bold">
-                <span>JUMLAH</span>
-                <span className="text-primary">Rp 2.625.000</span>
+                <span>JUMLAH (tanpa SPP)</span>
+                <span className="text-primary">{formatRupiah(totalKeseluruhan)}</span>
               </div>
+            </div>
+            <div className="rounded-md bg-amber-50 border border-amber-100 px-3 py-2 text-xs text-amber-800 mt-1">
+              Infaq bulanan / SPP: <span className="font-semibold">{infaqBulananDisplay}</span> per bulan
+              (dibayarkan setelah masuk KBM)
             </div>
             <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
               Pembayaran daftar ulang <strong>minimal 50%</strong> dan sisanya bisa diangsur,
@@ -187,38 +292,72 @@ export default function PpdbInfoInfaqPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <GraduationCap className="w-4 h-4 text-amber-600" />
-              Informasi Diskon
+              Informasi Diskon Anak Guru
             </CardTitle>
             <CardDescription className="text-xs">
               Apakah calon santri adalah anak dari guru / pengajar Pondok Pesantren Al Ausath?
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <label className="flex items-start gap-3 cursor-pointer">
-              <div
-                onClick={() => setIsAnakGuru((v) => !v)}
-                className={`w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors cursor-pointer ${
-                  isAnakGuru ? 'bg-amber-500 border-amber-500' : 'border-muted-foreground/40 hover:border-amber-400'
-                }`}
+            <div className="flex gap-6">
+              {/* Ya */}
+              <label
+                htmlFor="anak-guru-ya"
+                className="flex items-center gap-2.5 cursor-pointer select-none"
               >
-                {isAnakGuru && (
-                  <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </div>
-              <span className="text-sm">
-                Ya, saya adalah putra/putri dari guru atau pengajar di Ponpes Al Ausath
-              </span>
-            </label>
+                <div
+                  id="anak-guru-ya"
+                  role="radio"
+                  aria-checked={isAnakGuru === true}
+                  tabIndex={0}
+                  onClick={() => setIsAnakGuru(true)}
+                  onKeyDown={(e) => e.key === 'Enter' && setIsAnakGuru(true)}
+                  className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer focus:outline-none ${
+                    isAnakGuru === true
+                      ? 'border-amber-500 bg-amber-500'
+                      : 'border-muted-foreground/40 hover:border-amber-400'
+                  }`}
+                >
+                  {isAnakGuru === true && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+                <span className="text-sm font-medium">Ya</span>
+              </label>
 
-            {isAnakGuru && (
+              {/* Tidak */}
+              <label
+                htmlFor="anak-guru-tidak"
+                className="flex items-center gap-2.5 cursor-pointer select-none"
+              >
+                <div
+                  id="anak-guru-tidak"
+                  role="radio"
+                  aria-checked={isAnakGuru === false}
+                  tabIndex={0}
+                  onClick={() => setIsAnakGuru(false)}
+                  onKeyDown={(e) => e.key === 'Enter' && setIsAnakGuru(false)}
+                  className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer focus:outline-none ${
+                    isAnakGuru === false
+                      ? 'border-primary bg-primary'
+                      : 'border-muted-foreground/40 hover:border-primary/60'
+                  }`}
+                >
+                  {isAnakGuru === false && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+                <span className="text-sm font-medium">Tidak</span>
+              </label>
+            </div>
+
+            {isAnakGuru === true && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex gap-2">
                 <Percent className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-800">Diskon 50% untuk Anak Guru</p>
                   <p className="text-xs text-amber-700 mt-0.5">
-                    Admin akan memverifikasi status dan menyesuaikan nominal tagihan Anda.
+                    Admin akan memverifikasi status dan menyesuaikan nominal tagihan administrasi PPDB Anda.
                   </p>
                 </div>
               </div>
@@ -244,7 +383,7 @@ export default function PpdbInfoInfaqPage() {
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Saya telah membaca dan memahami informasi infaq pendidikan di atas, serta bersedia
-                memenuhi kewajiban infaq dengan niat lillahi ta&apos;ala.
+                memenuhi kewajiban infaq sesuai pilihan saya, dengan niat lillahi ta&apos;ala.
               </p>
             </label>
           </CardContent>
@@ -255,8 +394,8 @@ export default function PpdbInfoInfaqPage() {
                 Kembali
               </Link>
             </Button>
-            <Button onClick={handleLanjut} disabled={!confirmed} className="gap-2">
-              Lanjut ke Pembayaran
+            <Button onClick={handleLanjut} disabled={!confirmed || submitting} className="gap-2">
+              {submitting ? 'Menyimpan...' : 'Lanjut ke Pembayaran'}
               <ArrowRight className="w-4 h-4" />
             </Button>
           </CardFooter>
