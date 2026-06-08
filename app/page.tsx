@@ -23,7 +23,7 @@ export default function LandingPage() {
   const [pengumumanLoading, setPengumumanLoading] = React.useState(true)
   const [pengumumanError, setPengumumanError] = React.useState<string | null>(null)
 
-  const { isOpen, period, loading: periodLoading } = usePpdbPortalPeriodCheck()
+  const { isOpen, isKuotaPenuh, period, loading: periodLoading } = usePpdbPortalPeriodCheck()
 
   React.useEffect(() => {
     let isMounted = true
@@ -125,6 +125,11 @@ export default function LandingPage() {
                 <Loader2 className="w-3 h-3 animate-spin" />
                 Mengecek status PPDB...
               </div>
+            ) : isKuotaPenuh ? (
+              <div className="inline-flex items-center gap-2 bg-red-500/10 text-red-600 border border-red-500/20 px-4 py-1.5 rounded-full text-xs font-semibold">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                PPDB {period?.nama_gelombang} TA {period?.tahun_ajaran} - Kuota Penuh
+              </div>
             ) : isOpen && period ? (
               <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 px-4 py-1.5 rounded-full text-xs font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -147,12 +152,19 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 w-full sm:w-auto">
-              <Link href="/ppdb/register" className="w-full sm:w-auto">
-                <Button size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+              {isKuotaPenuh ? (
+                <Button size="lg" disabled className="w-full sm:w-auto bg-gray-400 text-gray-600 cursor-not-allowed hover:bg-gray-400">
                   <Calendar className="w-4 h-4 mr-2" />
-                  Daftar PPDB
+                  Daftar PPDB (Kuota Penuh)
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/ppdb/register" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full bg-primary text-primary-foreground hover:bg-primary/90">
+                    <Calendar className="w-4 h-4 mr-2" />
+                    Daftar PPDB
+                  </Button>
+                </Link>
+              )}
               <Link href="/login" className="w-full sm:w-auto">
                 <Button size="lg" variant="outline" className="w-full">
                   <Users className="w-4 h-4 mr-2" />

@@ -56,12 +56,18 @@ export default function PpdbInfoInfaqPage() {
   useEffect(() => {
     if (!data) return;
 
-    // Redirect guards
+    // Redirect guards: halaman ini hanya untuk step 'infaq'
     if (data.step === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/siap-menjadi-santri');
+      return;
+    }
+    if (data.step === 'pembayaran-ppdb') {
+      // Infaq sudah diisi, lanjut ke pembayaran
       router.replace('/ppdb/dashboard/pembayaran');
       return;
     }
-    if (data.step !== 'pembayaran-ppdb') {
+    if (data.step !== 'infaq') {
+      // Step lain: kembalikan ke dashboard agar diarahkan dengan benar
       router.replace('/ppdb/dashboard');
       return;
     }

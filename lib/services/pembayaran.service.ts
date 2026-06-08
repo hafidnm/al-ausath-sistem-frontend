@@ -46,6 +46,7 @@ export interface TagihanRow {
   totalDibayar: number;
   totalTunggakan: number;
   sumber: 'santri' | 'ppdb';
+  isAnakGuru: boolean;
 }
 
 export interface TagihanDetailResponse {
@@ -58,6 +59,7 @@ export interface TagihanDetailResponse {
     kelas_sekarang: string | null;
     tahun_ajaran: string | null;
     status: string | null;
+    isAnakGuru?: boolean;
   };
   ringkasan: {
     jumlah_invoice: number;
@@ -96,6 +98,7 @@ export interface ProsesRow {
   kodeUnit?: string;
   status: StatusPembayaran;
   daftarInvoice: InvoiceItem[];
+  isAnakGuru?: boolean;
 }
 
 export interface InvoiceItem {
@@ -118,6 +121,7 @@ export interface VerifikasiRow {
   statusPembayaran: StatusPembayaran;
   waktuInvoice: string;
   noHp?: string;
+  isAnakGuru?: boolean;
 }
 
 /** Detail invoice (GET /{id}/detail) */
@@ -325,6 +329,7 @@ const normalizeTagihanRow = (item: ApiRecord): TagihanRow => ({
       ),
   ),
   sumber: toStr(item.sumber ?? '').toLowerCase().includes('ppdb') ? 'ppdb' : 'santri',
+  isAnakGuru: Boolean(item.is_anak_guru ?? item.isAnakGuru ?? false),
 });
 
 const normalizeVerifikasiRow = (item: ApiRecord): VerifikasiRow => {
@@ -342,6 +347,7 @@ const normalizeVerifikasiRow = (item: ApiRecord): VerifikasiRow => {
     statusPembayaran: normalizeStatus(item.status_pembayaran ?? item.status_key ?? item.status ?? ''),
     waktuInvoice: toStr(item.waktu_invoice ?? item.waktuInvoice ?? item.tanggal_bayar ?? item.created_at ?? ''),
     noHp: toStr(item.no_hp ?? item.phone ?? item.telepon ?? item.whatsapp ?? ''),
+    isAnakGuru: Boolean(item.is_anak_guru ?? item.isAnakGuru ?? false),
   };
 };
 
@@ -373,6 +379,7 @@ const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
       status: normalizeStatus(inv.status_key ?? inv.status ?? ''),
       tanggal: toStr(inv.waktu_invoice ?? inv.tanggal ?? inv.created_at ?? ''),
     })),
+    isAnakGuru: Boolean(item.is_anak_guru ?? item.isAnakGuru ?? false),
   };
 };
 
@@ -406,6 +413,7 @@ export const pembayaranService = {
           kelas_sekarang: toStr((raw.profil as ApiRecord)?.kelas_sekarang ?? '') || null,
           tahun_ajaran: toStr((raw.profil as ApiRecord)?.tahun_ajaran ?? '') || null,
           status: toStr((raw.profil as ApiRecord)?.status ?? '') || null,
+          isAnakGuru: Boolean((raw.profil as ApiRecord)?.is_anak_guru ?? (raw.profil as ApiRecord)?.isAnakGuru ?? false),
         },
         ringkasan: {
           jumlah_invoice: toNum((raw.ringkasan as ApiRecord)?.jumlah_invoice ?? 0),

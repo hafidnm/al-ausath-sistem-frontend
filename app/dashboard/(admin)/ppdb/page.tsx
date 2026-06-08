@@ -72,8 +72,10 @@ const normalizeTesJenjang = (value?: string | null): TesKonfigurasiJenjangKey | 
   return null
 }
 
+import { toErrorMessage } from "@/hooks/shared/react-query-helpers"
+
 const getErrorMessage = (error: unknown, fallback: string) =>
-  error instanceof Error ? error.message : fallback
+  toErrorMessage(error, fallback)
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -302,6 +304,11 @@ export default function PpdbPage() {
 
   const handleVerifikasi = async (p: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => {
     if (status === "Diterima") {
+      // Check if santri has been verified before accepting
+      if (p.status !== "Terverifikasi") {
+        alert("Santri harus diverifikasi terlebih dahulu sebelum dapat diterima. Status saat ini: " + (p.status || "Menunggu"))
+        return
+      }
       setTerimaPendaftar(p)
       setIsTerimaOpen(true)
       void loadKelasList()

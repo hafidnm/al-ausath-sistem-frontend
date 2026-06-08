@@ -438,13 +438,20 @@ export default function SppTagihanDetailPage() {
         <Card className="md:col-span-1 border-border/50">
           <CardContent className="p-6">
             {/* Avatar */}
-            <div className="flex flex-col items-center mb-5">
-              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border mb-3">
+            <div className="flex flex-col items-center mb-5 gap-2">
+              <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center border-2 border-border mb-1">
                 <User className="w-10 h-10 text-muted-foreground" />
               </div>
-              <Badge className="bg-emerald-500/15 text-emerald-700 border-0 text-xs px-3">
-                {data.profil?.status?.toUpperCase() ?? "AKTIF"}
-              </Badge>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                <Badge className="bg-emerald-500/15 text-emerald-700 border-0 text-xs px-3">
+                  {data.profil?.status?.toUpperCase() ?? "AKTIF"}
+                </Badge>
+                {data.profil?.isAnakGuru && (
+                  <Badge className="bg-amber-500/15 text-amber-600 border-0 text-xs px-3 font-semibold">
+                    Anak Guru
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Profile Fields */}

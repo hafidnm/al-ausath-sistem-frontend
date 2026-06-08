@@ -5,6 +5,7 @@ export type PpdbVerificationStatus = 'Menunggu' | 'Terverifikasi' | 'Diterima' |
 export type PpdbPortalStep =
   | 'lengkapi-form'
   | 'tes'
+  | 'infaq'
   | 'menunggu-pengumuman'
   | 'pengumuman'
   | 'pembayaran-ppdb'

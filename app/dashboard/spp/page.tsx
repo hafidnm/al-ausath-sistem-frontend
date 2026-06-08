@@ -471,7 +471,16 @@ export default function TagihanPage() {
                       <TableCell className="font-mono text-sm">
                         {row.nomorInduk || "-"}
                       </TableCell>
-                      <TableCell className="font-medium">{row.namaLengkap || "-"}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{row.namaLengkap || "-"}</span>
+                          {row.isAnakGuru && (
+                            <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/20 border-0 font-medium text-[10px] px-1.5 py-0.5">
+                              Anak Guru
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{row.kelasSaatIni || "-"}</TableCell>
                       <TableCell>{row.tahunAjaran || "-"}</TableCell>
                       <TableCell>

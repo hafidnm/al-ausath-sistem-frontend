@@ -91,6 +91,9 @@ export default function PpdbDashboardPage() {
   const isSavingRef = useRef(false);
   const hasHydratedFromServerRef = useRef(false);
   const lastSavedSignatureRef = useRef('');
+  // Flag ini hanya true ketika user klik tombol "Simpan Form PPDB" secara manual.
+  // Digunakan agar redirect ke pengumuman/payment tidak terpicu oleh autosave.
+  const hasUserSubmittedRef = useRef(false);
 
   // Isu 8: Preview URL untuk file yang baru dipilih (belum upload)
   const [filePreviewUrls, setFilePreviewUrls] = useState<{
@@ -196,6 +199,12 @@ export default function PpdbDashboardPage() {
       return;
     }
 
+    // Step 'infaq': wajib dilewati sebelum pembayaran
+    if (data.step === 'infaq') {
+      router.replace('/ppdb/dashboard/infaq');
+      return;
+    }
+
     if (data.step === 'pembayaran-uang-pangkal' || data.step === 'gagal-bayar-uang-pangkal') {
       router.replace('/ppdb/dashboard/uang-pangkal');
       return;
@@ -212,28 +221,20 @@ export default function PpdbDashboardPage() {
     }
 
     if (data.step === 'pembayaran-ppdb') {
-      const infaqAcknowledged =
-        typeof window !== 'undefined' && sessionStorage.getItem('ppdb_infaq_acknowledged');
-      router.replace(infaqAcknowledged ? '/ppdb/dashboard/pembayaran' : '/ppdb/dashboard/infaq');
+      router.replace('/ppdb/dashboard/pembayaran');
       return;
     }
 
-    // Redirect ke pengumuman HANYA jika sudah benar-benar selesai:
-    // - step menunggu-pengumuman/pengumuman, ATAU
-    // - formCompleted DAN semua dokumen wajib sudah ada
-    const allDocsUploaded = Boolean(
-      data.berkasAktaUrl &&
-      data.berkasKkUrl &&
-      data.berkasRekomendasiUstadzUrl &&
-      data.berkasSuratPernyataanUrl
-    );
-
+    // Redirect ke pengumuman HANYA jika:
+    // 1. Backend mengembalikan step 'menunggu-pengumuman' atau 'pengumuman'
+    // 2. DAN user sudah klik tombol Simpan (hasUserSubmittedRef) ATAU sudah selesai sejak sebelumnya
+    //    (step bukan 'lengkapi-form' lagi — artinya backend sudah konfirmasi form selesai)
+    // Jangan redirect hanya karena formCompleted+allDocs agar autosave tidak memicu redirect.
     const shouldGoPengumuman = Boolean(
       !shouldGoTes
       && (
         data.step === 'menunggu-pengumuman'
         || (data.step === 'pengumuman' && data.statusVerifikasi !== 'diterima' && data.statusVerifikasi !== 'lulus' && data.statusVerifikasi !== 'accepted')
-        || (data.formCompleted && allDocsUploaded && data.step === 'lengkapi-form')
       ),
     );
 
@@ -351,6 +352,8 @@ export default function PpdbDashboardPage() {
 
     setManualSaving(true);
     isSavingRef.current = true;
+    // Tandai bahwa user secara eksplisit menekan simpan — mengaktifkan redirect setelah save
+    hasUserSubmittedRef.current = true;
     setAutoSaveStatus('saving');
 
     try {
@@ -395,11 +398,14 @@ export default function PpdbDashboardPage() {
         return;
       }
 
+      // Step 'infaq': backend akan redirect, tapi jika ternyata ada data refreshed
+      if (refreshedDashboard?.step === 'infaq') {
+        router.replace('/ppdb/dashboard/infaq');
+        return;
+      }
+
       if (refreshedDashboard?.step === 'pembayaran-ppdb') {
-        // Go through infaq info page first before payment
-        const infaqAcknowledged =
-          typeof window !== 'undefined' && sessionStorage.getItem('ppdb_infaq_acknowledged');
-        router.replace(infaqAcknowledged ? '/ppdb/dashboard/pembayaran' : '/ppdb/dashboard/infaq');
+        router.replace('/ppdb/dashboard/pembayaran');
         return;
       }
 
@@ -432,6 +438,8 @@ export default function PpdbDashboardPage() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan form PPDB';
       setAutoSaveStatus('error');
+      // Reset flag jika save gagal agar tidak ada redirect salah
+      hasUserSubmittedRef.current = false;
       toast({
         title: 'Simpan form gagal',
         description: message,
