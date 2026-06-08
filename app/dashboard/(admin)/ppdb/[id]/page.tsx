@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { usePpdbDetail, useUpdatePpdbTestResult, useVerifyPpdbPayments } from "@/hooks/ppdb/admin"
+import { toErrorMessage } from "@/hooks/shared/react-query-helpers"
 import { ppdbAdminApi } from "@/lib/ppdb/admin-api"
 import type { PpdbDetail } from "@/types/ppdb/admin"
 
@@ -87,7 +88,7 @@ export default function PpdbDetailPage() {
     } catch (err) {
       toast({
         title: "Gagal memperbarui",
-        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        description: toErrorMessage(err, "Terjadi kesalahan"),
         variant: "destructive",
       })
     }
@@ -105,7 +106,7 @@ export default function PpdbDetailPage() {
     } catch (err) {
       toast({
         title: "Gagal memperbarui",
-        description: err instanceof Error ? err.message : "Terjadi kesalahan",
+        description: toErrorMessage(err, "Terjadi kesalahan"),
         variant: "destructive",
       })
     }
@@ -126,7 +127,7 @@ export default function PpdbDetailPage() {
         catatanTes: res.catatanTes || "",
       })
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal memuat detail pendaftar'
+      const msg = toErrorMessage(err, 'Gagal memuat detail pendaftar')
       setError(msg)
       toast({
         title: 'Error',
@@ -155,7 +156,7 @@ export default function PpdbDetailPage() {
     } catch (err) {
       toast({
         title: 'Gagal',
-        description: err instanceof Error ? err.message : 'Gagal menyimpan hasil tes',
+        description: toErrorMessage(err, 'Gagal menyimpan hasil tes'),
         variant: 'destructive',
       })
     }

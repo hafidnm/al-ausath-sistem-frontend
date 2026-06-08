@@ -43,6 +43,8 @@ import {
   GraduationCap,
   Tag,
   Zap,
+  Users,
+  Info,
 } from "lucide-react"
 import { useSppSettings, useCreateSppSetting, useUpdateSppSetting, useDeleteSppSetting } from "@/hooks/use-spp-setting"
 import { useMasterData } from "@/hooks/use-master-data"
@@ -340,6 +342,19 @@ export default function SppSettingsPage() {
         </div>
       </div>
 
+      {/* Anak Guru Discount Info Banner */}
+      <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800/50 px-4 py-3 text-sm">
+        <Users className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+        <div className="flex-1">
+          <p className="font-semibold text-amber-800 dark:text-amber-400">Potongan Anak Guru Aktif</p>
+          <p className="text-amber-700 dark:text-amber-500 text-xs mt-0.5">
+            Santri yang bertanda <span className="font-semibold">Anak Guru</span> akan otomatis mendapat potongan <span className="font-semibold">50%</span> dari nominal tagihan saat tagihan dibuat.
+            Kolom nominal di bawah menampilkan tarif normal dan tarif Anak Guru (50%).
+          </p>
+        </div>
+        <Info className="w-4 h-4 text-amber-500 shrink-0" />
+      </div>
+
       {/* Table */}
       <Card className="border-border/50">
         <CardContent className="p-0">
@@ -382,8 +397,14 @@ export default function SppSettingsPage() {
                           {item.kategoriTagihan?.nama_tagihan || "Umum"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-mono font-bold">
-                        {formatCurrency(item.nominal)}
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="font-mono font-bold">{formatCurrency(item.nominal)}</span>
+                          <span className="text-[10px] text-amber-600 font-medium flex items-center gap-1">
+                            <Users className="w-2.5 h-2.5" />
+                            {formatCurrency(Math.round(item.nominal * 0.5))}
+                          </span>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <Badge className={item.aktif ? "bg-emerald-500" : "bg-slate-400"}>

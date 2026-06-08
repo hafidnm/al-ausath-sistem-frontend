@@ -160,7 +160,7 @@ function ProsesPembayaranTab() {
     void fetchProses({
       page: currentPage,
       per_page: Number(rowsPerPage),
-      search: appliedKeyword || undefined,
+      q: appliedKeyword || undefined,
       kode_unit: appliedUnit !== "all" ? appliedUnit : undefined,
       kode_kelas: appliedKelas !== "all" ? appliedKelas : undefined,
       status: appliedStatus !== "all" ? appliedStatus : undefined,
@@ -428,10 +428,13 @@ function VerifikasiPembayaranTab() {
   const filtered = useMemo(() => {
     const kw = appliedKeyword.toLowerCase().trim()
     return data.filter((row: VerifikasiRow) => {
-      const matchSearch = !kw || row.namaLengkap.toLowerCase().includes(kw) || row.nomorInduk.toLowerCase().includes(kw) || row.nomorInvoice.toLowerCase().includes(kw)
+      const matchSearch = !kw || 
+        (row.namaLengkap || "").toLowerCase().includes(kw) || 
+        (row.nomorInduk || "").toLowerCase().includes(kw) || 
+        (row.nomorInvoice || "").toLowerCase().includes(kw)
       const matchStatus = appliedStatus === "all" || row.statusPembayaran === appliedStatus
       const matchJenis = appliedJenis === "all" || row.jenisTransaksi === appliedJenis
-      const matchUnit = appliedUnit === "all" || row.namaUnit.toLowerCase().includes(appliedUnit.toLowerCase())
+      const matchUnit = appliedUnit === "all" || (row.namaUnit || "").toLowerCase().includes(appliedUnit.toLowerCase())
       return matchSearch && matchStatus && matchJenis && matchUnit
     })
   }, [data, appliedKeyword, appliedStatus, appliedJenis, appliedUnit])

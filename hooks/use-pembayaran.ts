@@ -60,7 +60,7 @@ export function useTagihanDetail() {
 
 export function useProsesPembayaran() {
   const query = useCallback(
-    (params?: { kode_unit?: string; kode_kelas?: string; search?: string; status?: string; page?: number; per_page?: number }) =>
+    (params?: { kode_unit?: string; kode_kelas?: string; q?: string; status?: string; page?: number; per_page?: number }) =>
       pembayaranService.getProses(params),
     [],
   );
@@ -70,7 +70,7 @@ export function useProsesPembayaran() {
   });
 
   const fetchProses = useCallback(
-    async (params?: { kode_unit?: string; kode_kelas?: string; search?: string; status?: string; page?: number; per_page?: number }) => run(params),
+    async (params?: { kode_unit?: string; kode_kelas?: string; q?: string; status?: string; page?: number; per_page?: number }) => run(params),
     [run],
   );
 

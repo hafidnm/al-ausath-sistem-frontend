@@ -32,10 +32,11 @@ export default function PpdbTesPage() {
             description: response.message || 'Silakan menunggu pengumuman berikutnya.',
           });
 
+          // Hanya redirect ke pengumuman jika step backend memang di sana.
+          // Jangan gunakan tesSubmitted karena bisa membypass step infaq.
           const shouldGoPengumuman =
             response.step === 'menunggu-pengumuman' ||
-            response.step === 'pengumuman' ||
-            response.tesSubmitted;
+            response.step === 'pengumuman';
 
           router.replace(shouldGoPengumuman ? '/ppdb/dashboard/pengumuman' : '/ppdb/dashboard');
         }
@@ -93,7 +94,9 @@ export default function PpdbTesPage() {
         description: 'Jawaban tes berhasil dikirim ke sistem.',
       });
 
-      router.replace('/ppdb/dashboard/pengumuman');
+      // Redirect ke dashboard agar step logic menentukan halaman berikutnya
+      // (infaq → pembayaran-ppdb), bukan langsung ke pengumuman.
+      router.replace('/ppdb/dashboard');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan jawaban tes';
       toast({

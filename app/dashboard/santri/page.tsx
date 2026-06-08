@@ -80,6 +80,7 @@ interface SantriRow {
   namaWali: string
   nomorTelepon: string
   alamatEmail: string
+  isAnakGuru: boolean
 }
 
 interface KelasOption {
@@ -163,6 +164,7 @@ const normalizeSantriRow = (raw: DataSantriApiItem): SantriRow => ({
   namaWali: toText(raw.nama_wali),
   nomorTelepon: toText(raw.nomor_telepon),
   alamatEmail: toText(raw.alamat_email),
+  isAnakGuru: Boolean((raw as any).is_anak_guru ?? (raw as any).isAnakGuru ?? false),
 })
 
 const toPayload = (form: SantriFormData): DataSantriPayload => ({
@@ -1023,7 +1025,16 @@ export default function SantriPage() {
                       <TableCell>{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
                       <TableCell>{santri.namaUnit || "-"}</TableCell>
                       <TableCell>{santri.nomorInduk || "-"}</TableCell>
-                      <TableCell className="font-medium">{santri.namaLengkap || "-"}</TableCell>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{santri.namaLengkap || "-"}</span>
+                          {santri.isAnakGuru && (
+                            <Badge className="bg-amber-500/15 text-amber-600 hover:bg-amber-500/20 border-0 font-medium text-[10px] px-1.5 py-0.5">
+                              Anak Guru
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>{santri.namaKelas || "-"}</TableCell>
                       <TableCell>{santri.tahunAjaran || "-"}</TableCell>
                       <TableCell>{formatGender(santri.jenisKelamin)}</TableCell>

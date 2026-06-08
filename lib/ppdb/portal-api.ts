@@ -143,6 +143,7 @@ const normalizeStep = (value: unknown): PpdbPortalStep => {
   if (!step) return 'lengkapi-form';
 
   if (step.includes('tes')) return 'tes';
+  if (step === 'infaq') return 'infaq';
   if (step === 'pengumuman' || step === 'announcement') return 'pengumuman';
   if (step === 'pembayaran-ppdb' || step === 'pembayaran_ppdb' || step === 'pembayaran') return 'pembayaran-ppdb';
   if (step === 'pembayaran-uang-pangkal' || step === 'pembayaran_uang_pangkal') return 'pembayaran-uang-pangkal';
@@ -197,15 +198,19 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
   );
   const hasPembayaran = Boolean(rawPembayaran.id_pembayaran ?? rawPembayaran.id);
 
-  // Resolve correct step — check pembayaran step from BE
+  // Resolve correct step — ALWAYS trust the step returned by the backend.
+  // derivedStep is only used as a last-resort fallback when the backend
+  // returns no step at all (e.g. legacy endpoints).
+  // We must NOT override payment/post-acceptance steps with a derived value
+  // because that would hide the pembayaran-uang-pangkal / pembayaran-spp flow.
   const rawStep = pickValue(sources, ['step', 'tahap']);
-  // BE returns 'pembayaran-ppdb' when payment is pending, 'siap-menjadi-santri' when payment verified
   const derivedStep = showHalamanTes
     ? 'tes'
     : formCompleted || pendaftaranSelesai || soalJawab.trim().length > 0
       ? (pengumumanOpen ? 'pengumuman' : 'menunggu-pengumuman')
       : 'lengkapi-form';
-  const step = normalizeStep(rawStep ?? derivedStep);
+  // Only fall back to derivedStep when rawStep is genuinely absent
+  const step = rawStep != null ? normalizeStep(rawStep) : normalizeStep(derivedStep);
 
   return {
     idPendaftar: pickText(sources, ['idPendaftar', 'id_pendaftar', 'id_pendaftaran', 'pendaftaran_id', 'id']),
@@ -277,7 +282,7 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     pembayaranPpdb: hasPembayaran ? {
       id_pembayaran: Number(rawPembayaran.id_pembayaran ?? rawPembayaran.id) || null,
       status: asString(rawPembayaran.status) || null,
-      nominal_bayar: Number(rawPembayaran.nominal_bayar ?? rawPembayaran.nominal ?? 100000),
+      nominal_bayar: Number(rawPembayaran.nominal_bayar ?? rawPembayaran.nominal ?? 0),
       has_tagihan: true,
     } : null,
     namaGelombang: pickText(sources, ['nama_gelombang', 'namaGelombang']) || undefined,
