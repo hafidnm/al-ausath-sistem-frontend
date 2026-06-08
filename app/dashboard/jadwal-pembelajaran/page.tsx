@@ -40,6 +40,7 @@ import { dataMataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -110,6 +111,7 @@ interface KelasMapelOption extends OptionItem {
   kelompokMapel: string
   tahunAjaran: string
   semester: string
+  status: string
 }
 
 const hariOptions: Array<{ value: HariValue; label: string }> = [
@@ -295,6 +297,7 @@ const buildCsvFromRows = (rows: JadwalRow[]): string => {
 
 export default function JadwalPembelajaranPage() {
   const { toast } = useToast()
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [rows, setRows] = useState<JadwalRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -302,7 +305,7 @@ export default function JadwalPembelajaranPage() {
   const [isLoading, setIsLoading] = useState(false)
 
   const initCalledRef = useRef(false)
-  const initDoneRef = useRef(false)
+  const [isInitDone, setIsInitDone] = useState(false)
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -326,10 +329,16 @@ export default function JadwalPembelajaranPage() {
   const [kelasFilter, setKelasFilter] = useState("all")
   const [mapelFilter, setMapelFilter] = useState("all")
   const [petugasFilter, setPetugasFilter] = useState("all")
-  const [tahunFilter, setTahunFilter] = useState("all")
   const [hariFilter, setHariFilter] = useState("all")
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setCurrentPage(1)
+    }
+  }, [selectedKodeTahun])
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -388,6 +397,7 @@ export default function JadwalPembelajaranPage() {
   const kelasFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const option of kelasMapelOptions) {
+      if (option.tahunAjaran !== selectedKodeTahun) continue
       if (unitFilter !== "all" && option.kodeUnit !== unitFilter) continue
       if (!option.kodeKelas) continue
       map.set(option.kodeKelas, option.namaKelas || option.kodeKelas)
@@ -396,11 +406,12 @@ export default function JadwalPembelajaranPage() {
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([value, label]) => ({ value, label }))
-  }, [kelasMapelOptions, unitFilter])
+  }, [kelasMapelOptions, unitFilter, selectedKodeTahun])
 
   const mapelFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const option of kelasMapelOptions) {
+      if (option.tahunAjaran !== selectedKodeTahun) continue
       if (unitFilter !== "all" && option.kodeUnit !== unitFilter) continue
       if (kelasFilter !== "all" && option.kodeKelas !== kelasFilter) continue
       if (!option.kodeMapel) continue
@@ -410,7 +421,11 @@ export default function JadwalPembelajaranPage() {
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([value, label]) => ({ value, label }))
-  }, [kelasMapelOptions, unitFilter, kelasFilter])
+  }, [kelasMapelOptions, unitFilter, kelasFilter, selectedKodeTahun])
+
+  const formKelasMapelOptions = useMemo(() => {
+    return kelasMapelOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
+  }, [kelasMapelOptions, selectedKodeTahun])
 
   const visibleRows = useMemo(() => {
     let nextRows = resolvedRows
@@ -470,7 +485,7 @@ export default function JadwalPembelajaranPage() {
       const q = keyword.trim()
       if (q) params.q = q
       if (petugasFilter !== "all") params.id_petugas = toNumber(petugasFilter, 0)
-      if (tahunFilter !== "all") params.tahun_ajaran = tahunFilter
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       if (hariFilter !== "all") params.hari = hariFilter
       if (semesterFilter !== "all") params.semester = Number(semesterFilter)
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
@@ -538,6 +553,7 @@ export default function JadwalPembelajaranPage() {
             kelompokMapel: "",
             tahunAjaran: toText(item.tahun_ajaran).trim(),
             semester: item.semester != null ? String(toNumber(item.semester, 1)) : "",
+            status: toText(item.status).trim().toUpperCase(),
           }))
           .filter((item) => item.value && item.kodeKelas && item.kodeMapel)
 
@@ -569,6 +585,7 @@ export default function JadwalPembelajaranPage() {
           kelompokMapel: kelompokByKodeMapel.get(item.kodeMapel) || "",
           tahunAjaran: item.tahunAjaran,
           semester: item.semester,
+          status: item.status,
         }))
 
         const petugas = (initData.petugas_list || [])
@@ -595,12 +612,10 @@ export default function JadwalPembelajaranPage() {
         setPetugasOptions(petugas)
         setTahunOptions(tahun)
         
-        initDoneRef.current = true
-        void fetchRows()
+        setIsInitDone(true)
       } catch (error) {
         console.error("Gagal memuat opsi filter awal", error)
-        initDoneRef.current = true
-        void fetchRows()
+        setIsInitDone(true)
       }
     }
 
@@ -610,9 +625,10 @@ export default function JadwalPembelajaranPage() {
   }, [])
 
   useEffect(() => {
-    if (!initDoneRef.current) return
+    if (!isInitDone) return
     void fetchRows()
   }, [
+    isInitDone,
     currentPage,
     rowsPerPage,
     keyword,
@@ -620,7 +636,7 @@ export default function JadwalPembelajaranPage() {
     kelasFilter,
     mapelFilter,
     petugasFilter,
-    tahunFilter,
+    selectedKodeTahun,
     hariFilter,
     semesterFilter,
     statusFilter,
@@ -710,7 +726,6 @@ export default function JadwalPembelajaranPage() {
     setKelasFilter("all")
     setMapelFilter("all")
     setPetugasFilter("all")
-    setTahunFilter("all")
     setHariFilter("all")
     setSemesterFilter("all")
     setStatusFilter("all")
@@ -948,7 +963,7 @@ export default function JadwalPembelajaranPage() {
         const blob = await dataJadwalPembelajaranService.exportCsv({
           q: keyword.trim() || undefined,
           id_petugas: petugasFilter === "all" ? undefined : toNumber(petugasFilter, 0),
-          tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
+          tahun_ajaran: selectedKodeTahun || undefined,
           hari: hariFilter === "all" ? undefined : hariFilter,
           semester: semesterFilter === "all" ? undefined : Number(semesterFilter),
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
@@ -1007,7 +1022,7 @@ export default function JadwalPembelajaranPage() {
                         <SelectValue className="truncate" placeholder="Pilih data kelas mapel" />
                       </SelectTrigger>
                       <SelectContent>
-                        {kelasMapelOptions.map((option) => (
+                        {formKelasMapelOptions.map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.label}
                           </SelectItem>
@@ -1161,7 +1176,7 @@ export default function JadwalPembelajaranPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-9">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8">
                 <div className="space-y-2 min-w-0">
                   <Label htmlFor="jadwal-keyword">Kata Kunci</Label>
                   <Input
@@ -1230,20 +1245,7 @@ export default function JadwalPembelajaranPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 min-w-0">
-                  <Label>Tahun Ajaran</Label>
-                  <Select value={tahunFilter} onValueChange={(value) => { setTahunFilter(value); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-full min-w-0">
-                      <SelectValue className="truncate" placeholder="Pilih tahun" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {tahunOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
                 <div className="space-y-2 min-w-0">
                   <Label>Hari</Label>
                   <Select value={hariFilter} onValueChange={(value) => { setHariFilter(value); setCurrentPage(1) }}>
@@ -1480,7 +1482,7 @@ export default function JadwalPembelajaranPage() {
                     <SelectValue className="truncate" placeholder="Pilih data kelas mapel" />
                   </SelectTrigger>
                   <SelectContent>
-                    {kelasMapelOptions.map((option) => (
+                    {formKelasMapelOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                     ))}
                   </SelectContent>

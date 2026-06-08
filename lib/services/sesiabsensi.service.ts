@@ -242,13 +242,13 @@ export const sesiAbsensiService = {
     return response.data
   },
 
-  async adminGetBelumDiabsen(params?: { tanggal?: string; kode_unit?: string; kode_kelas?: string }) {
+  async adminGetBelumDiabsen(params?: { tanggal?: string; kode_unit?: string; kode_kelas?: string; tahun_ajaran?: string }) {
     const response = await api.get<{ data: any[] }>(`${SESI_ABSENSI_BASE_PATH}/admin/belum-diabsen`, { params })
     return response.data.data
   },
 
-  async adminGetLogAktivitas() {
-    const response = await api.get<LogAktivitasResponse>(`${SESI_ABSENSI_BASE_PATH}/admin/log-aktivitas`)
+  async adminGetLogAktivitas(params?: { tahun_ajaran?: string }) {
+    const response = await api.get<LogAktivitasResponse>(`${SESI_ABSENSI_BASE_PATH}/admin/log-aktivitas`, { params })
     return response.data
   },
 
@@ -275,13 +275,13 @@ export const sesiAbsensiService = {
   },
 
   /** Endpoint konsolidasi: ganti 4 request terpisah (jadwal, petugas, tahun_ajaran, sesi_hari_ini) dengan 1 call. */
-  async guruPanelInit(): Promise<{
+  async guruPanelInit(params?: Record<string, string>): Promise<{
     jadwal: any[]
     petugas: any[]
     tahun_ajaran: any[]
     sesi_hari_ini: any[]
   }> {
-    const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/guru-panel/init`)
+    const response = await api.get(`${SESI_ABSENSI_BASE_PATH}/guru-panel/init`, { params })
     return response.data
   },
 

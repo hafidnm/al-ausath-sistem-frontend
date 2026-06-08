@@ -126,7 +126,11 @@ export default function PresensiGuruPage() {
   const loadLogs = async () => {
     setLogLoading(true)
     try {
-      const res = await sesiAbsensiService.adminGetLogAktivitas()
+      const params: any = {}
+      if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
+        params.tahun_ajaran = selectedKodeTahun
+      }
+      const res = await sesiAbsensiService.adminGetLogAktivitas(params)
       setLogs(res.log_aktivitas || [])
       setAuditLogs(res.log_audit || [])
     } catch (e) {
@@ -147,12 +151,12 @@ export default function PresensiGuruPage() {
     void loadOptions()
   }, [])
 
-  // Tab: Log Aktivitas
+  // Load log aktivitas saat tab log dibuka pertama kali, atau saat tahun_ajaran berubah
   useEffect(() => {
-    if (activeTab === "log_aktivitas") {
+    if (activeTab === "log_aktivitas" && isInitDone) {
       void loadLogs()
     }
-  }, [activeTab])
+  }, [activeTab, isInitDone, selectedKodeTahun])
 
   // Tab: Rekap (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
@@ -166,11 +170,12 @@ export default function PresensiGuruPage() {
     void loadRiwayatSesi()
   }, [isInitDone, activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.q, filterSesi.id_petugas_hadir])
 
-  // Tab: Belum Diabsen (Hanya dipanggil jika init selesai DAN tab aktif)
+  // Re-fetch saat tab "belum_diabsen" aktif atau saat filter dropdown/tahun berubah
   useEffect(() => {
-    if (!isInitDone || activeTab !== "belum_diabsen") return
-    void loadBelumDiabsen()
-  }, [isInitDone, activeTab, selectedUnitBelum, selectedKelasBelum, filterBelumDiabsen.tanggal])
+    if (activeTab === "belum_diabsen") {
+      void loadBelumDiabsen()
+    }
+  }, [activeTab, filterBelumDiabsen.tanggal, selectedUnitBelum, selectedKelasBelum, selectedKodeTahun])
 
   const loadOptions = async () => {
     try {
@@ -293,6 +298,9 @@ export default function PresensiGuruPage() {
       
       const params: any = {
         tanggal: activeDate
+      }
+      if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
+        params.tahun_ajaran = selectedKodeTahun
       }
       if (activeUnit !== "ALL") params.kode_unit = activeUnit
       if (activeKelas !== "ALL") params.kode_kelas = activeKelas

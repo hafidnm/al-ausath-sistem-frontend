@@ -39,6 +39,7 @@ import {
   dataAkunSantriService,
 } from "@/lib/services/akun-santri.service"
 import { dataSantriService } from "@/lib/services/santri.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { Download, Eye, Filter, MoreHorizontal, PencilLine, Plus, RefreshCcw, Trash2, ChevronDown } from "lucide-react"
 
 interface AkunRow {
@@ -69,8 +70,9 @@ interface FilterOptions {
     value: string
     label: string
     kodeUnit: string
+    tahunAjaran?: string
+    status?: string
   }[]
-  years: string[]
 }
 
 const defaultForm: AkunFormData = {
@@ -147,9 +149,10 @@ export default function AkunSantriPage() {
   const [selectedKeyword, setSelectedKeyword] = useState("")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState<"all" | BackendAkunSantriStatus>("all")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -178,7 +181,7 @@ export default function AkunSantriPage() {
   const [addSantriOptions, setAddSantriOptions] = useState<DataAkunSantriTanpaAkunItem[]>([])
   const [addSelectedNis, setAddSelectedNis] = useState("")
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ units: [], classes: [], years: [] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ units: [], classes: [] })
   const rowsLimit = Number(rowsPerPage)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isBulkActionLoading, setIsBulkActionLoading] = useState(false)
@@ -186,16 +189,17 @@ export default function AkunSantriPage() {
   const displayedRows = useMemo(() => {
     return rows.filter((row) => {
       if (selectedUnit !== "all" && row.namaUnit !== selectedUnit) return false
-      if (selectedTahunAjaran !== "all" && row.tahunAjaran !== selectedTahunAjaran) return false
       return true
     })
-  }, [rows, selectedUnit, selectedTahunAjaran])
+  }, [rows, selectedUnit])
 
   const filteredClassOptions = useMemo(() => {
-    if (selectedUnit === "all") return filterOptions.classes
-
-    return filterOptions.classes.filter((item) => item.kodeUnit === selectedUnit)
-  }, [filterOptions.classes, rows, selectedUnit])
+    let filtered = filterOptions.classes.filter(item => item.tahunAjaran === selectedKodeTahun)
+    if (selectedUnit !== "all") {
+      filtered = filtered.filter((item) => item.kodeUnit === selectedUnit)
+    }
+    return filtered
+  }, [filterOptions.classes, selectedUnit, selectedKodeTahun])
 
   const fetchRows = async () => {
     setIsLoading(true)
@@ -209,6 +213,7 @@ export default function AkunSantriPage() {
       if (q) params.q = q
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
       if (selectedStatus !== "all") params.status = selectedStatus
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       const result = await dataAkunSantriService.getAll(params)
       const mappedRows = result.data.map(normalizeAkunRow).filter((row) => row.id > 0)
@@ -250,7 +255,9 @@ export default function AkunSantriPage() {
           const value = toText(item.kode_kelas).trim()
           const label = toText(item.nama_kelas).trim() || value
           const kodeUnit = toText(item.kode_unit || item.unit?.kode_unit).trim()
-          return { value, label, kodeUnit }
+          const tahunAjaran = toText(item.tahun_ajaran).trim()
+          const status = toText(item.status).trim().toUpperCase()
+          return { value, label, kodeUnit, tahunAjaran, status }
         })
         .filter((item) => {
           if (!item.value || kelasSeen.has(item.value)) return false
@@ -258,17 +265,9 @@ export default function AkunSantriPage() {
           return true
         })
 
-      const years = Array.from(
-        new Set(
-          tahunResult.data
-            .map((item) => toText(item.kelas?.tahun_ajaran).trim())
-            .filter((item) => item.length > 0),
-        ),
-      )
-
-      setFilterOptions({ units, classes, years })
+      setFilterOptions({ units, classes })
     } catch {
-      setFilterOptions({ units: [], classes: [], years: [] })
+      setFilterOptions({ units: [], classes: [] })
     }
   }
 
@@ -320,7 +319,7 @@ export default function AkunSantriPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [selectedKeyword, selectedUnit, selectedKelas, selectedTahunAjaran, selectedStatus, rowsPerPage])
+  }, [selectedKeyword, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus, rowsPerPage])
 
   useEffect(() => {
     if (selectedKelas === "all") return
@@ -332,7 +331,7 @@ export default function AkunSantriPage() {
 
   useEffect(() => {
     void fetchRows()
-  }, [currentPage, rowsPerPage, selectedKeyword, selectedUnit, selectedKelas, selectedTahunAjaran, selectedStatus])
+  }, [currentPage, rowsPerPage, selectedKeyword, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus])
 
   const resetAddForm = () => setFormData(defaultForm)
 
@@ -482,10 +481,10 @@ export default function AkunSantriPage() {
     try {
       const params: Omit<DataAkunSantriListParams, "per_page" | "page"> = {}
       const q = selectedKeyword.trim()
-
       if (q) params.q = q
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
       if (selectedStatus !== "all") params.status = selectedStatus
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       const blob = await dataAkunSantriService.exportExcel(params)
       downloadBlob(blob, `data-akun-santri-${new Date().toISOString().slice(0, 10)}.csv`)
@@ -555,7 +554,6 @@ export default function AkunSantriPage() {
     setSelectedKeyword("")
     setSelectedUnit("all")
     setSelectedKelas("all")
-    setSelectedTahunAjaran("all")
     setSelectedStatus("all")
   }
 
@@ -618,7 +616,7 @@ export default function AkunSantriPage() {
               </SelectTrigger>
               <SelectContent>
                 {filterOptions.classes
-                  .filter((cls) => cls.kodeUnit === addSelectedUnit)
+                  .filter((cls) => cls.kodeUnit === addSelectedUnit && cls.tahunAjaran === selectedKodeTahun && cls.status === "AKTIF")
                   .map((cls) => (
                     <SelectItem key={cls.value} value={cls.value}>
                       {cls.label}
@@ -825,7 +823,7 @@ export default function AkunSantriPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t p-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <div className="space-y-2">
                   <Label>Kata Kunci</Label>
                   <Input
@@ -863,23 +861,6 @@ export default function AkunSantriPage() {
                       {filteredClassOptions.map((item) => (
                         <SelectItem key={item.value} value={item.value}>
                           {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tahun Ajaran</Label>
-                  <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {filterOptions.years.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {item}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -75,6 +75,7 @@ interface KelasOption {
   value: string
   label: string
   kodeUnit: string
+  tahunAjaran: string
 }
 
 interface TahunAjaranOption {
@@ -183,16 +184,7 @@ export default function KelasPage() {
   const [keyword, setKeyword] = useState("")
   const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
-  const [tahunFilter, setTahunFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
-
-  // Sync from global header tahun ajaran
-  useEffect(() => {
-    if (selectedKodeTahun) {
-      setTahunFilter(selectedKodeTahun)
-      setCurrentPage(1)
-    }
-  }, [selectedKodeTahun])
 
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -207,9 +199,11 @@ export default function KelasPage() {
   const kelasFilterOptions = useMemo(() => {
     const seen = new Set<string>()
     const options: Array<{ value: string; label: string }> = []
-    const source = unitFilter === "all"
-      ? kelasOptions
-      : kelasOptions.filter((option) => option.kodeUnit === unitFilter)
+    
+    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun)
+    if (unitFilter !== "all") {
+      source = source.filter((option) => option.kodeUnit === unitFilter)
+    }
 
     for (const option of source) {
       if (!option.value || seen.has(option.value)) continue
@@ -241,7 +235,7 @@ export default function KelasPage() {
       const q = keyword.trim()
       if (q) params.q = q
       if (unitFilter !== "all") params.kode_unit = unitFilter
-      if (tahunFilter !== "all") params.tahun_ajaran = tahunFilter
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
 
       const result = await dataKelasService.getAll(params)
@@ -278,7 +272,7 @@ export default function KelasPage() {
         const years: TahunAjaranOption[] = []
         for (const item of (initData.tahun_ajaran || [])) {
           const code = toText(item.kode_tahun).trim()
-          if (!code) continue
+          if (!code || toText(item.status).toUpperCase() !== "AKTIF") continue
           years.push({ value: code, label: toText(item.nama_tahun).trim() || code })
         }
 
@@ -292,6 +286,7 @@ export default function KelasPage() {
             value: kodeKelas,
             label: toText(item.nama_kelas).trim() || kodeKelas,
             kodeUnit: toText(item.kode_unit).trim(),
+            tahunAjaran: toText(item.tahun_ajaran).trim(),
           })
         }
 
@@ -323,13 +318,12 @@ export default function KelasPage() {
   useEffect(() => {
     if (!isInitDone) return
     void fetchRows()
-  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, selectedKodeTahun, statusFilter])
 
   const resetFilter = () => {
     setKeyword("")
     setUnitFilter("all")
     setKelasFilter("all")
-    setTahunFilter("all")
     setStatusFilter("all")
     setCurrentPage(1)
   }
@@ -524,7 +518,7 @@ export default function KelasPage() {
         const blob = await dataKelasService.exportExcel({
           q: keyword.trim() || undefined,
           kode_unit: unitFilter === "all" ? undefined : unitFilter,
-          tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
+          tahun_ajaran: selectedKodeTahun || undefined,
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
         })
 
@@ -709,7 +703,7 @@ export default function KelasPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <div className="space-y-2">
                   <Label htmlFor="kelas-keyword">Kata Kunci</Label>
                   <Input
@@ -759,28 +753,6 @@ export default function KelasPage() {
                     <SelectContent>
                       <SelectItem value="all">Semua Kelas</SelectItem>
                       {kelasFilterOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tahun Ajaran</Label>
-                  <Select
-                    value={tahunFilter}
-                    onValueChange={(value) => {
-                      setTahunFilter(value)
-                      setCurrentPage(1)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {tahunOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>

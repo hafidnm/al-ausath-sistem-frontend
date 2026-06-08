@@ -21,8 +21,8 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
-import { dataKelasService } from "@/lib/services/kelas.service"
-import { dataSantriService } from "@/lib/services/santri.service"
+import { dataMasterService } from "@/lib/services/data-master.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 
 type SantriRow = {
@@ -34,6 +34,18 @@ type SantriRow = {
 }
 
 type KelasOption = {
+  value: string
+  label: string
+  kodeUnit: string
+  tahunAjaran: string
+}
+
+type UnitOption = {
+  value: string
+  label: string
+}
+
+type TahunAjaranOption = {
   value: string
   label: string
 }
@@ -84,9 +96,20 @@ export default function SantriPindahKelasPage() {
   const { toast } = useToast()
 
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
-  const [rows, setRows] = useState<SantriRow[]>([])
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
+  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranOption[]>([])
+
+  const { selectedKodeTahun } = useTahunAjaran()
+
+  const [selectedUnitAsal, setSelectedUnitAsal] = useState("all")
+  const [selectedTahunAjaranAsal, setSelectedTahunAjaranAsal] = useState("all")
   const [selectedKelasAsal, setSelectedKelasAsal] = useState("")
+
+  const [selectedUnitTujuan, setSelectedUnitTujuan] = useState("all")
+  const [selectedTahunAjaranTujuan, setSelectedTahunAjaranTujuan] = useState("all")
   const [selectedKelasTujuan, setSelectedKelasTujuan] = useState("")
+
+  const [rows, setRows] = useState<SantriRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -95,33 +118,65 @@ export default function SantriPindahKelasPage() {
 
   const selectedCount = useMemo(() => selectedIds.length, [selectedIds])
 
-  const loadKelasOptions = async () => {
+  const loadInitData = async () => {
     try {
-      const result = await dataKelasService.getAll({ page: 1, per_page: 300 })
-      const seen = new Set<string>()
-      const mapped: KelasOption[] = []
+      const initData = await dataMasterService.getInitOptions()
+      
+      const mappedUnit: UnitOption[] = (initData.unit || []).map((u: any) => ({
+        value: u.kode_unit,
+        label: u.nama_unit || u.kode_unit
+      }))
+      
+      const mappedTahun: TahunAjaranOption[] = (initData.tahun_ajaran || [])
+        .filter((t: any) => t.status === "AKTIF")
+        .map((t: any) => ({
+          value: t.kode_tahun,
+          label: t.nama_tahun || t.kode_tahun
+        }))
 
-      for (const item of result.data) {
-        const kode = toText(item.kode_kelas).trim()
-        if (!kode || seen.has(kode)) continue
+      const mappedKelas: KelasOption[] = (initData.kelas || [])
+        .filter((k: any) => k.status === "AKTIF")
+        .map((k: any) => ({
+          value: k.kode_kelas,
+          label: k.nama_kelas || k.kode_kelas,
+          kodeUnit: k.kode_unit,
+          tahunAjaran: k.tahun_ajaran
+        }))
 
-        seen.add(kode)
-        mapped.push({
-          value: kode,
-          label: toText(item.nama_kelas).trim() || kode,
-        })
+      setUnitOptions(mappedUnit)
+      setTahunAjaranOptions(mappedTahun)
+      setKelasOptions(mappedKelas)
+
+      if (selectedKodeTahun) {
+        setSelectedTahunAjaranAsal(selectedKodeTahun)
+        setSelectedTahunAjaranTujuan(selectedKodeTahun)
       }
-
-      setKelasOptions(mapped)
     } catch {
       setKelasOptions([])
     }
   }
 
-  const kelasTujuanOptions = useMemo(
-    () => kelasOptions.filter((option) => option.value !== selectedKelasAsal),
-    [kelasOptions, selectedKelasAsal],
-  )
+  const kelasAsalOptionsFiltered = useMemo(() => {
+    let filtered = kelasOptions
+    if (selectedUnitAsal !== "all") {
+      filtered = filtered.filter(opt => opt.kodeUnit === selectedUnitAsal)
+    }
+    if (selectedTahunAjaranAsal !== "all") {
+      filtered = filtered.filter(opt => opt.tahunAjaran === selectedTahunAjaranAsal)
+    }
+    return filtered
+  }, [kelasOptions, selectedUnitAsal, selectedTahunAjaranAsal])
+
+  const kelasTujuanOptionsFiltered = useMemo(() => {
+    let filtered = kelasOptions.filter(option => option.value !== selectedKelasAsal)
+    if (selectedUnitTujuan !== "all") {
+      filtered = filtered.filter(opt => opt.kodeUnit === selectedUnitTujuan)
+    }
+    if (selectedTahunAjaranTujuan !== "all") {
+      filtered = filtered.filter(opt => opt.tahunAjaran === selectedTahunAjaranTujuan)
+    }
+    return filtered
+  }, [kelasOptions, selectedKelasAsal, selectedUnitTujuan, selectedTahunAjaranTujuan])
 
   const loadSantriByKelasAsal = async (kodeKelas: string) => {
     if (!kodeKelas) {
@@ -155,8 +210,16 @@ export default function SantriPindahKelasPage() {
   }
 
   useEffect(() => {
-    void loadKelasOptions()
+    void loadInitData()
   }, [])
+
+  useEffect(() => {
+    setSelectedKelasAsal("")
+  }, [selectedUnitAsal, selectedTahunAjaranAsal])
+
+  useEffect(() => {
+    setSelectedKelasTujuan("")
+  }, [selectedUnitTujuan, selectedTahunAjaranTujuan])
 
   useEffect(() => {
     setSelectedIds([])
@@ -258,36 +321,118 @@ export default function SantriPindahKelasPage() {
 
       <Card>
         <CardContent className="space-y-8 p-6">
-          <div className="space-y-3">
-            <p className="text-3xl font-medium text-foreground">Pilih Kelas Asal</p>
-            <Select value={selectedKelasAsal} onValueChange={setSelectedKelasAsal}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Kelas Asal" />
-              </SelectTrigger>
-              <SelectContent>
-                {kelasOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+              <h3 className="text-xl font-medium text-foreground border-b pb-2">Asal</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Tahun Ajaran</p>
+                  <Select value={selectedTahunAjaranAsal} onValueChange={setSelectedTahunAjaranAsal}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Tahun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {tahunAjaranOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-          <div className="space-y-3">
-            <p className="text-3xl font-medium text-foreground">Pilih Kelas Tujuan</p>
-            <Select value={selectedKelasTujuan} onValueChange={setSelectedKelasTujuan}>
-              <SelectTrigger>
-                <SelectValue placeholder="Pilih Kelas Tujuan" />
-              </SelectTrigger>
-              <SelectContent>
-                {kelasTujuanOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Unit</p>
+                  <Select value={selectedUnitAsal} onValueChange={setSelectedUnitAsal}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Pilih Kelas Asal</p>
+                <Select value={selectedKelasAsal} onValueChange={setSelectedKelasAsal}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Pilih Kelas Asal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kelasAsalOptionsFiltered.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-4 rounded-xl border p-4 bg-muted/20">
+              <h3 className="text-xl font-medium text-foreground border-b pb-2">Tujuan</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Tahun Ajaran</p>
+                  <Select value={selectedTahunAjaranTujuan} onValueChange={setSelectedTahunAjaranTujuan}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Tahun" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Tahun</SelectItem>
+                      {tahunAjaranOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Unit</p>
+                  <Select value={selectedUnitTujuan} onValueChange={setSelectedUnitTujuan}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Semua Unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Semua Unit</SelectItem>
+                      {unitOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-sm font-medium">Pilih Kelas Tujuan</p>
+                <Select value={selectedKelasTujuan} onValueChange={setSelectedKelasTujuan}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Pilih Kelas Tujuan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {kelasTujuanOptionsFiltered.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-3">

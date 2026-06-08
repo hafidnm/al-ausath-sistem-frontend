@@ -73,6 +73,7 @@ interface KelasOption {
   label: string
   kodeUnit: string
   tahunAjaran: string
+  status: string
 }
 
 interface TahunAjaranOption {
@@ -94,6 +95,7 @@ interface MapelOption {
   value: string
   label: string
   kodeUnit: string
+  status: string
 }
 
 const defaultFormState: KelasMapelFormData = {
@@ -196,16 +198,8 @@ export default function MapelPage() {
   const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [petugasFilter, setPetugasFilter] = useState("all")
-  const [tahunFilter, setTahunFilter] = useState("all")
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
-
-  // Sync from global header tahun ajaran
-  useEffect(() => {
-    if (selectedKodeTahun) {
-      setTahunFilter(selectedKodeTahun)
-    }
-  }, [selectedKodeTahun])
   const [formUnitFilter, setFormUnitFilter] = useState("all")
   const [editUnitFilter, setEditUnitFilter] = useState("all")
 
@@ -217,30 +211,43 @@ export default function MapelPage() {
   const rowsLimit = Number(rowsPerPage)
 
   const kelasByUnit = useMemo(() => {
-    if (unitFilter === "all") return kelasOptions
-    return kelasOptions.filter((option) => option.kodeUnit === unitFilter)
-  }, [kelasOptions, unitFilter])
+    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun)
+    if (unitFilter !== "all") {
+      source = source.filter((option) => option.kodeUnit === unitFilter)
+    }
+    return source
+  }, [kelasOptions, unitFilter, selectedKodeTahun])
 
   const formKelasByUnit = useMemo(() => {
-    if (formUnitFilter === "all") return kelasOptions
-    return kelasOptions.filter((option) => option.kodeUnit === formUnitFilter)
-  }, [kelasOptions, formUnitFilter])
+    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
+    if (formUnitFilter !== "all") {
+      source = source.filter((option) => option.kodeUnit === formUnitFilter)
+    }
+    return source
+  }, [kelasOptions, formUnitFilter, selectedKodeTahun])
 
   const formMapelByUnit = useMemo(() => {
-    if (formUnitFilter === "all") return mapelOptions
-    // Mapel dengan kodeUnit kosong (lintas unit) selalu ditampilkan
-    return mapelOptions.filter((option) => !option.kodeUnit || option.kodeUnit === formUnitFilter)
+    let source = mapelOptions.filter((option) => option.status === "AKTIF")
+    if (formUnitFilter !== "all") {
+      source = source.filter((option) => !option.kodeUnit || option.kodeUnit === formUnitFilter)
+    }
+    return source
   }, [mapelOptions, formUnitFilter])
 
   const editKelasByUnit = useMemo(() => {
-    if (editUnitFilter === "all") return kelasOptions
-    return kelasOptions.filter((option) => option.kodeUnit === editUnitFilter)
-  }, [kelasOptions, editUnitFilter])
+    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
+    if (editUnitFilter !== "all") {
+      source = source.filter((option) => option.kodeUnit === editUnitFilter)
+    }
+    return source
+  }, [kelasOptions, editUnitFilter, selectedKodeTahun])
 
   const editMapelByUnit = useMemo(() => {
-    if (editUnitFilter === "all") return mapelOptions
-    // Mapel dengan kodeUnit kosong (lintas unit) selalu ditampilkan
-    return mapelOptions.filter((option) => !option.kodeUnit || option.kodeUnit === editUnitFilter)
+    let source = mapelOptions.filter((option) => option.status === "AKTIF")
+    if (editUnitFilter !== "all") {
+      source = source.filter((option) => !option.kodeUnit || option.kodeUnit === editUnitFilter)
+    }
+    return source
   }, [mapelOptions, editUnitFilter])
 
   const kelasUnitMap = useMemo(() => {
@@ -298,7 +305,7 @@ export default function MapelPage() {
       if (q) params.q = q
       if (kelasFilter !== "all") params.kode_kelas = kelasFilter
       if (petugasFilter !== "all") params.id_petugas = toNumber(petugasFilter, 0)
-      if (tahunFilter !== "all") params.tahun_ajaran = tahunFilter
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       if (semesterFilter !== "all") params.semester = Number(semesterFilter)
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
 
@@ -333,9 +340,10 @@ export default function MapelPage() {
           const kode = toText(item.kode_kelas).trim()
           const kodeUnit = toText(item.kode_unit).trim().toUpperCase()
           const tahunAjaran = toText(item.tahun_ajaran).trim()
+          const status = toText(item.status).trim().toUpperCase()
           
           if (!kode) continue
-          kelas.push({ value: kode, label: toText(item.nama_kelas).trim() || kode, kodeUnit, tahunAjaran })
+          kelas.push({ value: kode, label: toText(item.nama_kelas).trim() || kode, kodeUnit, tahunAjaran, status })
         }
         
         for (const item of (initData.unit || [])) {
@@ -358,11 +366,13 @@ export default function MapelPage() {
         const mapel: MapelOption[] = []
         for (const item of (initData.mapel || [])) {
           const kode = toText(item.kode_mapel).trim().toUpperCase()
+          const status = toText(item.status).trim().toUpperCase()
           if (!kode) continue
           mapel.push({
             value: kode,
             label: toText(item.nama_mapel).trim() || kode,
             kodeUnit: toText(item.kode_unit).trim().toUpperCase(),
+            status,
           })
         }
 
@@ -403,7 +413,7 @@ export default function MapelPage() {
     }
 
     void fetchRows()
-  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, petugasFilter, tahunFilter, semesterFilter, statusFilter, kelasByUnit])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, petugasFilter, selectedKodeTahun, semesterFilter, statusFilter, kelasByUnit])
 
   useEffect(() => {
     if (!formData.kodeKelas) return
@@ -455,7 +465,6 @@ export default function MapelPage() {
     setUnitFilter("all")
     setKelasFilter("all")
     setPetugasFilter("all")
-    setTahunFilter("all")
     setSemesterFilter("all")
     setStatusFilter("all")
     setCurrentPage(1)
@@ -680,7 +689,7 @@ export default function MapelPage() {
           q: keyword.trim() || undefined,
           kode_kelas: kelasFilter === "all" ? undefined : kelasFilter,
           id_petugas: petugasFilter === "all" ? undefined : toNumber(petugasFilter, 0),
-          tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
+          tahun_ajaran: selectedKodeTahun || undefined,
           semester: semesterFilter === "all" ? undefined : Number(semesterFilter),
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
         })
@@ -889,7 +898,7 @@ export default function MapelPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-7">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
                 <div className="space-y-2">
                   <Label htmlFor="mapel-keyword">Kata Kunci</Label>
                   <Input
@@ -961,28 +970,6 @@ export default function MapelPage() {
                     <SelectContent>
                       <SelectItem value="all">Semua Petugas</SelectItem>
                       {petugasOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Tahun Ajaran</Label>
-                  <Select
-                    value={tahunFilter}
-                    onValueChange={(value) => {
-                      setTahunFilter(value)
-                      setCurrentPage(1)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih tahun ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {tahunOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>

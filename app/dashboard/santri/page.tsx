@@ -45,6 +45,7 @@ import { useToast } from "@/hooks/use-toast"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataUnitService } from "@/lib/services/unit.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { DataSantriApiItem, DataSantriListParams, DataSantriPayload, dataSantriService } from "@/lib/services/santri.service"
 import {
@@ -85,6 +86,7 @@ interface KelasOption {
   value: string
   label: string
   kodeUnit: string
+  tahunAjaran: string
 }
 
 interface UnitOption {
@@ -218,13 +220,13 @@ export default function SantriPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKelas, setSelectedKelas] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("AKTIF")
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
-  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranOption[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
+
+  const { selectedKodeTahun } = useTahunAjaran()
 
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
@@ -260,9 +262,12 @@ export default function SantriPage() {
   const displayedRows = useMemo(() => rows, [rows])
 
   const filteredKelasOptions = useMemo(() => {
-    if (selectedUnit === "all") return kelasOptions
-    return kelasOptions.filter((option) => option.kodeUnit === selectedUnit)
-  }, [kelasOptions, selectedUnit])
+    let filtered = kelasOptions.filter(option => option.tahunAjaran === selectedKodeTahun)
+    if (selectedUnit !== "all") {
+      filtered = filtered.filter((option) => option.kodeUnit === selectedUnit)
+    }
+    return filtered
+  }, [kelasOptions, selectedUnit, selectedKodeTahun])
 
   const stats = useMemo(() => {
     return {
@@ -286,7 +291,7 @@ export default function SantriPage() {
       if (query) params.q = query
       if (selectedUnit !== "all") params.kode_unit = selectedUnit
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
-      if (selectedTahunAjaran !== "all") params.tahun_ajaran = selectedTahunAjaran
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       // Bila "all", kecualikan LULUS agar tidak memenuhi list — santri lulus ada di halaman tersendiri
       if (selectedStatus === "all") {
@@ -308,7 +313,7 @@ export default function SantriPage() {
       if (query) summaryBaseParams.q = query
       if (selectedUnit !== "all") summaryBaseParams.kode_unit = selectedUnit
       if (selectedKelas !== "all") summaryBaseParams.kode_kelas = selectedKelas
-      if (selectedTahunAjaran !== "all") summaryBaseParams.tahun_ajaran = selectedTahunAjaran
+      if (selectedKodeTahun) summaryBaseParams.tahun_ajaran = selectedKodeTahun
 
       if (selectedStatus === "all" || selectedStatus === "AKTIF" || selectedStatus === "CUTI" || selectedStatus === "KELUAR") {
         const [aktifResult, lulusResult, keluarResult] = await Promise.all([
@@ -351,7 +356,8 @@ export default function SantriPage() {
         const mappedKelas: KelasOption[] = (initData.kelas || []).map((k: any) => ({
           value: k.kode_kelas,
           label: k.nama_kelas || k.kode_kelas,
-          kodeUnit: k.kode_unit
+          kodeUnit: k.kode_unit,
+          tahunAjaran: k.tahun_ajaran,
         }))
 
         const mappedUnit: UnitOption[] = (initData.unit || []).map((u: any) => ({
@@ -359,14 +365,8 @@ export default function SantriPage() {
           label: u.nama_unit || u.kode_unit
         }))
 
-        const mappedTahun: TahunAjaranOption[] = (initData.tahun_ajaran || []).map((t: any) => ({
-          value: t.kode_tahun,
-          label: t.nama_tahun || t.kode_tahun
-        }))
-
         setKelasOptions(mappedKelas)
         setUnitOptions(mappedUnit)
-        setTahunAjaranOptions(mappedTahun)
         
         initDoneRef.current = true
         // Langsung eksekusi fetch pertama agar aman
@@ -385,7 +385,7 @@ export default function SantriPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, selectedUnit, selectedKelas, selectedTahunAjaran, selectedStatus, rowsPerPage])
+  }, [searchQuery, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus, rowsPerPage])
 
   useEffect(() => {
     if (selectedKelas === "all") return
@@ -401,8 +401,9 @@ export default function SantriPage() {
 
   useEffect(() => {
     if (!initDoneRef.current) return
+    if (!selectedKodeTahun) return
     void fetchRows()
-  }, [currentPage, rowsPerPage, searchQuery, selectedUnit, selectedKelas, selectedTahunAjaran, selectedStatus])
+  }, [currentPage, rowsPerPage, searchQuery, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus])
 
   const resetAddForm = () => {
     setFormData(defaultForm)
@@ -519,7 +520,7 @@ export default function SantriPage() {
       if (selectedUnit !== "all") params.kode_unit = selectedUnit
       if (selectedStatus !== "all") params.status = selectedStatus
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
-      if (selectedTahunAjaran !== "all") params.tahun_ajaran = selectedTahunAjaran
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       const blob = await dataSantriService.exportExcel(params)
       downloadBlob(blob, `data-santri-${new Date().toISOString().slice(0, 10)}.csv`)
@@ -904,22 +905,7 @@ export default function SantriPage() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Tahun Ajaran</Label>
-                  <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {tahunAjaranOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
 
                 <div className="space-y-2">
                   <Label>Status Santri</Label>

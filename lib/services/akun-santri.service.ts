@@ -22,6 +22,7 @@ export interface DataAkunSantriApiItem {
 export interface DataAkunSantriListParams {
   q?: string
   kode_kelas?: string
+  tahun_ajaran?: string
   status?: BackendAkunSantriStatus
   per_page?: number
   page?: number

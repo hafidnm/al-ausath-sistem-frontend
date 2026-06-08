@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import type { TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import {
   Dialog,
   DialogContent,
@@ -307,6 +308,7 @@ const mapGuruStatusToApi = (status: GuruStatus): "HADIR" | "IZIN" | "SAKIT" => {
 
 export default function GuruPanelPage() {
   const { toast } = useToast()
+  const { selectedKodeTahun } = useTahunAjaran()
   // Guard: cegah double-invocation dari React StrictMode (development)
   const initCalledRef = useRef(false)
 
@@ -322,6 +324,13 @@ export default function GuruPanelPage() {
   const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
   const [activeTab, setActiveTab] = useState("jadwal")
   const [riwayatLoaded, setRiwayatLoaded] = useState(false)
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setSelectedTahunAjaranRekap(selectedKodeTahun)
+    }
+  }, [selectedKodeTahun])
 
   const [step, setStep] = useState(1)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -540,7 +549,9 @@ export default function GuruPanelPage() {
     try {
       const [userRes, initRes] = await Promise.all([
         authService.me(),
-        sesiAbsensiService.guruPanelInit(),
+        sesiAbsensiService.guruPanelInit(
+          selectedKodeTahun ? { tahun_ajaran: selectedKodeTahun } : undefined
+        ),
       ])
 
       // --- User ---
@@ -562,7 +573,7 @@ export default function GuruPanelPage() {
       const tahunList = toArray(initRes.tahun_ajaran) as TahunAjaranApiItem[]
       setTahunAjaranOptions(tahunList)
       const activeTahun = tahunList.find((t) => t.status === "AKTIF")
-      if (activeTahun?.kode_tahun) setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
+      if (activeTahun?.kode_tahun && !selectedKodeTahun) setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
 
       // --- Petugas ---
       const petugasMapped = toArray(initRes.petugas)
@@ -595,7 +606,9 @@ export default function GuruPanelPage() {
   const loadJadwal = async () => {
     setLoadingJadwal(true)
     try {
-      const initRes = await sesiAbsensiService.guruPanelInit()
+      const initRes = await sesiAbsensiService.guruPanelInit(
+        selectedKodeTahun ? { tahun_ajaran: selectedKodeTahun } : undefined
+      )
       const jadwalMapped = toArray(initRes.jadwal).map(mapJadwalToDisplay).filter((r) => r.id_jadwal > 0)
       setJadwalMengajar(jadwalMapped)
       // Refresh sesi hari ini sekaligus agar jadwalSelesaiHariIniSet up-to-date
@@ -678,6 +691,17 @@ export default function GuruPanelPage() {
       void loadRekap(currentPetugasId, selectedTahunAjaranRekap)
     }
   }, [selectedTahunAjaranRekap])
+
+  // Re-fetch jadwal saat tahun ajaran global berubah (setelah mount pertama)
+  const isMountedRef = useRef(false)
+  useEffect(() => {
+    if (!isMountedRef.current) {
+      isMountedRef.current = true
+      return
+    }
+    // Reload jadwal dengan filter tahun_ajaran baru
+    void loadJadwal()
+  }, [selectedKodeTahun])
 
   const resetDialogState = () => {
     setStep(1)

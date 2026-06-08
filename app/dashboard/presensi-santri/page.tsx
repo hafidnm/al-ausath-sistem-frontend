@@ -97,7 +97,11 @@ export default function PresensiSantriPage() {
   const loadLogs = async () => {
     setLogLoading(true)
     try {
-      const res = await sesiAbsensiService.adminGetLogAktivitas()
+      const params: any = {}
+      if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
+        params.tahun_ajaran = selectedKodeTahun
+      }
+      const res = await sesiAbsensiService.adminGetLogAktivitas(params)
       setLogs(res.log_aktivitas || [])
       setAuditLogs(res.log_audit || [])
     } catch (e) {
@@ -113,10 +117,10 @@ export default function PresensiSantriPage() {
   }
 
   useEffect(() => {
-    if (activeTab === "log_aktivitas") {
+    if (activeTab === "log_aktivitas" && isInitDone) {
       void loadLogs()
     }
-  }, [activeTab])
+  }, [activeTab, isInitDone, selectedKodeTahun])
 
   useEffect(() => {
     if (initCalledRef.current) return

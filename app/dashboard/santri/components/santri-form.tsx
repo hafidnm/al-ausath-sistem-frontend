@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle } from "lucide-react"
 import { dataKelasService } from "@/lib/services/kelas.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { DataSantriApiItem, DataSantriPayload } from "@/lib/services/santri.service"
 
 export interface SantriFormState {
@@ -229,6 +230,8 @@ export function SantriForm({
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const { selectedKodeTahun } = useTahunAjaran()
+
   const isCreateMode = mode === "create"
 
   useEffect(() => {
@@ -241,8 +244,15 @@ export function SantriForm({
 
   useEffect(() => {
     const loadOptions = async () => {
+      if (!selectedKodeTahun) return
+      
       try {
-        const result = await dataKelasService.getAll({ page: 1, per_page: 300 })
+        const result = await dataKelasService.getAll({ 
+          page: 1, 
+          per_page: 300,
+          tahun_ajaran: selectedKodeTahun,
+          status: "AKTIF"
+        })
         const seen = new Set<string>()
         const mapped: KelasOption[] = []
 
@@ -264,7 +274,7 @@ export function SantriForm({
     }
 
     void loadOptions()
-  }, [])
+  }, [selectedKodeTahun])
 
   const updateField = (key: keyof SantriFormState, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }))

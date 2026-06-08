@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import api from "@/lib/axios"
 import {
   BookOpen, FileText, Award, Receipt, Wallet, Megaphone,
@@ -75,6 +76,7 @@ const formatDate = (v: string) => {
 
 export default function SantriPanelPage() {
   const { toast } = useToast()
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [user, setUser] = useState<UserInfo | null>(null)
   const [rekap, setRekap] = useState<RekapSantri | null>(null)
@@ -84,13 +86,20 @@ export default function SantriPanelPage() {
 
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
-  const initDoneRef = useRef(false)
+  const [isInitDone, setIsInitDone] = useState(false)
 
   /* Filter riwayat */
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPeriode, setFilterPeriode] = useState("all")
   const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
   const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
+
+  // Sync from global header tahun ajaran
+  useEffect(() => {
+    if (selectedKodeTahun) {
+      setSelectedTahunAjaran(selectedKodeTahun)
+    }
+  }, [selectedKodeTahun])
 
   /* ─── Fetch rekap ─────────────────────────────────────── */
   const fetchRekap = async (nomorInduk: string, tahunAjaran?: string) => {
@@ -160,13 +169,13 @@ export default function SantriPanelPage() {
         const tahunList = tahunRes.data || []
         setTahunAjaranOptions(tahunList)
         const activeTahun = tahunList.find((t) => t.status === "AKTIF")
-        if (activeTahun?.kode_tahun) {
+        if (activeTahun?.kode_tahun && !selectedKodeTahun) {
           setSelectedTahunAjaran(activeTahun.kode_tahun)
         }
       } catch (error) {
         console.error("Gagal memuat tahun ajaran", error)
       } finally {
-        initDoneRef.current = true
+        setIsInitDone(true)
         setIsLoading(false)
       }
     }
@@ -178,12 +187,12 @@ export default function SantriPanelPage() {
 
   // Trigger ulang riwayat saat filter periode atau tahun ajaran berubah
   useEffect(() => {
-    if (!initDoneRef.current) return
+    if (!isInitDone) return
     if (user?.nomor_induk) {
       void fetchRiwayat(user.nomor_induk, filterPeriode)
       void fetchRekap(user.nomor_induk)
     }
-  }, [filterPeriode, selectedTahunAjaran, user?.nomor_induk])
+  }, [isInitDone, filterPeriode, selectedTahunAjaran, user?.nomor_induk])
 
   /* ─── Computed ─────────────────────────────────────────────── */
   const hadir = Number(rekap?.jumlah_hadir ?? 0)
