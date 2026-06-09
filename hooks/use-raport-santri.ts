@@ -40,13 +40,41 @@ const getRaportDirect = async (params: any): Promise<RaportData | null> => {
     }
 
     console.log('Raw apiData:', apiData)
-    console.log('apiData.status:', apiData?.status)
-    console.log('apiData.status_raport:', apiData?.status_raport)
-    
+
+    // Some backends return { raport: {...}, santri: {...}, nilai_mapel: [...] }
+    // Normalize/flatten so FE can access fields directly: nomor_induk, tahun_ajaran, semester
+    const raportObj = apiData.raport ?? apiData
+    const santriObj = apiData.santri ?? apiData.siswa ?? apiData.student ?? {}
+    const nilaiMapel = apiData.nilai_mapel ?? raportObj.nilai_mapel ?? apiData?.nilai_mapel
+
+    const nomorInduk = (
+      raportObj?.nomor_induk
+      || santriObj?.nomor_induk
+      || raportObj?.nis
+      || santriObj?.nis
+      || ''
+    )
+
+    const tahunAjaranVal = (
+      raportObj?.tahun_ajaran
+      || apiData?.tahun_ajaran
+      || santriObj?.tahun_ajaran
+      || ''
+    )
+
+    const semesterVal = (
+      raportObj?.semester ?? apiData?.semester ?? santriObj?.semester ?? 0
+    )
+
     // Normalize the response data
     const data: RaportData = {
-      ...apiData,
-      status_raport: apiData?.status || apiData?.status_raport || 'DRAFT',
+      ...raportObj,
+      nomor_induk: String(nomorInduk || '').trim(),
+      tahun_ajaran: String(tahunAjaranVal || '').trim(),
+      semester: Number(semesterVal) || 0,
+      santri: santriObj,
+      nilai_mapel: Array.isArray(nilaiMapel) ? nilaiMapel : undefined,
+      status_raport: (raportObj?.status || apiData?.status || raportObj?.status_raport || apiData?.status_raport || 'DRAFT'),
     }
     
     console.log('Extracted raport data:', data)
