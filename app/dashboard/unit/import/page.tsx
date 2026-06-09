@@ -24,7 +24,6 @@ type PreviewRow = {
   nomor_urut: string
   keterangan: string
   status: string
-  status_ppdb: string
   jumlah_kelas: string
   jumlah_santri: string
 }
@@ -35,7 +34,6 @@ const TEMPLATE_HEADERS = [
   "nomor_urut",
   "keterangan",
   "status",
-  "status_ppdb",
 ]
 
 const SUPPORTED_IMPORT_EXTENSIONS = ["csv", "txt", "xlsx", "xls"] as const
@@ -71,7 +69,6 @@ const mapAffectedUnitsToPreview = (units: DataUnitApiItem[]): PreviewRow[] => {
     nomor_urut: toText(unit.nomor_urut),
     keterangan: toText(unit.keterangan),
     status: toText(unit.status),
-    status_ppdb: toText(unit.status_ppdb),
     jumlah_kelas: String(toNumber(unit.jumlah_kelas ?? unit.kelas_count)),
     jumlah_santri: String(toNumber(unit.jumlah_santri ?? unit.santri_count)),
   }))
@@ -102,7 +99,6 @@ const parseCsvText = (content: string): PreviewRow[] => {
       nomor_urut: rowObj.nomor_urut || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
       jumlah_kelas: "-",
       jumlah_santri: "-",
     }
@@ -141,7 +137,6 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       nomor_urut: rowObj.nomor_urut || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
       jumlah_kelas: "-",
       jumlah_santri: "-",
     }
@@ -160,8 +155,8 @@ export default function UnitImportPage() {
   const handleDownloadTemplate = () => {
     const templateRows = [
       TEMPLATE_HEADERS.join(","),
-      "PAUD,PAUD,1,Jenjang PAUD,AKTIF,AKTIF",
-      "TK,TK,2,Jenjang TK,AKTIF,AKTIF",
+      "PAUD,PAUD,1,Jenjang PAUD,AKTIF",
+      "TK,TK,2,Jenjang TK,AKTIF",
     ]
 
     const blob = new Blob([templateRows.join("\n")], { type: "text/csv;charset=utf-8;" })
@@ -323,7 +318,6 @@ export default function UnitImportPage() {
                 <TableHead>NOMOR URUT</TableHead>
                 <TableHead>KETERANGAN</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead>STATUS PPDB</TableHead>
                 <TableHead>JUMLAH KELAS</TableHead>
                 <TableHead>JUMLAH SANTRI</TableHead>
                 <TableHead>AKSI IMPOR</TableHead>
@@ -332,13 +326,13 @@ export default function UnitImportPage() {
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -351,7 +345,6 @@ export default function UnitImportPage() {
                     <TableCell>{row.nomor_urut || "-"}</TableCell>
                     <TableCell>{row.keterangan || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
-                    <TableCell>{row.status_ppdb || "-"}</TableCell>
                     <TableCell>{row.jumlah_kelas || "0"}</TableCell>
                     <TableCell>{row.jumlah_santri || "0"}</TableCell>
                     <TableCell>

@@ -24,9 +24,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
@@ -41,7 +43,7 @@ import { dataMasterService } from "@/lib/services/data-master.service"
 import { ArrowUpDown, ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type GuruStatus = "Aktif" | "Nonaktif"
-type SortField = "nip" | "nama" | "email" | "telepon" | "peran" | "unit" | "status" | "terakhirMasuk"
+type SortField = "nip" | "nama" | "email" | "telepon" | "peran" | "status" | "terakhirMasuk"
 
 interface GuruRow {
   id: number
@@ -49,8 +51,7 @@ interface GuruRow {
   nama: string
   email: string
   telepon: string
-  peran: string
-  unit: string
+  peran: string[]
   status: GuruStatus
   terakhirMasuk: string
 }
@@ -61,14 +62,8 @@ interface GuruFormData {
   email: string
   telepon: string
   password: string
-  peran: string
-  unit: string
+  peran: string[]
   status: GuruStatus
-}
-
-interface UnitOption {
-  value: string
-  label: string
 }
 
 const defaultFormState: GuruFormData = {
@@ -77,8 +72,7 @@ const defaultFormState: GuruFormData = {
   email: "",
   telepon: "",
   password: "",
-  peran: "Petugas Admin",
-  unit: "SEMUA",
+  peran: [],
   status: "Aktif",
 }
 
@@ -109,8 +103,13 @@ const normalizePetugasRow = (raw: DataPetugasApiItem): GuruRow => ({
   nama: toText(raw.nama_lengkap),
   email: toText(raw.alamat_email),
   telepon: toText(raw.nomor_telepon) || "-",
-  peran: toText(raw.peran_akun),
-  unit: toText(raw.pilihan_unit) || "SEMUA",
+  peran: (() => {
+    const raw_peran = raw.peran_akun
+    if (!raw_peran) return []
+    // Flatten in case backend returns [["Staf Pengajar"]] instead of ["Staf Pengajar"]
+    const arr = Array.isArray(raw_peran) ? raw_peran.flat() : [toText(raw_peran)]
+    return arr.map((p) => toText(p)).filter(Boolean)
+  })(),
   status: fromBackendStatus(raw.status),
   terakhirMasuk: toText(raw.last_login) || "-",
 })
@@ -159,7 +158,6 @@ export default function GuruPage() {
   const [rows, setRows] = useState<GuruRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [searchKeyword, setSearchKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<GuruStatus | "all">("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("nama")
@@ -185,7 +183,6 @@ export default function GuruPage() {
   const [editingFormData, setEditingFormData] = useState<GuruFormData>(defaultFormState)
 
   const [peranOptions, setPeranOptions] = useState<string[]>(fallbackPeranOptions)
-  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([{ value: "SEMUA", label: "SEMUA" }])
 
   const rowsLimit = Number(rowsPerPage)
 
@@ -199,9 +196,8 @@ export default function GuruPage() {
   }, [rows, sortField, sortDirection])
 
   const displayedRows = useMemo(() => {
-    if (unitFilter === "all") return sortedRows
-    return sortedRows.filter((row) => row.unit === unitFilter)
-  }, [sortedRows, unitFilter])
+    return sortedRows
+  }, [sortedRows])
 
   const selectedCount = selectedIds.length
 
@@ -244,17 +240,6 @@ export default function GuruPage() {
         if (initData.peran && initData.peran.length > 0) {
           setPeranOptions(initData.peran)
         }
-        
-        const mappedUnit: UnitOption[] = [{ value: "SEMUA", label: "SEMUA" }]
-        for (const item of (initData.unit || [])) {
-          const code = toText(item.kode_unit).trim()
-          if (!code) continue
-          mappedUnit.push({
-            value: code,
-            label: toText(item.nama_unit).trim() || code,
-          })
-        }
-        setUnitOptions(mappedUnit)
         
         initDoneRef.current = true
         // Langsung panggil fetch pertama
@@ -312,13 +297,8 @@ export default function GuruPage() {
 
   const resetFilter = () => {
     setSearchKeyword("")
-    setUnitFilter("all")
     setStatusFilter("all")
     setRoleFilter("all")
-  }
-
-  const getUnitLabel = (unitCode: string): string => {
-    return unitOptions.find((option) => option.value === unitCode)?.label || unitCode || "-"
   }
 
   const openEditDialog = (id: number) => {
@@ -333,7 +313,6 @@ export default function GuruPage() {
       telepon: target.telepon === "-" ? "" : target.telepon,
       password: "",
       peran: target.peran,
-      unit: target.unit,
       status: target.status,
     })
     setIsEditDialogOpen(true)
@@ -357,7 +336,6 @@ export default function GuruPage() {
           nomor_induk: formData.nip,
           nama_lengkap: formData.nama,
           peran_akun: formData.peran,
-          pilihan_unit: formData.unit,
           alamat_email: formData.email,
           nomor_telepon: formData.telepon,
           password: formData.password,
@@ -396,7 +374,6 @@ export default function GuruPage() {
           nomor_induk: editingFormData.nip,
           nama_lengkap: editingFormData.nama,
           peran_akun: editingFormData.peran,
-          pilihan_unit: editingFormData.unit,
           alamat_email: editingFormData.email,
           nomor_telepon: editingFormData.telepon,
           password: editingFormData.password.trim() || undefined,
@@ -549,36 +526,41 @@ export default function GuruPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Peran Petugas</Label>
-                    <Select value={formData.peran} onValueChange={(value) => setFormData((prev) => ({ ...prev, peran: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih peran" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {peranOptions.map((option) => (
-                          <SelectItem key={option} value={option}>
-                            {option}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Pilih Unit</Label>
-                    <Select value={formData.unit} onValueChange={(value) => setFormData((prev) => ({ ...prev, unit: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih unit" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {unitOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between font-normal text-left px-3">
+                          <span className="truncate">
+                            {formData.peran.length > 0 ? formData.peran.join(", ") : "Pilih peran..."}
+                          </span>
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                        <div className="flex flex-col space-y-2">
+                          {peranOptions.map((option) => (
+                            <div key={option} className="flex items-center space-x-2 rounded-sm p-1 hover:bg-accent hover:text-accent-foreground">
+                              <Checkbox
+                                id={`add-role-${option}`}
+                                checked={formData.peran.includes(option)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setFormData((prev) => ({ ...prev, peran: [...prev.peran, option] }))
+                                  } else {
+                                    setFormData((prev) => ({ ...prev, peran: prev.peran.filter((p) => p !== option) }))
+                                  }
+                                }}
+                              />
+                              <Label htmlFor={`add-role-${option}`} className="font-normal cursor-pointer flex-1">
+                                {option}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2">
                     <Label>Status</Label>
@@ -639,8 +621,8 @@ export default function GuruPage() {
 
           <CollapsibleContent>
             <CardContent className="border-t pt-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                <div className="space-y-2 md:col-span-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="search-keyword">Kata Kunci</Label>
                   <Input
                     id="search-keyword"
@@ -648,23 +630,6 @@ export default function GuruPage() {
                     value={searchKeyword}
                     onChange={(event) => setSearchKeyword(event.target.value)}
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Pilih Unit</Label>
-                  <Select value={unitFilter} onValueChange={setUnitFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -762,9 +727,6 @@ export default function GuruPage() {
                   </TableHead>
                   <TableHead className="w-12 text-xs font-semibold uppercase tracking-wide text-muted-foreground">#</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("unit")}>PILIHAN UNIT<ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "unit" && "text-foreground")} /></button>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("nama")}>NAMA LENGKAP<ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "nama" && "text-foreground")} /></button>
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -804,27 +766,27 @@ export default function GuruPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="bg-primary/10 text-primary">
-                          {getUnitLabel(guru.unit)}
-                        </Badge>
-                      </TableCell>
                       <TableCell>{guru.nama}</TableCell>
                       <TableCell>{guru.email}</TableCell>
                       <TableCell>{guru.telepon}</TableCell>
                       <TableCell>
-                        <Badge
-                          className={cn(
-                            guru.peran === "Petugas Keuangan" && "bg-lime-500 text-white hover:bg-lime-500",
-                            guru.peran === "Petugas Admin" && "bg-blue-600 text-white hover:bg-blue-600",
-                            guru.peran === "Petugas PPDB" && "bg-emerald-500 text-white hover:bg-emerald-500",
-                            guru.peran === "Petugas SPP" && "bg-violet-500 text-white hover:bg-violet-500",
-                            !["Petugas Keuangan", "Petugas Admin", "Petugas PPDB", "Petugas SPP"].includes(guru.peran) &&
-                              "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          {guru.peran}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1">
+                          {guru.peran.map((p) => (
+                            <Badge
+                              key={p}
+                              className={cn(
+                                p === "Petugas Keuangan" && "bg-lime-500 text-white hover:bg-lime-500",
+                                p === "Petugas Admin" && "bg-blue-600 text-white hover:bg-blue-600",
+                                p === "Petugas PPDB" && "bg-emerald-500 text-white hover:bg-emerald-500",
+                                p === "Petugas SPP" && "bg-violet-500 text-white hover:bg-violet-500",
+                                !["Petugas Keuangan", "Petugas Admin", "Petugas PPDB", "Petugas SPP"].includes(p) &&
+                                  "bg-muted text-muted-foreground",
+                              )}
+                            >
+                              {p}
+                            </Badge>
+                          ))}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={guru.status === "Aktif" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
@@ -935,15 +897,11 @@ export default function GuruPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Peran Petugas</p>
-                <p className="font-medium">{detailData?.peran || "-"}</p>
+                <p className="font-medium">{detailData?.peran.join(", ") || "-"}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <div className="space-y-1">
-                <p className="text-sm text-muted-foreground">Pilihan Unit</p>
-                <p className="font-medium">{getUnitLabel(detailData?.unit || "")}</p>
-              </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <p className="text-sm text-muted-foreground">Status</p>
                 <p className="font-medium">{detailData?.status || "-"}</p>
@@ -1023,48 +981,52 @@ export default function GuruPage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Peran Petugas</Label>
-                <Select value={editingFormData.peran} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, peran: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih peran" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {peranOptions.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal text-left px-3">
+                      <span className="truncate">
+                        {editingFormData.peran.length > 0 ? editingFormData.peran.join(", ") : "Pilih peran..."}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-2" align="start">
+                    <div className="flex flex-col space-y-2">
+                      {peranOptions.map((option) => (
+                        <div key={option} className="flex items-center space-x-2 rounded-sm p-1 hover:bg-accent hover:text-accent-foreground">
+                          <Checkbox
+                            id={`edit-role-${option}`}
+                            checked={editingFormData.peran.includes(option)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEditingFormData((prev) => ({ ...prev, peran: [...prev.peran, option] }))
+                              } else {
+                                setEditingFormData((prev) => ({ ...prev, peran: prev.peran.filter((p) => p !== option) }))
+                              }
+                            }}
+                          />
+                          <Label htmlFor={`edit-role-${option}`} className="font-normal cursor-pointer flex-1">
+                            {option}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="space-y-2">
-                <Label>Pilih Unit</Label>
-                <Select value={editingFormData.unit} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, unit: value }))}>
+                <Label>Status</Label>
+                <Select value={editingFormData.status} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, status: value as GuruStatus }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih unit" />
+                    <SelectValue placeholder="Pilih status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {unitOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
+                    <SelectItem value="Aktif">Aktif</SelectItem>
+                    <SelectItem value="Nonaktif">Nonaktif</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={editingFormData.status} onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, status: value as GuruStatus }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Aktif">Aktif</SelectItem>
-                  <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

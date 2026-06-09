@@ -11,7 +11,6 @@ export interface DataKelasApiItem {
   nama_jurusan?: string | null
   tahun_ajaran?: string
   status?: BackendKelasStatus | null
-  status_ppdb?: BackendKelasStatus | null
   deleted_at?: string | null
   created_at?: string | null
   updated_at?: string | null
@@ -38,7 +37,6 @@ export interface DataKelasListParams {
   kode_unit?: string
   tahun_ajaran?: string
   status?: BackendKelasStatus
-  status_ppdb?: BackendKelasStatus
   per_page?: number
   page?: number
 }
@@ -60,7 +58,6 @@ export interface DataKelasPayload {
   nama_jurusan?: string | null
   tahun_ajaran: string
   status?: BackendKelasStatus | null
-  status_ppdb?: BackendKelasStatus | null
 }
 
 export interface DataKelasPaginationMeta {
@@ -153,7 +150,6 @@ export interface GetKelasParams {
   kode_unit?: string
   tahun_ajaran?: string
   status?: string
-  status_ppdb?: string
 }
 
 const KELAS_BASE_PATH = "/akademik/kelas"
@@ -213,7 +209,6 @@ const normalizePayload = (payload: DataKelasPayload): DataKelasPayload => ({
   nama_jurusan: payload.nama_jurusan?.trim() || null,
   tahun_ajaran: payload.tahun_ajaran.trim(),
   status: payload.status || null,
-  status_ppdb: payload.status_ppdb || null,
 })
 
 export const dataKelasService = {

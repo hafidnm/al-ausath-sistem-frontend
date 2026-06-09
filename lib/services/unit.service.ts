@@ -10,7 +10,6 @@ export interface DataUnitApiItem {
   nomor_urut?: number
   keterangan?: string | null
   status?: BackendStatus
-  status_ppdb?: BackendStatus
   created_at?: string
   updated_at?: string
   kelas_count?: number
@@ -22,7 +21,6 @@ export interface DataUnitApiItem {
 export interface DataUnitListParams {
   q?: string
   status?: BackendStatus
-  status_ppdb?: BackendStatus
   per_page?: number
   page?: number
 }
@@ -33,7 +31,6 @@ export interface DataUnitPayload {
   nomor_urut?: number | null
   keterangan?: string | null
   status?: BackendStatus
-  status_ppdb?: BackendStatus
 }
 
 export interface DataUnitPaginationMeta {
@@ -110,7 +107,6 @@ const normalizePayload = (payload: DataUnitPayload): DataUnitPayload => ({
   nomor_urut: payload.nomor_urut ?? null,
   keterangan: payload.keterangan?.trim() || null,
   status: payload.status,
-  status_ppdb: payload.status_ppdb,
 })
 
 export const dataUnitService = {

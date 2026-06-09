@@ -99,18 +99,32 @@ function TahunAjaranSelector() {
   )
 }
 
-const adminMenuItems = [
+type MenuItem = {
+  icon: any
+  label: string
+  href?: string
+  subItems?: { icon: any; label: string; href: string }[]
+}
+
+const adminMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
   { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
-  { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
-  { icon: GraduationCap, label: "Santri Lulus", href: "/dashboard/santri/lulus" },
-  { icon: UserCheck, label: "Data Akun Santri", href: "/dashboard/akun-santri" },
-  { icon: GraduationCap, label: "Data Petugas", href: "/dashboard/guru" },
-  { icon: School, label: "Data Kelas", href: "/dashboard/kelas" },
-  { icon: Building2, label: "Data Unit", href: "/dashboard/unit" },
-  { icon: BookOpen, label: "Data Kelas Mapel", href: "/dashboard/kelas-mapel" },
-  { icon: BookOpen, label: "Data Mata Pelajaran", href: "/dashboard/mapel" },
-  { icon: Calendar, label: "Data Jadwal Pembelajaran", href: "/dashboard/jadwal-pembelajaran" },
+  {
+    icon: Building2,
+    label: "Data Master",
+    subItems: [
+      { icon: Users, label: "Data Santri", href: "/dashboard/santri" },
+      { icon: GraduationCap, label: "Santri Lulus", href: "/dashboard/santri/lulus" },
+      { icon: UserCheck, label: "Data Akun Santri", href: "/dashboard/akun-santri" },
+      { icon: GraduationCap, label: "Data Petugas", href: "/dashboard/guru" },
+      { icon: School, label: "Data Kelas", href: "/dashboard/kelas" },
+      { icon: Building2, label: "Data Unit", href: "/dashboard/unit" },
+      { icon: BookOpen, label: "Data Kelas Mapel", href: "/dashboard/kelas-mapel" },
+      { icon: BookOpen, label: "Data Mata Pelajaran", href: "/dashboard/mapel" },
+      { icon: Calendar, label: "Data Jadwal Pembelajaran", href: "/dashboard/jadwal-pembelajaran" },
+      { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
+    ]
+  },
   { icon: Star, label: "Ekstrakurikuler", href: "/dashboard/ekskul" },
   { icon: ListChecks, label: "Rekap Pendaftar Ekskul", href: "/dashboard/ekskul-rekap" },
   { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
@@ -121,7 +135,6 @@ const adminMenuItems = [
   { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
   { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
   { icon: TrendingUp, label: "Analitik", href: "/dashboard/analitik" },
-  { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
   { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
@@ -130,9 +143,8 @@ const adminMenuItems = [
   { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
 ]
 
-const guruMenuItems = [
+const guruMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/guru-panel" },
-  { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
   { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/admin-panel/nilai-mapel" },
   { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
   { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
@@ -141,12 +153,12 @@ const guruMenuItems = [
 ]
 
 // Staf Pengajar should have access to Analitik
-const stafPengajarMenuItems = [
+const stafPengajarMenuItems: MenuItem[] = [
   ...guruMenuItems,
   { icon: TrendingUp, label: "Analitik Pengajar", href: "/dashboard/analitik-pengajar" },
 ]
 
-const sppMenuItems = [
+const sppMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
   { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
@@ -154,13 +166,13 @@ const sppMenuItems = [
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 
-const ppdbMenuItems = [
+const ppdbMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
 ]
 
-const santriMenuItems = [
+const santriMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/santri-panel" },
   { icon: FileText, label: "Rapor Digital", href: "/dashboard/santri-panel/rapor" },
   { icon: Award, label: "Nilai Mapel", href: "/dashboard/santri-panel/nilai-mapel" },
@@ -181,7 +193,12 @@ export default function DashboardLayout({
   const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true)
   const [user, setUser] = useState<any>(null)
   const [role, setRole] = useState<string>("")
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
+
+  const toggleMenu = (label: string) => {
+    setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -282,20 +299,71 @@ export default function DashboardLayout({
           {/* Navigation */}
           <nav className="flex-1 overflow-y-auto p-4 space-y-1">
             {(role === 'petugas'
-               ? (
-                   user?.peran_akun === 'Petugas Admin' ? adminMenuItems
-                   : user?.peran_akun === 'Petugas SPP'  ? sppMenuItems
-                   : user?.peran_akun === 'Petugas PPDB' ? ppdbMenuItems
-                   : user?.peran_akun === 'Staf Pengajar' ? stafPengajarMenuItems
-                   : guruMenuItems   // Petugas Tata Usaha and other petugas
-                 )
+               ? (() => {
+                   const peran: string[] = Array.isArray(user?.peran_akun)
+                     ? user.peran_akun.flat().map(String)
+                     : (user?.peran_akun ? [String(user.peran_akun)] : [])
+                   if (peran.includes('Petugas Admin')) return adminMenuItems
+                   if (peran.includes('Petugas SPP'))  return sppMenuItems
+                   if (peran.includes('Petugas PPDB')) return ppdbMenuItems
+                   if (peran.includes('Staf Pengajar')) return stafPengajarMenuItems
+                   return guruMenuItems // Petugas Tata Usaha dan lainnya
+                 })()
                : santriMenuItems
              ).map((item) => {
+              if (item.subItems) {
+                const isAnyChildActive = item.subItems.some((sub: any) => pathname === sub.href)
+                const isOpen = openMenus[item.label] || isAnyChildActive
+
+                return (
+                  <div key={item.label} className="flex flex-col space-y-1">
+                    <button
+                      onClick={() => toggleMenu(item.label)}
+                      className={cn(
+                        "flex items-center justify-between w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                        isAnyChildActive
+                          ? "bg-sidebar-accent/50 text-sidebar-foreground"
+                          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon className="w-5 h-5" />
+                        {item.label}
+                      </div>
+                      <ChevronDown className={cn("w-4 h-4 transition-transform", isOpen && "rotate-180")} />
+                    </button>
+                    {isOpen && (
+                      <div className="flex flex-col pl-9 space-y-1 mt-1">
+                        {item.subItems.map((sub: any) => {
+                          const isSubActive = pathname === sub.href
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                isSubActive
+                                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                                  : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                              )}
+                            >
+                              <sub.icon className="w-4 h-4" />
+                              {sub.label}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               const isActive = pathname === item.href
               return (
                 <Link
-                  key={item.href}
-                  href={item.href}
+                  key={item.href || item.label}
+                  href={item.href || "#"}
                   onClick={() => setSidebarOpen(false)}
                   className={cn(
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
@@ -360,7 +428,13 @@ export default function DashboardLayout({
               )}
               <div>
                 <h2 className="font-semibold text-foreground">
-                  {[...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems].find((item) => item.href === pathname)?.label || "Dashboard"}
+                  {([...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems] as any[]).find((item) => {
+                    if (item.href === pathname) return true;
+                    if (item.subItems) {
+                      return item.subItems.find((sub: any) => sub.href === pathname);
+                    }
+                    return false;
+                  })?.label || "Dashboard"}
                 </h2>
               </div>
               {/* Tahun Ajaran Global Selector */}

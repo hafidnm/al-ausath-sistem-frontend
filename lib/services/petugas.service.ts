@@ -7,8 +7,7 @@ export interface DataPetugasApiItem {
   id?: number
   nomor_induk?: string | null
   nama_lengkap?: string
-  peran_akun?: string
-  pilihan_unit?: string | null
+  peran_akun?: string[]
   alamat_email?: string
   nomor_telepon?: string | null
   status?: BackendPetugasStatus
@@ -28,8 +27,7 @@ export interface DataPetugasListParams {
 export interface DataPetugasPayload {
   nomor_induk?: string | null
   nama_lengkap: string
-  peran_akun: string
-  pilihan_unit?: string | null
+  peran_akun: string[]
   alamat_email: string
   nomor_telepon?: string | null
   password?: string
@@ -108,8 +106,8 @@ const extractItem = (payload: unknown): DataPetugasApiItem => {
 const normalizePayload = (payload: DataPetugasPayload): DataPetugasPayload => ({
   nomor_induk: payload.nomor_induk?.trim() || null,
   nama_lengkap: payload.nama_lengkap.trim(),
-  peran_akun: payload.peran_akun,
-  pilihan_unit: payload.pilihan_unit?.trim() || null,
+  // Flatten nested arrays defensively: [["Petugas Admin"]] => ["Petugas Admin"]
+  peran_akun: (Array.isArray(payload.peran_akun) ? payload.peran_akun.flat() as string[] : [payload.peran_akun]).filter(Boolean),
   alamat_email: payload.alamat_email.trim(),
   nomor_telepon: payload.nomor_telepon?.trim() || null,
   password: payload.password,

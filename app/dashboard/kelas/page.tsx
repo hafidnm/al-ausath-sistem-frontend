@@ -38,7 +38,6 @@ import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ArrowUpDown, ChevronDown, Download, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
-type UiPpdbStatus = "Dibuka" | "Ditutup"
 
 interface KelasRow {
   id: number
@@ -53,7 +52,6 @@ interface KelasRow {
   santriLulus: number
   santriKeluar: number
   status: UiStatus
-  statusPpdb: UiPpdbStatus
 }
 
 interface KelasFormData {
@@ -63,7 +61,6 @@ interface KelasFormData {
   namaJurusan: string
   tahunAjaran: string
   status: UiStatus
-  statusPpdb: UiPpdbStatus
 }
 
 interface UnitOption {
@@ -90,7 +87,6 @@ const defaultFormState: KelasFormData = {
   namaJurusan: "",
   tahunAjaran: "",
   status: "Aktif",
-  statusPpdb: "Dibuka",
 }
 
 const toText = (value: unknown): string => {
@@ -108,9 +104,6 @@ const toNumber = (value: unknown, fallback = 0): number => {
 const toBackendStatus = (status: UiStatus): BackendStatus => (status === "Aktif" ? "AKTIF" : "NONAKTIF")
 const fromBackendStatus = (status: unknown): UiStatus => (toText(status).toUpperCase() === "NONAKTIF" ? "Nonaktif" : "Aktif")
 
-const toBackendPpdbStatus = (status: UiPpdbStatus): BackendStatus => (status === "Dibuka" ? "AKTIF" : "NONAKTIF")
-const fromBackendPpdbStatus = (status: unknown): UiPpdbStatus => (toText(status).toUpperCase() === "AKTIF" ? "Dibuka" : "Ditutup")
-
 const normalizeKelasRow = (raw: DataKelasApiItem): KelasRow => ({
   id: toNumber(raw.id_kelas ?? raw.id, -1),
   namaUnit: toText(raw.unit?.nama_unit) || toText(raw.kode_unit) || "-",
@@ -124,7 +117,6 @@ const normalizeKelasRow = (raw: DataKelasApiItem): KelasRow => ({
   santriLulus: toNumber(raw.jumlah_santri_lulus),
   santriKeluar: toNumber(raw.jumlah_santri_keluar),
   status: fromBackendStatus(raw.status),
-  statusPpdb: fromBackendPpdbStatus(raw.status_ppdb),
 })
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -362,7 +354,6 @@ export default function KelasPage() {
       namaJurusan: target.namaJurusan,
       tahunAjaran: target.tahunAjaran,
       status: target.status,
-      statusPpdb: target.statusPpdb,
     })
     setIsEditDialogOpen(true)
   }
@@ -387,7 +378,6 @@ export default function KelasPage() {
           nama_jurusan: formData.namaJurusan || null,
           tahun_ajaran: formData.tahunAjaran,
           status: toBackendStatus(formData.status),
-          status_ppdb: toBackendPpdbStatus(formData.statusPpdb),
         })
 
         toast({
@@ -434,7 +424,6 @@ export default function KelasPage() {
           nama_jurusan: editingFormData.namaJurusan || null,
           tahun_ajaran: editingFormData.tahunAjaran,
           status: toBackendStatus(editingFormData.status),
-          status_ppdb: toBackendPpdbStatus(editingFormData.statusPpdb),
         })
 
         toast({
@@ -606,7 +595,7 @@ export default function KelasPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Tahun Ajaran</Label>
                     <Select
@@ -637,21 +626,6 @@ export default function KelasPage() {
                       <SelectContent>
                         <SelectItem value="Aktif">Aktif</SelectItem>
                         <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status PPDB</Label>
-                    <Select
-                      value={formData.statusPpdb}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, statusPpdb: value as UiPpdbStatus }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih status PPDB" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Dibuka">Dibuka</SelectItem>
-                        <SelectItem value="Ditutup">Ditutup</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -850,7 +824,6 @@ export default function KelasPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI LULUS</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI KELUAR</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS PPDB</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">AKSI</TableHead>
                 </TableRow>
               </TableHeader>
@@ -883,11 +856,6 @@ export default function KelasPage() {
                       <TableCell>
                         <Badge variant="secondary" className={row.status === "Aktif" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
                           {row.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className={row.statusPpdb === "Dibuka" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}>
-                          {row.statusPpdb}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -1015,7 +983,7 @@ export default function KelasPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Tahun Ajaran</Label>
                 <Select
@@ -1046,21 +1014,6 @@ export default function KelasPage() {
                   <SelectContent>
                     <SelectItem value="Aktif">Aktif</SelectItem>
                     <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status PPDB</Label>
-                <Select
-                  value={editingFormData.statusPpdb}
-                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, statusPpdb: value as UiPpdbStatus }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih status PPDB" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Dibuka">Dibuka</SelectItem>
-                    <SelectItem value="Ditutup">Ditutup</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

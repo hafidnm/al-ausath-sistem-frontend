@@ -17,7 +17,6 @@ type PreviewRow = {
   nama_jurusan: string
   tahun_ajaran: string
   status: string
-  status_ppdb: string
 }
 
 const SUPPORTED_IMPORT_EXTENSIONS = ["csv", "txt", "xlsx", "xls"] as const
@@ -60,7 +59,6 @@ const parseCsvText = (content: string): PreviewRow[] => {
       nama_jurusan: rowObj.nama_jurusan || "",
       tahun_ajaran: rowObj.tahun_ajaran || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
     }
   })
 }
@@ -98,7 +96,6 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       nama_jurusan: rowObj.nama_jurusan || "",
       tahun_ajaran: rowObj.tahun_ajaran || "",
       status: rowObj.status || "",
-      status_ppdb: rowObj.status_ppdb || "",
     }
   })
 }
@@ -293,19 +290,18 @@ export default function KelasImportPage() {
                 <TableHead>NAMA JURUSAN</TableHead>
                 <TableHead>TAHUN AJARAN</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead>STATUS PPDB</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -319,7 +315,6 @@ export default function KelasImportPage() {
                     <TableCell>{row.nama_jurusan || "-"}</TableCell>
                     <TableCell>{row.tahun_ajaran || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
-                    <TableCell>{row.status_ppdb || "-"}</TableCell>
                   </TableRow>
                 ))
               )}

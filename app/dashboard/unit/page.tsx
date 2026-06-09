@@ -68,7 +68,6 @@ import {
 import { useToast } from "@/hooks/use-toast"
 
 type UnitStatus = "Aktif" | "Nonaktif"
-type PpdbStatus = "Dibuka" | "Ditutup"
 type SortField =
   | "urut"
   | "kode"
@@ -77,7 +76,6 @@ type SortField =
   | "jumlahKelas"
   | "jumlahSantri"
   | "statusUnit"
-  | "statusPpdb"
 
 interface UnitRow {
   id: number
@@ -88,7 +86,6 @@ interface UnitRow {
   jumlahKelas: number
   jumlahSantri: number
   statusUnit: UnitStatus
-  statusPpdb: PpdbStatus
 }
 
 interface UnitFormData {
@@ -99,7 +96,6 @@ interface UnitFormData {
   jumlahKelas: string
   jumlahSantri: string
   statusUnit: UnitStatus
-  statusPpdb: PpdbStatus
 }
 
 const defaultFormState: UnitFormData = {
@@ -110,7 +106,6 @@ const defaultFormState: UnitFormData = {
   jumlahKelas: "0",
   jumlahSantri: "0",
   statusUnit: "Aktif",
-  statusPpdb: "Dibuka",
 }
 
 const toNumber = (value: unknown, fallback = 0): number => {
@@ -132,12 +127,6 @@ const fromBackendStatus = (status: unknown): UnitStatus => {
   return normalized === "NONAKTIF" ? "Nonaktif" : "Aktif"
 }
 
-const toBackendPpdbStatus = (status: PpdbStatus): BackendStatus => (status === "Dibuka" ? "AKTIF" : "NONAKTIF")
-
-const fromBackendPpdbStatus = (status: unknown): PpdbStatus => {
-  const normalized = toText(status).toUpperCase()
-  return normalized === "NONAKTIF" ? "Ditutup" : "Dibuka"
-}
 
 const normalizeUnitRow = (raw: DataUnitApiItem): UnitRow => ({
   id: toNumber(raw.id_unit ?? raw.id, -1),
@@ -148,7 +137,6 @@ const normalizeUnitRow = (raw: DataUnitApiItem): UnitRow => ({
   jumlahKelas: toNumber(raw.jumlah_kelas ?? raw.kelas_count, 0),
   jumlahSantri: toNumber(raw.jumlah_santri ?? raw.santri_count, 0),
   statusUnit: fromBackendStatus(raw.status),
-  statusPpdb: fromBackendPpdbStatus(raw.status_ppdb),
 })
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -175,7 +163,6 @@ export default function UnitPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState("")
   const [unitStatusFilter, setUnitStatusFilter] = useState<"all" | UnitStatus>("all")
-  const [ppdbStatusFilter, setPpdbStatusFilter] = useState<"all" | PpdbStatus>("all")
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -218,7 +205,6 @@ export default function UnitPage() {
       const query = searchKeyword.trim()
       if (query) params.q = query
       if (unitStatusFilter !== "all") params.status = toBackendStatus(unitStatusFilter)
-      if (ppdbStatusFilter !== "all") params.status_ppdb = toBackendPpdbStatus(ppdbStatusFilter)
 
       const result = await dataUnitService.getAll(params)
       const rows = result.data.map(normalizeUnitRow).filter((row) => row.id > 0)
@@ -240,12 +226,12 @@ export default function UnitPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchKeyword, unitStatusFilter, ppdbStatusFilter, rowsPerPage])
+  }, [searchKeyword, unitStatusFilter, rowsPerPage])
 
   useEffect(() => {
     setSelectedIds([])
     void fetchUnits()
-  }, [currentPage, rowsPerPage, searchKeyword, unitStatusFilter, ppdbStatusFilter])
+  }, [currentPage, rowsPerPage, searchKeyword, unitStatusFilter])
 
   const pagedUnits = sortedUnits
   const pagedIds = pagedUnits.map((unit) => unit.id)
@@ -344,7 +330,6 @@ export default function UnitPage() {
       jumlahKelas: String(unit.jumlahKelas),
       jumlahSantri: String(unit.jumlahSantri),
       statusUnit: unit.statusUnit,
-      statusPpdb: unit.statusPpdb,
     })
     setIsDetailDialogOpen(true)
   }
@@ -369,7 +354,6 @@ export default function UnitPage() {
           nomor_urut: editingFormData.urut ? Number(editingFormData.urut) : null,
           keterangan: editingFormData.keterangan || null,
           status: toBackendStatus(editingFormData.statusUnit),
-          status_ppdb: toBackendPpdbStatus(editingFormData.statusPpdb),
         })
 
         toast({
@@ -401,7 +385,6 @@ export default function UnitPage() {
         const query = searchKeyword.trim()
         if (query) params.q = query
         if (unitStatusFilter !== "all") params.status = toBackendStatus(unitStatusFilter)
-        if (ppdbStatusFilter !== "all") params.status_ppdb = toBackendPpdbStatus(ppdbStatusFilter)
 
         const blob = await dataUnitService.exportExcel(params)
         const url = URL.createObjectURL(blob)
@@ -443,7 +426,6 @@ export default function UnitPage() {
           nomor_urut: formData.urut ? Number(formData.urut) : null,
           keterangan: formData.keterangan || null,
           status: toBackendStatus(formData.statusUnit),
-          status_ppdb: toBackendPpdbStatus(formData.statusPpdb),
         })
 
         toast({
@@ -471,7 +453,6 @@ export default function UnitPage() {
   const resetFilter = () => {
     setSearchKeyword("")
     setUnitStatusFilter("all")
-    setPpdbStatusFilter("all")
   }
 
   const selectedCount = selectedIds.length
@@ -541,7 +522,7 @@ export default function UnitPage() {
                   />
                 </div>
 
-                <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2 md:grid-cols-1">
                   <div className="space-y-2">
                     <Label>Status Unit</Label>
                     <Select
@@ -554,22 +535,6 @@ export default function UnitPage() {
                       <SelectContent>
                         <SelectItem value="Aktif">Aktif</SelectItem>
                         <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Status PPDB</Label>
-                    <Select
-                      value={formData.statusPpdb}
-                      onValueChange={(value) => setFormData((prev) => ({ ...prev, statusPpdb: value as PpdbStatus }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih status PPDB" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Dibuka">Dibuka</SelectItem>
-                        <SelectItem value="Ditutup">Ditutup</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -623,7 +588,7 @@ export default function UnitPage() {
 
           <CollapsibleContent>
             <CardContent className="border-t pt-4">
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="unit-search">Cari Unit</Label>
                   <Input
@@ -647,23 +612,6 @@ export default function UnitPage() {
                       <SelectItem value="all">Semua Status</SelectItem>
                       <SelectItem value="Aktif">Aktif</SelectItem>
                       <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Status PPDB</Label>
-                  <Select
-                    value={ppdbStatusFilter}
-                    onValueChange={(value) => setPpdbStatusFilter(value as "all" | PpdbStatus)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Semua status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Status</SelectItem>
-                      <SelectItem value="Dibuka">Dibuka</SelectItem>
-                      <SelectItem value="Ditutup">Ditutup</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -777,12 +725,6 @@ export default function UnitPage() {
                       <ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "statusUnit" && "text-foreground")} />
                     </button>
                   </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("statusPpdb")}>
-                      STATUS PPDB
-                      <ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "statusPpdb" && "text-foreground")} />
-                    </button>
-                  </TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">AKSI</TableHead>
                 </TableRow>
               </TableHeader>
@@ -822,20 +764,6 @@ export default function UnitPage() {
                           )}
                         >
                           {unit.statusUnit}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "gap-1.5 font-semibold",
-                            unit.statusPpdb === "Dibuka"
-                              ? "bg-primary/10 text-primary"
-                              : "bg-muted text-muted-foreground",
-                          )}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {unit.statusPpdb}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
@@ -947,7 +875,7 @@ export default function UnitPage() {
               />
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2 md:grid-cols-1">
               <div className="space-y-2">
                 <Label>Status Unit</Label>
                 <Select
@@ -960,22 +888,6 @@ export default function UnitPage() {
                   <SelectContent>
                     <SelectItem value="Aktif">Aktif</SelectItem>
                     <SelectItem value="Nonaktif">Nonaktif</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Status PPDB</Label>
-                <Select
-                  value={editingFormData.statusPpdb}
-                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, statusPpdb: value as PpdbStatus }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Dibuka">Dibuka</SelectItem>
-                    <SelectItem value="Ditutup">Ditutup</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
