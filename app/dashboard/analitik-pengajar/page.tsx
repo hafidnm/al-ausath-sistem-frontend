@@ -17,7 +17,7 @@ export default function AnalitikPengajarPage() {
   const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
   const [query, setQuery] = useState<AnalyticsQuery>({})
-  const [userRole, setUserRole] = useState<string>("")
+  const [userRole, setUserRole] = useState<unknown>("")
 
   const {
     data: classStats,
@@ -72,7 +72,35 @@ export default function AnalitikPengajarPage() {
 
   // Only render for pengajar/guru role
   const validTeacherRoles = ["guru_mapel", "guru mapel", "mapel", "staf pengajar"]
-  const isTeacher = validTeacherRoles.includes((userRole || "").toLowerCase())
+
+  const normalizeRoles = (role: unknown): string[] => {
+    if (!role) return []
+
+    if (Array.isArray(role)) {
+      return role.flat(Infinity).map(String).map((value) => value.toLowerCase())
+    }
+
+    if (typeof role === "string") {
+      const trimmed = role.trim()
+
+      if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+        try {
+          const parsed = JSON.parse(trimmed)
+          if (Array.isArray(parsed)) {
+            return parsed.flat(Infinity).map(String).map((value) => value.toLowerCase())
+          }
+        } catch {
+          // ignore parse errors and fall back to raw string
+        }
+      }
+
+      return [trimmed.toLowerCase()]
+    }
+
+    return [String(role).toLowerCase()]
+  }
+
+  const isTeacher = normalizeRoles(userRole).some((role) => validTeacherRoles.includes(role))
 
   if (!mounted) {
     return <div className="space-y-6" />
