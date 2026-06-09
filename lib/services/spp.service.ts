@@ -25,6 +25,7 @@ import type {
   SppSetting,
   SppSettingListResponse,
   SppSettingQuery,
+  ProvisionBillsResponse,
   SppStatus,
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
@@ -45,6 +46,7 @@ export type {
   SppSetting,
   SppSettingListResponse,
   SppSettingQuery,
+  ProvisionBillsResponse,
   SppStatus,
   SppTunggakanSummary,
   UpdateSppPaymentRequest,
@@ -459,6 +461,21 @@ export const sppService = {
       return response.data;
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal menghapus setting SPP'));
+    }
+  },
+
+  async provisionBills(params?: {
+    id_santri?: string | number;
+    kode_kelas?: string;
+    id_unit?: string | number;
+    id_golongan_spp?: string | number;
+    jenjang?: string;
+  }): Promise<ProvisionBillsResponse> {
+    try {
+      const response = await api.post(`${BASE}/provision-bills`, params ?? {});
+      return response.data as ProvisionBillsResponse;
+    } catch (error) {
+      throw new Error(extractErrorMessage(error, 'Gagal menjalankan provision tagihan SPP'));
     }
   },
 

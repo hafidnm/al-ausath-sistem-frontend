@@ -62,6 +62,7 @@ interface PpdbTableProps {
   onVerifikasi: (item: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => void
   onDelete: (item: PpdbDetail) => void
   onCreateTagihan: (item: PpdbDetail) => void
+  onCreateTagihanInfaq: (item: PpdbDetail) => void
   tagihanLoading: boolean
 }
 
@@ -119,6 +120,7 @@ export function PpdbTable({
   onVerifikasi,
   onDelete,
   onCreateTagihan,
+  onCreateTagihanInfaq,
   tagihanLoading,
 }: PpdbTableProps) {
   // We use server-side filtering and pagination now, so data is already filtered for the current page
@@ -262,6 +264,13 @@ export function PpdbTable({
                               >
                                 <Wallet className="w-4 h-4 mr-2" />
                                 Buat Tagihan PPDB
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => onCreateTagihanInfaq(p)}
+                                disabled={tagihanLoading}
+                              >
+                                <Wallet className="w-4 h-4 mr-2" />
+                                Buat Tagihan Infaq
                               </DropdownMenuItem>
                             </>
                           )}

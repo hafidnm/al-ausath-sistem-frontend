@@ -664,6 +664,14 @@ export const ppdbAdminApi = {
     return response.data;
   },
 
+  async createTagihanInfaq(id: string): Promise<unknown> {
+    const response = await requestWithBasePathFallback((basePath) =>
+      api.post(buildPath(basePath, `/${id}/tagihan-infaq`), {}),
+    );
+
+    return response.data;
+  },
+
   async exportPendaftar(query?: { jenjang?: string; tahun_masuk?: string; status_verifikasi?: string; q?: string }): Promise<Blob> {
     const response = await requestWithBasePathFallback((basePath) =>
       api.get(buildPath(basePath, '/export'), {

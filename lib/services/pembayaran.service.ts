@@ -72,6 +72,7 @@ export interface TagihanDetailResponse {
     nomor_invoice: string;
     periode_tagihan: string | null;
     rincian_tagihan: string | null;
+    jenis_tagihan: string;
     jumlah_tagihan: number;
     jumlah_dibayar: number;
     jumlah_tunggakan: number;
@@ -83,7 +84,26 @@ export interface TagihanDetailResponse {
     kwitansi_url: string | null;
     bukti_bayar_url?: string | null;
     catatan_bayar?: string | null;
+    jumlah_minimum_dp?: number;
+    bulan?: string | null;
   }>;
+  spp_settings?: Array<{
+    id_setting: number;
+    nama_setting: string;
+    periode: string | null;
+    jenjang: string | null;
+    kode_kelas: string | null;
+    jumlah: number;
+    aktif: boolean;
+  }>;
+  ppdb_selection?: {
+    pilihan_uang_gedung: number | null;
+    pilihan_infaq_bulanan: number | null;
+    is_anak_guru: boolean;
+    status_verifikasi: string | null;
+    batas_bayar_uang_pangkal: string | null;
+    batas_bayar_spp: string | null;
+  } | null;
 }
 
 /** Row untuk halaman Proses Pembayaran (GET /proses) */
@@ -422,23 +442,29 @@ export const pembayaranService = {
           total_tunggakan: toNum((raw.ringkasan as ApiRecord)?.total_tunggakan ?? 0),
         },
         invoice: Array.isArray(raw.invoice)
-          ? (raw.invoice as ApiRecord[]).map((item) => ({
-              id_pembayaran: toNum(item.id_pembayaran ?? 0),
-              nomor_invoice: toStr(item.nomor_invoice ?? '-'),
-              periode_tagihan: toStr(item.periode_tagihan ?? '') || null,
-              rincian_tagihan: toStr(item.rincian_tagihan ?? '') || null,
-              jumlah_tagihan: toNum(item.jumlah_tagihan ?? 0),
-              jumlah_dibayar: toNum(item.jumlah_dibayar ?? 0),
-              jumlah_tunggakan: toNum(item.jumlah_tunggakan ?? 0),
-              status: toStr(item.status ?? ''),
-              status_key: normalizeStatus(item.status_key ?? item.status ?? ''),
-              status_label: toStr(item.status_label ?? '-'),
-              waktu_invoice: toStr(item.waktu_invoice ?? '') || null,
-              kwitansi_tersedia: Boolean(item.kwitansi_tersedia ?? false),
-              kwitansi_url: toStr(item.kwitansi_url ?? '') || null,
-              bukti_bayar_url: toStr(item.bukti_bayar_url ?? '') || null,
-              catatan_bayar: toStr(item.catatan_bayar ?? '') || null,
-            }))
+          ? (raw.invoice as ApiRecord[]).map((item) => {
+              const bulanValue = toStr(item.bulan ?? '') || null
+              return {
+                id_pembayaran: toNum(item.id_pembayaran ?? 0),
+                nomor_invoice: toStr(item.nomor_invoice ?? '-'),
+                periode_tagihan: toStr(item.periode_tagihan ?? '') || null,
+                rincian_tagihan: toStr(item.rincian_tagihan ?? '') || null,
+                jenis_tagihan: toStr(item.jenis_tagihan ?? item.jenisTagihan ?? item.jenis ?? 'SPP'),
+                jumlah_tagihan: toNum(item.jumlah_tagihan ?? 0),
+                jumlah_dibayar: toNum(item.jumlah_dibayar ?? 0),
+                jumlah_tunggakan: toNum(item.jumlah_tunggakan ?? 0),
+                status: toStr(item.status ?? ''),
+                status_key: normalizeStatus(item.status_key ?? item.status ?? ''),
+                status_label: toStr(item.status_label ?? '-'),
+                waktu_invoice: toStr(item.waktu_invoice ?? '') || null,
+                kwitansi_tersedia: Boolean(item.kwitansi_tersedia ?? false),
+                kwitansi_url: toStr(item.kwitansi_url ?? '') || null,
+                bukti_bayar_url: toStr(item.bukti_bayar_url ?? '') || null,
+                catatan_bayar: toStr(item.catatan_bayar ?? '') || null,
+                jumlah_minimum_dp: toNum(item.jumlah_minimum_dp ?? item.jumlahMinimumDp ?? item.minimum_dp ?? 0),
+                bulan: bulanValue,
+              }
+            })
           : [],
       };
     } catch (error) {

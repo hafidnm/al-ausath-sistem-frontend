@@ -461,6 +461,7 @@ export default function SantriPanelPage() {
           <CardTitle className="text-lg">Administrasi Santri</CardTitle>
           <CardDescription>
             Akses cepat untuk memantau tagihan, status pembayaran, dan pengumuman.
+            Untuk calon santri PPDB, pilihan infaq akan muncul di halaman Administrasi setelah pendaftaran diterima.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">

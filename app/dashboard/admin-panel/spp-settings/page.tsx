@@ -59,6 +59,7 @@ export default function SppSettingsPage() {
   const { createSetting, loading: creating } = useCreateSppSetting()
   const { updateSetting, loading: updating } = useUpdateSppSetting()
   const { deleteSetting } = useDeleteSppSetting()
+  const [provisionLoading, setProvisionLoading] = useState(false)
 
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -181,6 +182,28 @@ export default function SppSettingsPage() {
     }
   }
 
+  const handleProvisionBills = async () => {
+    if (!confirm("Jalankan provision tagihan SPP untuk seluruh santri aktif?")) return
+
+    setProvisionLoading(true)
+    try {
+      const result = await sppService.provisionBills()
+      toast({
+        title: "Provision berhasil",
+        description: `${result.data.processed} santri aktif diproses.`,
+      })
+      await fetchSettings()
+    } catch (error: any) {
+      toast({
+        title: "Gagal",
+        description: error?.message ?? "Gagal menjalankan provision tagihan SPP.",
+        variant: "destructive",
+      })
+    } finally {
+      setProvisionLoading(false)
+    }
+  }
+
   const formatCurrency = (v: number) =>
     new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(v)
 
@@ -201,6 +224,10 @@ export default function SppSettingsPage() {
           <Button variant="outline" size="sm" onClick={() => fetchSettings()} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleProvisionBills} disabled={provisionLoading}>
+            <Zap className={`w-4 h-4 mr-2 ${provisionLoading ? "animate-pulse" : ""}`} />
+            {provisionLoading ? "Provisioning..." : "Provision Tagihan"}
           </Button>
 
           {/* Dialog Tambah / Edit */}

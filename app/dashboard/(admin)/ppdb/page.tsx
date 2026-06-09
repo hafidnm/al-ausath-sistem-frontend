@@ -329,7 +329,13 @@ export default function PpdbPage() {
   const loadKelasList = useCallback(async () => {
     setKelasLoading(true)
     try {
-      const result = await dataKelasService.getAll({ per_page: 500, status: "AKTIF", status_ppdb: "AKTIF" })
+      const kelasParams = {
+        per_page: 500,
+        status: "AKTIF" as const,
+        status_ppdb: "AKTIF" as const,
+      } as Parameters<typeof dataKelasService.getAll>[0] & { status_ppdb: "AKTIF" }
+
+      const result = await dataKelasService.getAll(kelasParams)
       const mappedList = result.data.map(item => ({
         id: item.id_kelas ?? item.id ?? -1,
         kode_kelas: item.kode_kelas ?? "",
@@ -454,6 +460,19 @@ export default function PpdbPage() {
     }
   }
 
+  const handleCreateTagihanInfaq = async (p: PpdbDetail) => {
+    if (!confirm(`Buat tagihan infaq untuk ${p.name}?`)) return
+    setIsTagihanLoading(true)
+    try {
+      await runActionWithIdFallback(p, (id) => ppdbAdminApi.createTagihanInfaq(id))
+      alert("Tagihan infaq berhasil dibuat")
+    } catch (err) {
+      alert(getErrorMessage(err, "Gagal membuat tagihan infaq"))
+    } finally {
+      setIsTagihanLoading(false)
+    }
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   // Note: For true global stats across all pages, consider updating backend to provide global counters.
   // For now, these represent counts from the overall paginator (total) and the current page items.
@@ -532,6 +551,7 @@ export default function PpdbPage() {
             onVerifikasi={handleVerifikasi}
             onDelete={handleDeletePendaftar}
             onCreateTagihan={handleCreateTagihan}
+            onCreateTagihanInfaq={handleCreateTagihanInfaq}
             tagihanLoading={isTagihanLoading}
           />
 

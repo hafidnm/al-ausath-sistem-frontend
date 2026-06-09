@@ -177,6 +177,27 @@ export interface PpdbPortalDashboard {
   kodeKelasDiterima?: string;
 }
 
+export interface PpdbPortalBillingOption {
+  value: 1 | 2;
+  label: string;
+  amount: number;
+  display: string;
+}
+
+export interface PpdbPortalBillingInfo {
+  isAnakGuru: boolean;
+  pilihanUangGedung: 1 | 2 | null;
+  pilihanInfaqBulanan: 1 | 2 | null;
+  uangGedungOptions: PpdbPortalBillingOption[];
+  infaqBulananOptions: PpdbPortalBillingOption[];
+  selectedUangGedung: PpdbPortalBillingOption | null;
+  selectedInfaqBulanan: PpdbPortalBillingOption | null;
+  uangGedungLabel: string | null;
+  uangGedungAmount: number | null;
+  infaqBulananLabel: string | null;
+  infaqBulananAmount: number | null;
+}
+
 export interface PpdbPortalTesStatus {
   canAccessTes: boolean;
   showHalamanTes: boolean;

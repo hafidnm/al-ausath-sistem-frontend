@@ -17,6 +17,7 @@ import type { StatusPembayaran } from "@/lib/services/pembayaran.service"
 import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download, Percent, Landmark } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
+import { sppService } from "@/lib/services/spp.service"
 
 interface RekeningBank {
   id_rekening: number
@@ -56,6 +57,12 @@ const statusBadgeClassMap: Record<StatusPembayaran, string> = {
   dibatalkan: "bg-slate-500/15 text-slate-600 border-0 text-xs font-semibold",
 }
 
+const ppdbAcceptedStatusRegex = /diterima|lulus|accepted/i
+
+function isPpdbAcceptedStatus(status?: string | null) {
+  return Boolean(status && ppdbAcceptedStatusRegex.test(status))
+}
+
 type InvoiceDetailRow = {
   id_pembayaran: number
   nomor_invoice: string
@@ -72,7 +79,19 @@ type InvoiceDetailRow = {
   kwitansi_tersedia: boolean
   kwitansi_url: string | null
   jumlah_minimum_dp?: number // Tambahan untuk DP 50%
-  bulan?: string // Untuk tracking bulan SPP
+  bulan?: string | null // Untuk tracking bulan SPP
+}
+
+type PaymentOption = 'lunas' | 'dp'
+
+type SppSettingSummary = {
+  id_setting: number
+  nama_setting: string
+  periode: string | null
+  jenjang: string | null
+  kode_kelas: string | null
+  jumlah: number
+  aktif: boolean
 }
 
 export default function SantriAdministrasiPage() {
@@ -83,6 +102,8 @@ export default function SantriAdministrasiPage() {
   const [nomorInduk, setNomorInduk] = useState("")
   const [rekeningList, setRekeningList] = useState<RekeningBank[]>([])
   const [selectedRekeningId, setSelectedRekeningId] = useState("")
+  const [sppSettings, setSppSettings] = useState<SppSettingSummary[]>([])
+  const [loadingSppSettings, setLoadingSppSettings] = useState(false)
 
   // Payment upload states
   const [payDialogOpen, setPayDialogOpen] = useState(false)
@@ -91,6 +112,7 @@ export default function SantriAdministrasiPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const [metode, setMetode] = useState("Transfer Bank")
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>("lunas")
   const [catatan, setCatatan] = useState("")
   const [downloadingKwitansiId, setDownloadingKwitansiId] = useState<number | null>(null)
   
@@ -113,6 +135,22 @@ export default function SantriAdministrasiPage() {
     }
     void loadAuth()
 
+    setLoadingSppSettings(true)
+    sppService.getSettings({ per_page: 100 })
+      .then((res) => {
+        setSppSettings((res.data || []).map((item) => ({
+          id_setting: Number(item.id),
+          nama_setting: item.nama,
+          periode: item.tahunAjaran || null,
+          jenjang: item.jenjang || null,
+          kode_kelas: item.kodeKelas || null,
+          jumlah: item.nominal,
+          aktif: item.aktif,
+        })))
+      })
+      .catch(() => {/* non-critical */})
+      .finally(() => setLoadingSppSettings(false))
+
     // Load rekening bank aktif
     api.get("/administrasi/rekening?status=AKTIF")
       .then((res) => {
@@ -134,11 +172,13 @@ export default function SantriAdministrasiPage() {
   useEffect(() => {
     if (myTagihanRow?.id) {
       void fetchTagihanDetail(myTagihanRow.id)
-    } else if (santriId && !loadingAll && allTagihan.length === 0) {
-      // Fallback: santri may only have infaq (not in pembayaran_spp), fetch by santriId directly
-      void fetchTagihanDetail(santriId)
+    } else if (santriId) {
+      // Fallback: if no matching tagihan row was found in the bill list,
+      // still try fetching detail by santri id because PPDB infaq bills may
+      // exist under the linked santri / pendaftar entity.
+      void fetchTagihanDetail(String(santriId))
     }
-  }, [myTagihanRow?.id, santriId, loadingAll, allTagihan.length, fetchTagihanDetail])
+  }, [myTagihanRow?.id, santriId, fetchTagihanDetail])
 
   useEffect(() => {
     return () => {
@@ -151,6 +191,7 @@ export default function SantriAdministrasiPage() {
     setFile(null)
     setPreviewUrl(null)
     setMetode("Transfer Bank")
+    setPaymentOption("lunas")
     setCatatan("")
     setPayDialogOpen(true)
   }
@@ -181,11 +222,16 @@ export default function SantriAdministrasiPage() {
       const formData = new FormData()
       formData.append("bukti_bayar", file)
       formData.append("metode_bayar", metode)
+      formData.append("payment_option", paymentOption)
       if (metode === "Transfer Bank" && selectedRekeningId) {
         formData.append("id_rekening", selectedRekeningId)
       }
-      if (catatan) {
-        formData.append("catatan_bayar", catatan)
+      const finalCatatan = paymentOption === "dp"
+        ? `DP 50%${catatan ? ` - ${catatan}` : ""}`
+        : `Lunas${catatan ? ` - ${catatan}` : ""}`
+
+      if (finalCatatan) {
+        formData.append("catatan_bayar", finalCatatan)
       }
 
       await api.post(`/administrasi/pembayaran/${selectedInvoice.id_pembayaran}/upload-bukti`, formData, {
@@ -252,6 +298,10 @@ export default function SantriAdministrasiPage() {
   }
 
   const invoices = detailData?.invoice || []
+  const ppdbSelection = detailData?.ppdb_selection ?? null
+  const linkedSppSettings = detailData?.spp_settings ?? []
+  const dpMinimum = selectedInvoice?.jumlah_minimum_dp ?? Math.ceil((selectedInvoice?.jumlah_tunggakan ?? 0) * 0.5)
+  const jumlahBayarSaatIni = selectedInvoice ? (paymentOption === "dp" ? dpMinimum : selectedInvoice.jumlah_tunggakan) : 0
 
   const belumLunas = useMemo(
     () => invoices.filter((item) => item.status_key !== "lunas"),
@@ -260,6 +310,11 @@ export default function SantriAdministrasiPage() {
 
   const sudahLunas = useMemo(
     () => invoices.filter((item) => item.status_key === "lunas"),
+    [invoices]
+  )
+
+  const ppdbInvoices = useMemo(
+    () => invoices.filter((item) => (item.jenis_tagihan ?? "").toUpperCase().includes("PPDB")),
     [invoices]
   )
 
@@ -279,6 +334,14 @@ export default function SantriAdministrasiPage() {
       }
     )
   }, [invoices])
+
+  const isPpdbProfile = detailData?.profil?.sumber === 'ppdb'
+  const isPpdbAccepted = isPpdbAcceptedStatus(detailData?.profil?.status)
+  const hasPpdbBilling = isPpdbProfile || ppdbInvoices.length > 0
+  const activeSppSettings = useMemo(() => sppSettings.filter((item) => item.aktif), [sppSettings])
+  const belumLunasEmptyMessage = hasPpdbBilling && !isPpdbAccepted
+    ? 'Tagihan PPDB akan muncul setelah pendaftaran Anda diterima. Silakan periksa status PPDB di dashboard PPDB.'
+    : 'Alhamdulillah! Tidak ada tagihan yang belum lunas.'
 
   const isLoading = loadingAll || loadingDetail
 
@@ -308,7 +371,7 @@ export default function SantriAdministrasiPage() {
       </div>
 
       {/* Profil Info Card - Tampilkan jika ada data anak guru atau dari PPDB */}
-      {detailData?.profil && (detailData.profil.is_anak_guru || detailData.profil.sumber === 'ppdb') && (
+      {detailData?.profil && (detailData.profil.isAnakGuru || hasPpdbBilling) && (
         <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-md">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center gap-2">
@@ -336,7 +399,7 @@ export default function SantriAdministrasiPage() {
               </div>
             </div>
             
-            {detailData.profil.is_anak_guru && (
+            {detailData.profil.isAnakGuru && (
               <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 flex gap-2.5">
                 <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                   <Percent className="w-5 h-5 text-amber-600" />
@@ -350,15 +413,93 @@ export default function SantriAdministrasiPage() {
               </div>
             )}
             
-            {detailData.profil.sumber === 'ppdb' && (
+            {hasPpdbBilling && (
               <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-800 dark:text-blue-200">
                 <p className="font-semibold flex items-center gap-1.5">
                   <Info className="w-3.5 h-3.5" />
                   Data dari PPDB
                 </p>
                 <p className="mt-1">
-                  Tagihan Anda mungkin termasuk Uang Pangkal, Perlengkapan, dan SPP Bulanan sesuai pilihan infaq saat pendaftaran.
+                  Infaq PPDB berbeda dengan tagihan SPP reguler. Pilihan infaq yang Anda isi saat pendaftaran
+                  akan muncul sebagai tagihan di halaman <strong>Administrasi</strong> setelah pendaftaran benar-benar
+                  diterima oleh pesantren.
                 </p>
+              </div>
+            )}
+
+            {ppdbInvoices.length > 0 && (
+              <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-xs text-emerald-900">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5" />
+                  Tagihan PPDB / Infaq Tercatat
+                </p>
+                <p className="mt-1 text-emerald-800">
+                  Ada {ppdbInvoices.length} tagihan PPDB/infaq yang sudah masuk ke akun santri ini dan tampil di daftar tagihan di bawah.
+                </p>
+              </div>
+            )}
+
+            {(ppdbSelection || linkedSppSettings.length > 0) && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 space-y-3">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Receipt className="w-3.5 h-3.5" />
+                  Ringkasan Pilihan Tagihan
+                </p>
+                {ppdbSelection && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-500">Pilihan Uang Gedung</p>
+                      <p className="font-medium">
+                        {ppdbSelection.pilihan_uang_gedung === 1
+                          ? 'Pilihan A'
+                          : ppdbSelection.pilihan_uang_gedung === 2
+                            ? 'Pilihan B'
+                            : '-'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-500">Pilihan Infaq Bulanan</p>
+                      <p className="font-medium">
+                        {ppdbSelection.pilihan_infaq_bulanan === 1
+                          ? 'Pilihan A'
+                          : ppdbSelection.pilihan_infaq_bulanan === 2
+                            ? 'Pilihan B'
+                            : '-'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 text-[11px]">
+                  <div className="rounded border bg-white p-2">
+                    <p className="text-slate-500 uppercase tracking-wide">Setting SPP Aktif</p>
+                    <p className="font-semibold">{activeSppSettings.length} data</p>
+                  </div>
+                  <div className="rounded border bg-white p-2">
+                    <p className="text-slate-500 uppercase tracking-wide">Setting Terkait</p>
+                    <p className="font-semibold">{linkedSppSettings.length} data</p>
+                  </div>
+                </div>
+
+                {linkedSppSettings.length > 0 && (
+                  <div className="space-y-1.5">
+                    {linkedSppSettings.slice(0, 3).map((setting) => (
+                      <div key={setting.id_setting} className="rounded border bg-white px-3 py-2 flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-medium text-slate-900">{setting.nama_setting}</p>
+                          <p className="text-[10px] text-slate-500">
+                            {setting.jenjang || '-'} {setting.kode_kelas ? `• ${setting.kode_kelas}` : ''}
+                          </p>
+                        </div>
+                        <p className="font-semibold text-slate-700">{formatCurrency(setting.jumlah)}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {loadingSppSettings && (
+                  <p className="text-[10px] text-slate-500">Memuat setting SPP aktif...</p>
+                )}
               </div>
             )}
           </CardContent>
@@ -465,7 +606,7 @@ export default function SantriAdministrasiPage() {
                     ) : belumLunas.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={7} className="py-12 text-center text-muted-foreground text-sm">
-                          Alhamdulillah! Tidak ada tagihan yang belum lunas.
+                          {belumLunasEmptyMessage}
                         </TableCell>
                       </TableRow>
                     ) : (
@@ -477,6 +618,14 @@ export default function SantriAdministrasiPage() {
                             <div>
                               <p className="font-semibold text-sm text-foreground">{row.rincian_tagihan || "Tagihan SPP"}</p>
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
+                              {row.bukti_bayar_url && (
+                                <p className="text-xs text-emerald-700 mt-1">
+                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                </p>
+                              )}
+                              {row.catatan_bayar && (
+                                <p className="text-xs text-muted-foreground mt-1">Catatan: {row.catatan_bayar}</p>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm font-semibold">{formatCurrency(row.jumlah_tagihan)}</TableCell>
@@ -542,6 +691,14 @@ export default function SantriAdministrasiPage() {
                             <div>
                               <p className="font-semibold text-sm text-foreground">{row.rincian_tagihan || "Tagihan SPP"}</p>
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
+                              {row.bukti_bayar_url && (
+                                <p className="text-xs text-emerald-700 mt-1">
+                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                </p>
+                              )}
+                              {row.catatan_bayar && (
+                                <p className="text-xs text-muted-foreground mt-1">Catatan: {row.catatan_bayar}</p>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="text-right text-sm font-semibold">{formatCurrency(row.jumlah_tagihan)}</TableCell>
@@ -622,13 +779,55 @@ export default function SantriAdministrasiPage() {
             )}
 
             <div className="grid gap-2">
-              <Label className="text-xs text-muted-foreground uppercase font-bold">Total yang Harus Dibayar</Label>
+              <Label className="text-xs text-muted-foreground uppercase font-bold">Opsi Pembayaran</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption("lunas")}
+                  className={`rounded-lg border px-3 py-2 text-sm text-left transition ${
+                    paymentOption === "lunas"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <p className="font-semibold">Bayar Lunas</p>
+                  <p className="text-xs">Bayar sisa tagihan penuh</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentOption("dp")}
+                  className={`rounded-lg border px-3 py-2 text-sm text-left transition ${
+                    paymentOption === "dp"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <p className="font-semibold">Bayar DP</p>
+                  <p className="text-xs">Minimal {formatCurrency(dpMinimum)}</p>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label className="text-xs text-muted-foreground uppercase font-bold">Jumlah yang akan dibayarkan</Label>
               <div className="text-2xl font-extrabold text-foreground bg-muted p-3 rounded-lg border border-border flex items-center justify-between">
-                <span>{formatCurrency(selectedInvoice?.jumlah_tunggakan ?? 0)}</span>
+                <span>{formatCurrency(jumlahBayarSaatIni)}</span>
                 <Badge variant="outline" className="text-xs font-mono uppercase bg-background">
                   {selectedInvoice?.jenis_tagihan}
                 </Badge>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              {paymentOption === "dp" ? (
+                <p>
+                  Pilih DP bila Anda ingin membayar sebagian terlebih dahulu. Transfer minimal {formatCurrency(dpMinimum)} dan lampirkan bukti pembayaran.
+                </p>
+              ) : (
+                <p>
+                  Bayar lunas untuk menutup seluruh sisa tagihan sekaligus. Sistem akan mencatat bukti transfer dan menunggu verifikasi admin.
+                </p>
+              )}
             </div>
 
             {/* Rekening Bank Tujuan Transfer */}

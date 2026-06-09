@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
 const OPSI_UANG_GEDUNG = [
   { value: 1, label: 'Pilihan A', amount: 1_500_000, display: 'Rp 1.500.000' },
@@ -39,6 +40,7 @@ export default function PpdbInfoInfaqPage() {
   const router = useRouter();
   const { toast } = useToast();
   const { data, loading, fetchDashboard } = usePpdbPortalDashboard();
+  const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
 
   const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
   const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
@@ -51,6 +53,14 @@ export default function PpdbInfoInfaqPage() {
       toast({ title: 'Gagal memuat data', variant: 'destructive' });
     });
   }, [fetchDashboard, toast]);
+
+  useEffect(() => {
+    void ppdbPortalApi.getBillingInfo()
+      .then(setBillingInfo)
+      .catch(() => {
+        setBillingInfo(null);
+      });
+  }, []);
 
   // Sync from backend data once loaded
   useEffect(() => {
@@ -87,12 +97,27 @@ export default function PpdbInfoInfaqPage() {
     }
   }, [data, router, submitting]);
 
+  useEffect(() => {
+    if (!billingInfo) return;
+
+    if (billingInfo.pilihanUangGedung === 1 || billingInfo.pilihanUangGedung === 2) {
+      setPilihanUangGedung(billingInfo.pilihanUangGedung);
+    }
+    if (billingInfo.pilihanInfaqBulanan === 1 || billingInfo.pilihanInfaqBulanan === 2) {
+      setPilihanInfaqBulanan(billingInfo.pilihanInfaqBulanan);
+    }
+    setIsAnakGuru(Boolean(billingInfo.isAnakGuru));
+  }, [billingInfo]);
+
   // Computed totals
-  const gedungAmount = OPSI_UANG_GEDUNG.find(o => o.value === pilihanUangGedung)!.amount;
+  const uangGedungOptions = (billingInfo?.uangGedungOptions?.length ? billingInfo.uangGedungOptions : OPSI_UANG_GEDUNG) as PpdbPortalBillingOption[];
+  const infaqOptions = (billingInfo?.infaqBulananOptions?.length ? billingInfo.infaqBulananOptions : OPSI_INFAQ_BULANAN) as PpdbPortalBillingOption[];
+
+  const gedungAmount = uangGedungOptions.find(o => o.value === pilihanUangGedung)?.amount ?? 0;
   const fixedTotal = FIXED_UANG_PANGKAL_ITEMS.reduce((s, i) => s + i.amount, 0);
   const totalUangPangkal = gedungAmount + fixedTotal; // e.g. 2.375.000 or 2.875.000
   const totalKeseluruhan = totalUangPangkal + UANG_MODUL;
-  const infaqBulananDisplay = OPSI_INFAQ_BULANAN.find(o => o.value === pilihanInfaqBulanan)!.display;
+  const infaqBulananDisplay = infaqOptions.find(o => o.value === pilihanInfaqBulanan)?.display ?? '-';
 
   const handleLanjut = async () => {
     setSubmitting(true);
@@ -182,7 +207,7 @@ export default function PpdbInfoInfaqPage() {
             <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 space-y-2">
               <p className="text-sm font-medium">Uang gedung dll — pilih salah satu:</p>
               <div className="flex gap-4">
-                {OPSI_UANG_GEDUNG.map((opsi) => (
+                {uangGedungOptions.map((opsi) => (
                   <button
                     key={opsi.value}
                     type="button"
@@ -250,7 +275,7 @@ export default function PpdbInfoInfaqPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-4">
-              {OPSI_INFAQ_BULANAN.map((opsi) => (
+              {infaqOptions.map((opsi) => (
                 <button
                   key={opsi.value}
                   type="button"
@@ -374,6 +399,15 @@ export default function PpdbInfoInfaqPage() {
                 <Percent className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-800">Diskon 50% untuk Anak Guru</p>
+
+              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
+                <p className="font-medium text-amber-900">Pilihan tersimpan</p>
+                <p className="text-amber-800 mt-1">
+                  {billingInfo?.selectedInfaqBulanan
+                    ? `${billingInfo.selectedInfaqBulanan.label} - ${billingInfo.selectedInfaqBulanan.display}`
+                    : 'Belum ada pilihan infaq yang tersimpan'}
+                </p>
+              </div>
                   <p className="text-xs text-amber-700 mt-0.5">
                     Admin akan memverifikasi status dan menyesuaikan nominal tagihan administrasi PPDB Anda.
                   </p>

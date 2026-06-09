@@ -37,6 +37,7 @@ export interface DataKelasListParams {
   kode_unit?: string
   tahun_ajaran?: string
   status?: BackendKelasStatus
+  status_ppdb?: BackendKelasStatus
   per_page?: number
   page?: number
 }

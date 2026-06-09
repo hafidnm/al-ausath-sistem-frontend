@@ -158,6 +158,20 @@ export interface SppSettingListResponse {
   message: string;
 }
 
+export interface ProvisionBillsResponse {
+  message: string;
+  data: {
+    processed: number;
+    filters: {
+      id_santri?: number | null;
+      kode_kelas?: string | null;
+      id_unit?: number | null;
+      id_golongan_spp?: number | null;
+      jenjang?: string | null;
+    };
+  };
+}
+
 export interface SppGolonganListResponse {
   data: SppGolongan[];
   message: string;

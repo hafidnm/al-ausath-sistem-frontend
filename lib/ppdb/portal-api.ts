@@ -1,5 +1,6 @@
 import api, { clearStoredPpdbToken, getCsrfToken, setPpdbAuthMarker, setStoredPpdbToken } from '@/lib/axios';
 import type {
+  PpdbPortalBillingInfo,
   PpdbPortalDashboard,
   PpdbPortalFormRequest,
   PpdbPortalLoginRequest,
@@ -376,6 +377,70 @@ export const ppdbPortalApi = {
   async getDashboard(): Promise<PpdbPortalDashboard> {
     const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/dashboard`);
     return normalizeDashboard(response.data);
+  },
+
+  async getPembayaranStatus(): Promise<PpdbPortalDashboard> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/pembayaran`);
+    return normalizeDashboard(response.data);
+  },
+
+  async getBillingInfo(): Promise<PpdbPortalBillingInfo> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/billing`);
+    const data = resolveData(response.data);
+    const selectedUangGedung = asRecord(data.selected_uang_gedung);
+    const selectedInfaqBulanan = asRecord(data.selected_infaq_bulanan);
+
+    return {
+      isAnakGuru: asBool(data.is_anak_guru),
+      pilihanUangGedung: (data.pilihan_uang_gedung === 1 || data.pilihan_uang_gedung === 2)
+        ? data.pilihan_uang_gedung
+        : null,
+      pilihanInfaqBulanan: (data.pilihan_infaq_bulanan === 1 || data.pilihan_infaq_bulanan === 2)
+        ? data.pilihan_infaq_bulanan
+        : null,
+      uangGedungOptions: Array.isArray(data.uang_gedung_options)
+        ? data.uang_gedung_options.map((item) => {
+            const option = asRecord(item);
+            return {
+            value: option.value === 2 ? 2 : 1,
+            label: asString(option.label),
+            amount: Number(option.amount ?? 0),
+            display: asString(option.display),
+          };
+          })
+        : [],
+      infaqBulananOptions: Array.isArray(data.infaq_bulanan_options)
+        ? data.infaq_bulanan_options.map((item) => {
+            const option = asRecord(item);
+            return {
+            value: option.value === 2 ? 2 : 1,
+            label: asString(option.label),
+            amount: Number(option.amount ?? 0),
+            display: asString(option.display),
+          };
+          })
+        : [],
+      selectedUangGedung: Object.keys(selectedUangGedung).length > 0
+        ? {
+            value: selectedUangGedung.value === 2 ? 2 : 1,
+            label: asString(selectedUangGedung.label),
+            amount: Number(selectedUangGedung.amount ?? 0),
+            display: asString(selectedUangGedung.display),
+          }
+        : null,
+      selectedInfaqBulanan: Object.keys(selectedInfaqBulanan).length > 0
+        ? {
+            value: selectedInfaqBulanan.value === 2 ? 2 : 1,
+            label: asString(selectedInfaqBulanan.label),
+            amount: Number(selectedInfaqBulanan.amount ?? 0),
+            display: asString(selectedInfaqBulanan.display),
+          }
+        : null,
+      uangGedungLabel: asString(data.uang_gedung_label) || null,
+      uangGedungAmount: data.uang_gedung_amount != null ? Number(data.uang_gedung_amount) : null,
+      infaqBulananLabel: asString(data.infaq_bulanan_label) || null,
+      infaqBulananAmount: data.infaq_bulanan_amount != null ? Number(data.infaq_bulanan_amount) : null,
+    };
   },
 
   async updateForm(payload: PpdbPortalFormRequest): Promise<unknown> {

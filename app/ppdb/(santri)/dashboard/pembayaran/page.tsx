@@ -8,8 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
+import { usePpdbPortalPembayaranStatus } from '@/hooks/ppdb/santri';
 import api from '@/lib/axios';
+import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+import type { PpdbPortalBillingInfo } from '@/types/ppdb/portal';
 
 interface RekeningBank {
   id_rekening: number;
@@ -25,7 +27,8 @@ interface RekeningBank {
 export default function PpdbPembayaranPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data, loading, fetchDashboard } = usePpdbPortalDashboard();
+  const { data, loading, fetchPembayaranStatus } = usePpdbPortalPembayaranStatus();
+  const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
   
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -45,14 +48,22 @@ export default function PpdbPembayaranPage() {
   }, []);
 
   useEffect(() => {
-    void fetchDashboard().catch(() => {
+    void fetchPembayaranStatus().catch(() => {
       toast({
         title: 'Gagal memuat data',
         description: 'Tidak dapat memuat status pembayaran',
         variant: 'destructive',
       });
     });
-  }, [fetchDashboard, toast]);
+  }, [fetchPembayaranStatus, toast]);
+
+  useEffect(() => {
+    void ppdbPortalApi.getBillingInfo()
+      .then(setBillingInfo)
+      .catch(() => {
+        setBillingInfo(null);
+      });
+  }, []);
 
   useEffect(() => {
     if (!data) return;
@@ -105,7 +116,7 @@ export default function PpdbPembayaranPage() {
       
       setFile(null);
       setPreviewUrl(null);
-      await fetchDashboard();
+      await fetchPembayaranStatus();
     } catch (error: any) {
       toast({
         title: 'Gagal mengunggah',
@@ -154,6 +165,14 @@ export default function PpdbPembayaranPage() {
   const paymentInfo = data?.pembayaranPpdb;
   const isVerified = paymentInfo?.status === 'terverifikasi';
   const isPendingVerification = paymentInfo?.status === 'menunggu_verifikasi';
+  const pilihanInfaqBulanan = data?.pilihanInfaqBulanan;
+  const selectedInfaq = billingInfo?.selectedInfaqBulanan;
+  const isPpdbAccepted = data?.statusVerifikasi?.toLowerCase() === 'diterima' || data?.step === 'siap-menjadi-santri';
+  const infaqSummary = selectedInfaq
+    ? `${selectedInfaq.label} - ${selectedInfaq.display}`
+    : pilihanInfaqBulanan
+      ? `Pilihan infaq bulanan: Rp ${Number(pilihanInfaqBulanan).toLocaleString('id-ID')}`
+      : 'Pilihan infaq belum tersimpan';
   
   return (
     <div className="min-h-screen bg-background py-8 px-4">
@@ -179,11 +198,24 @@ export default function PpdbPembayaranPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Status PPDB</p>
+                <p className="mt-1 font-semibold">{isPpdbAccepted ? 'Diterima' : (data?.statusVerifikasi || 'Menunggu')}</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Infaq Bulanan</p>
+                <p className="mt-1 font-semibold">{infaqSummary}</p>
+              </div>
+            </div>
+
             {!paymentInfo?.has_tagihan ? (
               <div className="rounded-lg border border-warning/20 bg-warning/5 p-4 flex gap-3">
                 <Info className="w-5 h-5 text-warning flex-shrink-0" />
                 <p className="text-sm text-warning-foreground">
-                  Tagihan pembayaran belum tersedia. Admin akan segera menerbitkan tagihan Anda.
+                  {isPpdbAccepted
+                    ? 'Tagihan pembayaran belum tersedia. Admin akan segera menerbitkan tagihan Anda.'
+                    : 'Tagihan infaq akan muncul setelah pendaftaran Anda dinyatakan diterima.'}
                 </p>
               </div>
             ) : (
@@ -242,6 +274,9 @@ export default function PpdbPembayaranPage() {
                       <li>Simpan struk / bukti transfer (format JPG, PNG, atau PDF).</li>
                       <li>Unggah bukti transfer pada form di bawah ini.</li>
                     </ol>
+                    <p className="text-xs text-muted-foreground">
+                      Infaq yang Anda pilih saat pendaftaran disimpan di backend dan dipakai sebagai tagihan setelah status PPDB diterima.
+                    </p>
                   </div>
                 </div>
 

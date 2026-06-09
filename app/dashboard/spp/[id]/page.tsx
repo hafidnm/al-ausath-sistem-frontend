@@ -73,6 +73,7 @@ type InvoiceRow = {
   nomor_invoice: string
   periode_tagihan: string | null
   rincian_tagihan: string | null
+  jenis_tagihan?: string
   jumlah_potongan?: number
   jumlah_tagihan: number
   jumlah_dibayar: number
@@ -148,6 +149,11 @@ function InvoiceTable({
                   {row.rincian_tagihan ? (
                     <div>
                       <p className="font-semibold text-primary text-xs">{row.rincian_tagihan}</p>
+                      {row.jenis_tagihan && (
+                        <Badge variant="outline" className="mt-1 text-[10px] uppercase tracking-wide">
+                          {row.jenis_tagihan === 'PPDB' ? 'PPDB / Infaq' : row.jenis_tagihan}
+                        </Badge>
+                      )}
                     </div>
                   ) : (
                     <span className="text-muted-foreground">Tagihan SPP</span>
@@ -510,6 +516,14 @@ export default function SppTagihanDetailPage() {
             <CardTitle className="text-base">Daftar Tagihan</CardTitle>
           </CardHeader>
           <CardContent>
+            {data.profil?.sumber === 'ppdb' && (
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
+                <p className="font-semibold">Tagihan PPDB / Infaq</p>
+                <p className="mt-1 text-xs text-emerald-800">
+                  Pilihan infaq PPDB akan muncul di daftar tagihan ini setelah pendaftar dinyatakan diterima.
+                </p>
+              </div>
+            )}
             <Tabs defaultValue="belum-lunas" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="belum-lunas" id="tab-belum-lunas">
@@ -619,6 +633,11 @@ export default function SppTagihanDetailPage() {
               <div className="grid grid-cols-2 gap-y-3">
                 <div className="text-muted-foreground">Kategori</div>
                 <div className="font-medium">{selectedInvoice.rincian_tagihan || "Tagihan SPP"}</div>
+
+                <div className="text-muted-foreground">Jenis Tagihan</div>
+                <div className="font-medium">
+                  {selectedInvoice.jenis_tagihan === 'PPDB' ? 'PPDB / Infaq' : (selectedInvoice.jenis_tagihan || '-')}
+                </div>
                 
                 <div className="text-muted-foreground">Periode</div>
                 <div className="font-medium">{selectedInvoice.periode_tagihan || formatDate(selectedInvoice.waktu_invoice)}</div>
