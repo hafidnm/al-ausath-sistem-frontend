@@ -196,14 +196,16 @@ export function RaporFiltersCard({
           </div>
           <div>
             <Label htmlFor="tahun-ajaran">Tahun ajaran</Label>
-            <Input id="tahun-ajaran" className="mt-2" value={tahunAjaran} onChange={(event) => onTahunAjaranChange(event.target.value)} />
+            <Input id="tahun-ajaran" className="mt-2" value={tahunAjaran} onChange={(event) => onTahunAjaranChange(event.target.value.trim() || "all")} placeholder="Format: 2025/2026 atau 'all'" />
+            <p className="text-xs text-muted-foreground mt-1">Ketik 'all' untuk menampilkan semua tahun ajaran</p>
           </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-4">
           <div>
             <Label>Kelas</Label>
-            <Input className="mt-2" value={kodeKelas} onChange={(event) => onKodeKelasChange(event.target.value)} placeholder="Kode kelas / all" />
+            <Input className="mt-2" value={kodeKelas} onChange={(event) => onKodeKelasChange(event.target.value.trim() || "all")} placeholder="Kode kelas atau 'all' untuk semua" />
+            <p className="text-xs text-muted-foreground mt-1">Ketik 'all' untuk menampilkan semua kelas</p>
           </div>
           <div>
             <Label>Semester</Label>

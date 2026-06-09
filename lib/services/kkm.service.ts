@@ -96,20 +96,40 @@ const extractList = (payload: any): any[] => {
   if (Array.isArray(payload?.results)) return payload.results
   return []
 }
-
 const normalizePayload = (payload: KkmPayload): KkmPayload => {
-  const kodeMapel = payload.kode_mapel?.trim()
-  const tahunAjaran = payload.tahun_ajaran?.trim()
-  const kodeUnitRaw = typeof payload.kode_unit === "string" ? payload.kode_unit.trim() : payload.kode_unit
-  const keteranganRaw = payload.keterangan?.trim()
+  // Defensive: if frontend accidentally passes arrays (e.g., from multi-select or library quirks),
+  // coerce to scalar values expected by backend to avoid "Array to string conversion" errors.
+  const ensureScalar = (v: any): any => {
+    if (Array.isArray(v)) return v.length > 0 ? v[0] : undefined
+    return v
+  }
 
-  return {
-    ...payload,
-    kode_mapel: kodeMapel,
-    tahun_ajaran: tahunAjaran,
+  const rawKodeMapel = ensureScalar(payload.kode_mapel)
+  const rawTahun = ensureScalar(payload.tahun_ajaran)
+  const rawKodeUnit = ensureScalar(payload.kode_unit)
+  const rawKeterangan = ensureScalar(payload.keterangan)
+  const rawSemester = ensureScalar(payload.semester)
+  const rawNilai = ensureScalar(payload.nilai_kkm)
+
+  const kodeMapel = typeof rawKodeMapel === "string" ? rawKodeMapel.trim() : (rawKodeMapel != null ? String(rawKodeMapel) : undefined)
+  const tahunAjaran = typeof rawTahun === "string" ? rawTahun.trim() : (rawTahun != null ? String(rawTahun) : undefined)
+  const kodeUnitRaw = typeof rawKodeUnit === "string" ? rawKodeUnit.trim() : (rawKodeUnit != null ? String(rawKodeUnit) : undefined)
+  const keteranganRaw = typeof rawKeterangan === "string" ? rawKeterangan.trim() : (rawKeterangan != null ? String(rawKeterangan) : undefined)
+
+  // Ensure numeric fields are proper numbers
+  const semesterNum = Number(rawSemester)
+  const nilaiNum = Number(rawNilai)
+
+  const out: KkmPayload = {
+    kode_mapel: kodeMapel ?? "",
+    tahun_ajaran: tahunAjaran ?? "",
+    semester: Number.isFinite(semesterNum) ? semesterNum : (typeof payload.semester === 'number' ? payload.semester : 0),
+    nilai_kkm: Number.isFinite(nilaiNum) ? nilaiNum : (typeof payload.nilai_kkm === 'number' ? payload.nilai_kkm : 0),
     kode_unit: kodeUnitRaw ? kodeUnitRaw : null,
     keterangan: keteranganRaw ? keteranganRaw : undefined,
   }
+
+  return out
 }
 
 export const kkmService = {

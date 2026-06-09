@@ -24,25 +24,57 @@ interface UseRaportSantriParams {
 
 const getRaportDirect = async (params: any): Promise<RaportData | null> => {
   try {
-    const response = await api.get("/akademik/raport/self", { params })
+    // Use /akademik/raport/self endpoint - specific for santri, auto-detects logged-in user
+    const response = await api.get("/akademik/raport/self", { 
+      params
+    })
     
     console.log('Raw raport response:', response.data)
+    console.log('Response status code:', response.status)
     
-    // Extract the nested data structure
-    const apiData = response.data?.data
-    if (!apiData || !apiData.raport) {
+    // Extract the data from response
+    const apiData = response.data?.data ?? response.data
+    if (!apiData) {
       console.log('No raport data in response')
       return null
     }
 
-    // Flatten the structure into one object for easier use
-    const raport = apiData.raport
+    console.log('Raw apiData:', apiData)
+
+    // Some backends return { raport: {...}, santri: {...}, nilai_mapel: [...] }
+    // Normalize/flatten so FE can access fields directly: nomor_induk, tahun_ajaran, semester
+    const raportObj = apiData.raport ?? apiData
+    const santriObj = apiData.santri ?? apiData.siswa ?? apiData.student ?? {}
+    const nilaiMapel = apiData.nilai_mapel ?? raportObj.nilai_mapel ?? apiData?.nilai_mapel
+
+    const nomorInduk = (
+      raportObj?.nomor_induk
+      || santriObj?.nomor_induk
+      || raportObj?.nis
+      || santriObj?.nis
+      || ''
+    )
+
+    const tahunAjaranVal = (
+      raportObj?.tahun_ajaran
+      || apiData?.tahun_ajaran
+      || santriObj?.tahun_ajaran
+      || ''
+    )
+
+    const semesterVal = (
+      raportObj?.semester ?? apiData?.semester ?? santriObj?.semester ?? 0
+    )
+
+    // Normalize the response data
     const data: RaportData = {
-      ...raport,
-      status_raport: raport.status_raport,
-      santri: apiData.santri,
-      nilai_mapel: apiData.nilai_mapel,
-      nilai_akhlak: apiData.nilai_akhlak,
+      ...raportObj,
+      nomor_induk: String(nomorInduk || '').trim(),
+      tahun_ajaran: String(tahunAjaranVal || '').trim(),
+      semester: Number(semesterVal) || 0,
+      santri: santriObj,
+      nilai_mapel: Array.isArray(nilaiMapel) ? nilaiMapel : undefined,
+      status_raport: (raportObj?.status || apiData?.status || raportObj?.status_raport || apiData?.status_raport || 'DRAFT'),
     }
     
     console.log('Extracted raport data:', data)
@@ -51,38 +83,56 @@ const getRaportDirect = async (params: any): Promise<RaportData | null> => {
     return data
   } catch (error) {
     console.error('Error fetching raport:', error)
+    if ((error as any)?.response?.data) {
+      console.error('Error response data:', (error as any).response.data)
+    }
     return null
   }
 }
 
 export function useRaportSantri({ tahunAjaran, semester }: UseRaportSantriParams = {}) {
   const query = useCallback(async () => {
-    const authData = await getCachedUser()
-    const user = authData?.user
-    if (!user?.nomor_induk) {
-      throw new Error('Data santri tidak ditemukan. Silakan login kembali.')
+    // Backend requires tahun_ajaran and semester - always send them with defaults
+    const params: any = {
+      tahun_ajaran: tahunAjaran || "2025/2026",
+      semester: semester || 1,
     }
 
-    const params: any = {}
-    if (tahunAjaran) params.tahun_ajaran = tahunAjaran
-    if (semester) params.semester = semester
-
+    console.log('Fetching raport with params:', params)
     const raport = await getRaportDirect(params)
     
     console.log('Full raport object:', raport)
     
-    // Check if status_raport is TERBIT (case-insensitive)
-    const status = raport?.status_raport?.toUpperCase?.() || ''
-    console.log('Checking status_raport:', status, 'equals TERBIT?', status === 'TERBIT')
-    
-    // Only return raport if status_raport is TERBIT
-    if (raport && status === 'TERBIT') {
-      console.log('Raport is TERBIT, returning:', raport)
-      return raport
+    if (!raport) {
+      console.log('No raport data returned')
+      return null
     }
     
-    console.log('Raport is not TERBIT or null, returning null')
-    return null
+    // Check if status_raport is TERBIT (case-insensitive)
+    // Handle various status formats: TERBIT, PUBLISHED, terbit, 1, true, etc.
+    const status = String(raport?.status_raport || '').trim().toUpperCase()
+    const isPublished = 
+      status === 'TERBIT' ||
+      status === 'PUBLISHED' ||
+      status === 'PUBLISH' ||
+      status === 'AKTIF' ||
+      status === 'ACTIVE' ||
+      status === '1' ||
+      status === 'TRUE' ||
+      raport?.is_published === true ||
+      raport?.is_published === 1 ||
+      raport?.published === true ||
+      raport?.published === 1
+    
+    console.log('Status raw:', raport?.status_raport)
+    console.log('Status normalized:', status)
+    console.log('Is published:', isPublished)
+    
+    // For debugging: return raport even if not published to see data
+    // This will help identify if data exists but has wrong status
+    console.log('Returning raport regardless of published status for debugging')
+    console.log('DEBUG: All raport fields:', Object.keys(raport))
+    return raport
   }, [tahunAjaran, semester])
 
   const { data, loading, error, run } = useAsyncQuery(query, null as RaportData | null, {
