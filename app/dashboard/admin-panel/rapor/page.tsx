@@ -77,7 +77,7 @@ export default function AdminPanelRaporPage() {
   const router = useRouter()
   const [query, setQuery] = useState("")
   const [kodeKelas, setKodeKelas] = useState("all")
-  const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+  const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("1")
   const [status, setStatus] = useState("all")
   const [perPage, setPerPage] = useState("10")
@@ -186,13 +186,21 @@ export default function AdminPanelRaporPage() {
       const searchText = (searchOverride ?? query).trim()
       const searchIsNomorInduk = /^\d+$/.test(searchText)
       const includeNilaiMapel = status === "TERBIT"
+      
+      // Normalize kodeKelas: if "all" or empty, send undefined to fetch all classes
+      const normalizedKodeKelas = (kodeKelas || "").trim().toLowerCase()
+      const kodeKelasParam = (normalizedKodeKelas === "all" || !normalizedKodeKelas) ? undefined : kodeKelas.trim()
+      
+      // Normalize tahunAjaran: if "all" or empty, send undefined to fetch all years
+      const normalizedTahunAjaran = (tahunAjaran || "").trim().toLowerCase()
+      const tahunAjaranParam = (normalizedTahunAjaran === "all" || !normalizedTahunAjaran) ? undefined : tahunAjaran.trim()
 
       const data = await raporService.getAll({
         q: searchText || undefined,
         nama: searchIsNomorInduk ? undefined : searchText || undefined,
         nomor_induk: searchText || undefined,
-        kode_kelas: kodeKelas === "all" ? undefined : kodeKelas,
-        tahun_ajaran: tahunAjaran || undefined,
+        kode_kelas: kodeKelasParam,
+        tahun_ajaran: tahunAjaranParam,
         semester: semester === "all" ? undefined : semester,
         status: status === "all" ? undefined : status,
         per_page: perPage,
@@ -304,7 +312,7 @@ export default function AdminPanelRaporPage() {
   const handleReset = () => {
     setQuery("")
     setKodeKelas("all")
-    setTahunAjaran("2025/2026")
+    setTahunAjaran("all")
     setSemester("1")
     setStatus("all")
     setPerPage("10")
