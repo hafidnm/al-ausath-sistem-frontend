@@ -3,7 +3,8 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { canAccess, getRoleHome } from "@/lib/rbac"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -195,6 +196,7 @@ export default function DashboardLayout({
   const [role, setRole] = useState<string>("")
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
+  const router = useRouter()
 
   const toggleMenu = (label: string) => {
     setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }))
@@ -209,16 +211,37 @@ export default function DashboardLayout({
     const authData = await getCachedUser()
 
     if (!authData?.user) {
-      window.location.replace("/login")
+      router.replace("/login")
       return
     }
+
+    // ── RBAC Whitelist Guard ──────────────────────────────────
+    const petugasRoles: string[] = Array.isArray(authData.user.peran_akun)
+      ? authData.user.peran_akun
+      : typeof authData.user.peran_akun === "string" && authData.user.peran_akun.startsWith("[")
+        ? JSON.parse(authData.user.peran_akun)
+        : authData.user.peran_akun
+          ? [authData.user.peran_akun]
+          : []
+
+    const isSantri = authData.role === "santri"
+    const effectiveRoles: string[] = isSantri ? ["santri"] : petugasRoles
+
+    if (!canAccess(effectiveRoles, pathname)) {
+      const home = getRoleHome(effectiveRoles)
+      if (pathname !== home) {
+        router.replace(home)
+        return
+      }
+    }
+    // ─────────────────────────────────────────────────────────
 
     setUser(authData.user)
     setRole(authData.role)
   }
 
   checkAuth()
-}, [])
+}, [pathname])
 
   const handleLogout = async () => {
   try {
