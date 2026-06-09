@@ -7,11 +7,13 @@ import { useSubjectScores, useScoresTrend, useAcademicProgress } from "@/hooks/u
 import { SubjectScoresTable } from "./components/subject-scores-table"
 import { ScoresTrendChart } from "./components/scores-trend-chart"
 import { AcademicProgressCard } from "./components/academic-progress-card"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
-const TAHUN_AJARAN = "2025/2026"
 const SEMESTER = 1
 
 export default function AnalitikSantriPage() {
+  const { selectedKodeTahun } = useTahunAjaran()
+
   const {
     data: subjectScores,
     loading: loadingScores,
@@ -34,11 +36,12 @@ export default function AnalitikSantriPage() {
   } = useAcademicProgress()
 
   useEffect(() => {
-    fetchScores({ tahun_ajaran: TAHUN_AJARAN, semester: SEMESTER })
-    fetchTrend({ tahun_ajaran: TAHUN_AJARAN })
-    fetchProgress({ tahun_ajaran: TAHUN_AJARAN, semester: SEMESTER })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (!selectedKodeTahun) return
+
+    fetchScores({ tahun_ajaran: selectedKodeTahun, semester: SEMESTER })
+    fetchTrend({ tahun_ajaran: selectedKodeTahun })
+    fetchProgress({ tahun_ajaran: selectedKodeTahun, semester: SEMESTER })
+  }, [selectedKodeTahun, fetchScores, fetchTrend, fetchProgress])
 
   return (
     <div className="space-y-6">
@@ -46,7 +49,7 @@ export default function AnalitikSantriPage() {
       <div>
         <h1 className="text-2xl font-bold text-foreground">Analitik Akademik</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          Pantau perkembangan nilai dan progres belajar Anda secara menyeluruh
+          Pantau perkembangan nilai dan progres belajar Anda secara menyeluruh{selectedKodeTahun ? ` untuk tahun ajaran ${selectedKodeTahun}` : ''}
         </p>
       </div>
 
