@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getCachedUser } from "@/lib/auth-cache"
 import { useTagihan, useTagihanDetail } from "@/hooks/use-pembayaran"
 import type { StatusPembayaran } from "@/lib/services/pembayaran.service"
-import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download } from "lucide-react"
+import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download, Percent } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
 
@@ -60,6 +60,8 @@ type InvoiceDetailRow = {
   waktu_invoice: string | null
   kwitansi_tersedia: boolean
   kwitansi_url: string | null
+  jumlah_minimum_dp?: number // Tambahan untuk DP 50%
+  bulan?: string // Untuk tracking bulan SPP
 }
 
 export default function SantriAdministrasiPage() {
@@ -270,6 +272,64 @@ export default function SantriAdministrasiPage() {
           </Button>
         </div>
       </div>
+
+      {/* Profil Info Card - Tampilkan jika ada data anak guru atau dari PPDB */}
+      {detailData?.profil && (detailData.profil.is_anak_guru || detailData.profil.sumber === 'ppdb') && (
+        <Card className="border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-md">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Info className="h-5 w-5 text-emerald-600" />
+              Informasi Profil Santri
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Nama Lengkap</p>
+                <p className="font-medium">{detailData.profil.nama_lengkap}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold">NIS/Nomor Induk</p>
+                <p className="font-medium font-mono">{detailData.profil.nomor_induk}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Unit/Jenjang</p>
+                <p className="font-medium">{detailData.profil.nama_unit}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Kelas</p>
+                <p className="font-medium">{detailData.profil.kelas_sekarang || '-'}</p>
+              </div>
+            </div>
+            
+            {detailData.profil.is_anak_guru && (
+              <div className="mt-3 rounded-lg border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 flex gap-2.5">
+                <div className="shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Percent className="w-5 h-5 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-100">Status Anak Guru</p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200 mt-0.5">
+                    Mendapatkan diskon 50% untuk tagihan Uang Pangkal PPDB sesuai kebijakan pesantren.
+                  </p>
+                </div>
+              </div>
+            )}
+            
+            {detailData.profil.sumber === 'ppdb' && (
+              <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/20 p-3 text-xs text-blue-800 dark:text-blue-200">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <Info className="w-3.5 h-3.5" />
+                  Data dari PPDB
+                </p>
+                <p className="mt-1">
+                  Tagihan Anda mungkin termasuk Uang Pangkal, Perlengkapan, dan SPP Bulanan sesuai pilihan infaq saat pendaftaran.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

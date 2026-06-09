@@ -55,6 +55,9 @@ export default function PpdbInfoInfaqPage() {
   // Sync from backend data once loaded
   useEffect(() => {
     if (!data) return;
+    
+    // Jangan redirect jika sedang submitting untuk menghindari loop
+    if (submitting) return;
 
     // Redirect guards: halaman ini hanya untuk step 'infaq'
     if (data.step === 'siap-menjadi-santri') {
@@ -82,7 +85,7 @@ export default function PpdbInfoInfaqPage() {
     if (typeof data.isAnakGuru === 'boolean') {
       setIsAnakGuru(data.isAnakGuru);
     }
-  }, [data, router]);
+  }, [data, router, submitting]);
 
   // Computed totals
   const gedungAmount = OPSI_UANG_GEDUNG.find(o => o.value === pilihanUangGedung)!.amount;
@@ -103,14 +106,23 @@ export default function PpdbInfoInfaqPage() {
         sessionStorage.setItem('ppdb_infaq_acknowledged', '1');
         if (isAnakGuru) sessionStorage.setItem('ppdb_is_anak_guru', '1');
       }
-      router.push('/ppdb/dashboard/pembayaran');
+      
+      // Tambahkan toast success untuk feedback
+      toast({
+        title: 'Pilihan infaq berhasil disimpan',
+        description: 'Mengarahkan ke halaman pembayaran...',
+      });
+      
+      // Gunakan setTimeout kecil untuk memastikan state tersimpan sebelum redirect
+      setTimeout(() => {
+        router.push('/ppdb/dashboard/pembayaran');
+      }, 100);
     } catch (err) {
       toast({
         title: 'Gagal menyimpan pilihan',
         description: err instanceof Error ? err.message : 'Silahkan coba lagi',
         variant: 'destructive',
       });
-    } finally {
       setSubmitting(false);
     }
   };

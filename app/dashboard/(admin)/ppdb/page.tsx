@@ -304,11 +304,6 @@ export default function PpdbPage() {
 
   const handleVerifikasi = async (p: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => {
     if (status === "Diterima") {
-      // Check if santri has been verified before accepting
-      if (p.status !== "Terverifikasi") {
-        alert("Santri harus diverifikasi terlebih dahulu sebelum dapat diterima. Status saat ini: " + (p.status || "Menunggu"))
-        return
-      }
       setTerimaPendaftar(p)
       setIsTerimaOpen(true)
       void loadKelasList()
