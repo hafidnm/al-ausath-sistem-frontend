@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,14 @@ interface RaportDisplayProps {
 export function RaportDisplay({ tahunAjaran = "2025/2026", semester = 1 }: RaportDisplayProps) {
   const { data: raport, loading, error } = useRaportSantri({ tahunAjaran, semester })
   const [downloading, setDownloading] = useState(false)
+
+  // Debug log whenever data changes
+  useEffect(() => {
+    console.log('RaportDisplay - tahunAjaran:', tahunAjaran, 'semester:', semester)
+    console.log('RaportDisplay - raport data:', raport)
+    console.log('RaportDisplay - loading:', loading)
+    console.log('RaportDisplay - error:', error)
+  }, [raport, loading, error, tahunAjaran, semester])
 
   const handleDownload = async () => {
     try {
