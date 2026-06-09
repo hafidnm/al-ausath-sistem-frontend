@@ -387,7 +387,7 @@ const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
 
 export const pembayaranService = {
   /** GET /api/administrasi/pembayaran/tagihan — daftar tagihan semua entitas */
-  async getTagihan(params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }): Promise<{ data: TagihanRow[] }> {
+  async getTagihan(params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }): Promise<{ data: TagihanRow[]; meta?: any }> {
     try {
       const response = await api.get(`${BASE}/tagihan`, { params });
       const data = extractList(response.data).map(normalizeTagihanRow);

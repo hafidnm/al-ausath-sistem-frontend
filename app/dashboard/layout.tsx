@@ -54,6 +54,7 @@ import {
   ListChecks,
   CreditCard,
   BookMarked,
+  Landmark,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
 
@@ -142,6 +143,7 @@ const adminMenuItems: MenuItem[] = [
   { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
   { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
   { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
+  { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
 ]
 
 const guruMenuItems: MenuItem[] = [

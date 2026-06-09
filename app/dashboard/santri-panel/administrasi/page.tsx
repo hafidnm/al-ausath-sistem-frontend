@@ -14,9 +14,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { getCachedUser } from "@/lib/auth-cache"
 import { useTagihan, useTagihanDetail } from "@/hooks/use-pembayaran"
 import type { StatusPembayaran } from "@/lib/services/pembayaran.service"
-import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download, Percent } from "lucide-react"
+import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download, Percent, Landmark } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
+
+interface RekeningBank {
+  id_rekening: number
+  nama_rekening: string
+  nama_pemilik: string
+  nomor_rekening: string
+  nama_bank: string
+  cabang_bank: string | null
+  peruntukan: string | null
+  status: string
+}
 
 const toText = (value: unknown): string => {
   if (typeof value === "string") return value
@@ -70,6 +81,8 @@ export default function SantriAdministrasiPage() {
   const { data: detailData, loading: loadingDetail, fetchTagihanDetail } = useTagihanDetail()
   
   const [nomorInduk, setNomorInduk] = useState("")
+  const [rekeningList, setRekeningList] = useState<RekeningBank[]>([])
+  const [selectedRekeningId, setSelectedRekeningId] = useState("")
 
   // Payment upload states
   const [payDialogOpen, setPayDialogOpen] = useState(false)
@@ -83,19 +96,33 @@ export default function SantriAdministrasiPage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  const [santriId, setSantriId] = useState<number | null>(null)
+
   useEffect(() => {
     const loadAuth = async () => {
       const authData = await getCachedUser()
       const nis = toText(authData?.user?.nomor_induk).trim()
+      const sid = authData?.user?.id_santri ?? authData?.santri?.id_santri ?? null
       setNomorInduk(nis)
+      if (sid) setSantriId(Number(sid))
       if (nis) {
         void fetchTagihan({ nomor_induk: nis })
       } else {
         void fetchTagihan()
       }
     }
-
     void loadAuth()
+
+    // Load rekening bank aktif
+    api.get("/administrasi/rekening?status=AKTIF")
+      .then((res) => {
+        const list = res.data?.data ?? []
+        setRekeningList(list)
+        if (list.length > 0) {
+          setSelectedRekeningId(String(list[0].id_rekening))
+        }
+      })
+      .catch(() => {/* silently fail - rekening not critical */})
   }, [fetchTagihan])
 
   const myTagihanRow = useMemo(() => {
@@ -103,11 +130,15 @@ export default function SantriAdministrasiPage() {
     return allTagihan.find((item) => toText(item.nomorInduk).trim() === nomorInduk)
   }, [allTagihan, nomorInduk])
 
+  // Fetch detail: prefer myTagihanRow.id, fallback to santriId direct lookup
   useEffect(() => {
     if (myTagihanRow?.id) {
       void fetchTagihanDetail(myTagihanRow.id)
+    } else if (santriId && !loadingAll && allTagihan.length === 0) {
+      // Fallback: santri may only have infaq (not in pembayaran_spp), fetch by santriId directly
+      void fetchTagihanDetail(santriId)
     }
-  }, [myTagihanRow?.id, fetchTagihanDetail])
+  }, [myTagihanRow?.id, santriId, loadingAll, allTagihan.length, fetchTagihanDetail])
 
   useEffect(() => {
     return () => {
@@ -150,6 +181,9 @@ export default function SantriAdministrasiPage() {
       const formData = new FormData()
       formData.append("bukti_bayar", file)
       formData.append("metode_bayar", metode)
+      if (metode === "Transfer Bank" && selectedRekeningId) {
+        formData.append("id_rekening", selectedRekeningId)
+      }
       if (catatan) {
         formData.append("catatan_bayar", catatan)
       }
@@ -596,6 +630,42 @@ export default function SantriAdministrasiPage() {
                 </Badge>
               </div>
             </div>
+
+            {/* Rekening Bank Tujuan Transfer */}
+            {rekeningList.length > 0 && metode === "Transfer Bank" && (
+              <div className="grid gap-2">
+                <Label className="text-xs text-muted-foreground uppercase font-bold flex items-center gap-1.5">
+                  <Landmark className="w-3.5 h-3.5" />
+                  Rekening Tujuan Transfer (Pilih salah satu)
+                </Label>
+                <div className="space-y-2">
+                  {rekeningList.map((rek) => {
+                    const isSelected = selectedRekeningId === String(rek.id_rekening)
+                    return (
+                      <div
+                        key={rek.id_rekening}
+                        onClick={() => setSelectedRekeningId(String(rek.id_rekening))}
+                        className={`flex items-center justify-between rounded-lg border px-3 py-2 text-sm cursor-pointer transition-all ${
+                          isSelected
+                            ? "border-emerald-500 bg-emerald-50/50 dark:bg-emerald-950/20 ring-1 ring-emerald-500"
+                            : "border-border bg-muted/30 hover:bg-muted/50"
+                        }`}
+                      >
+                        <div>
+                          <p className="font-semibold text-foreground">{rek.nama_bank}{rek.cabang_bank ? ` - ${rek.cabang_bank}` : ""}</p>
+                          <p className="font-mono text-base font-bold tracking-wider text-primary">{rek.nomor_rekening}</p>
+                          <p className="text-xs text-muted-foreground">a.n. {rek.nama_pemilik}</p>
+                          {rek.peruntukan && <p className="text-xs text-muted-foreground/70 italic">{rek.peruntukan}</p>}
+                        </div>
+                        {isSelected && (
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-2">
               <Label htmlFor="metode">Metode Pembayaran</Label>

@@ -3,13 +3,25 @@
 import Link from 'next/link';
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, AlertTriangle, Landmark } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+import api from '@/lib/axios';
+
+interface RekeningBank {
+  id_rekening: number;
+  nama_rekening: string;
+  nama_bank: string;
+  nomor_rekening: string;
+  nama_pemilik: string;
+  peruntukan?: string;
+  cabang_bank?: string;
+  aktif: boolean;
+}
 
 export default function PpdbPembayaranUangPangkalPage() {
   const router = useRouter();
@@ -19,7 +31,19 @@ export default function PpdbPembayaranUangPangkalPage() {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [rekeningList, setRekeningList] = useState<RekeningBank[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Load rekening bank aktif
+    api.get("/administrasi/rekening?status=AKTIF")
+      .then((res) => {
+        if (res.data && Array.isArray(res.data.data)) {
+          setRekeningList(res.data.data);
+        }
+      })
+      .catch(() => {/* silently fail - rekening not critical */});
+  }, []);
 
   useEffect(() => {
     void fetchDashboard().catch(() => {
@@ -209,17 +233,37 @@ export default function PpdbPembayaranUangPangkalPage() {
                         : '-'}
                     </p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Rekening Transfer:</span>
-                    <p className="font-semibold mt-0.5">Bank Syariah Indonesia (BSI)</p>
-                    <p className="text-primary font-bold">714-888-9990 a.n. PPTQ Al-Ausath</p>
-                  </div>
+                </div>
+
+                <div className="space-y-2 border-t pt-3">
+                  <span className="text-muted-foreground font-semibold flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                    <Landmark className="w-3.5 h-3.5 text-primary" />
+                    Rekening Tujuan Transfer:
+                  </span>
+                  {rekeningList.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                      {rekeningList.map((rek) => (
+                        <div key={rek.id_rekening} className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm">
+                          <p className="font-bold text-foreground">{rek.nama_bank}{rek.cabang_bank ? ` - ${rek.cabang_bank}` : ""}</p>
+                          <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">{rek.nomor_rekening}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">a.n. {rek.nama_pemilik}</p>
+                          {rek.peruntukan && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{rek.peruntukan}</p>}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm max-w-sm">
+                      <p className="font-bold text-foreground">Bank Syariah Indonesia (BSI)</p>
+                      <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">714-888-9990</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">a.n. PPTQ Al-Ausath</p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2 pt-2 border-t">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Instruksi Pembayaran:</p>
                   <ol className="list-decimal list-inside text-xs text-muted-foreground space-y-1 leading-relaxed">
-                    <li>Transfer minimal 50% dari total nominal (Rp {dpNominal.toLocaleString('id-ID')}) ke rekening di atas.</li>
+                    <li>Transfer minimal 50% dari total nominal (Rp {dpNominal.toLocaleString('id-ID')}) ke salah satu rekening di atas.</li>
                     <li>Pastikan Anda menyimpan bukti transfer / struk pembayaran.</li>
                     <li>Unggah bukti transfer pada form di bawah untuk dilakukan verifikasi oleh admin.</li>
                   </ol>
