@@ -173,7 +173,7 @@ export function RaportDisplay({ tahunAjaran = "2025/2026", semester = 1 }: Rapor
         <Alert className="border-blue-200/50 bg-blue-50/50">
           <AlertCircle className="h-4 w-4 text-blue-600" />
           <AlertDescription className="text-blue-700 text-sm">
-            Raport ini telah diterbitkan oleh pihak sekolah dan siap untuk diunduh.
+            Pastikan Raport ini telah diterbitkan oleh pihak sekolah untuk diunduh.
           </AlertDescription>
         </Alert>
       </CardContent>
