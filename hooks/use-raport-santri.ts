@@ -124,14 +124,16 @@ export function useRaportSantri({ tahunAjaran, semester }: UseRaportSantriParams
       raport?.published === true ||
       raport?.published === 1
     
+    const normalizedStatus = status || ''
     console.log('Status raw:', raport?.status_raport)
-    console.log('Status normalized:', status)
+    console.log('Status normalized:', normalizedStatus)
     console.log('Is published:', isPublished)
-    
-    // For debugging: return raport even if not published to see data
-    // This will help identify if data exists but has wrong status
-    console.log('Returning raport regardless of published status for debugging')
-    console.log('DEBUG: All raport fields:', Object.keys(raport))
+
+    if (!isPublished) {
+      console.log('Raport is not published; hiding from santri display')
+      return null
+    }
+
     return raport
   }, [tahunAjaran, semester])
 
