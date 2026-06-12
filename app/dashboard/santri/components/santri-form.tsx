@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { AlertTriangle } from "lucide-react"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import { DataSantriApiItem, DataSantriPayload } from "@/lib/services/santri.service"
 
 export interface SantriFormState {
@@ -231,6 +232,7 @@ export function SantriForm({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
 
   const isCreateMode = mode === "create"
 
@@ -251,6 +253,7 @@ export function SantriForm({
           page: 1, 
           per_page: 300,
           tahun_ajaran: selectedKodeTahun,
+          kode_unit: selectedKodeUnit || undefined,
           status: "AKTIF"
         })
         const seen = new Set<string>()
@@ -274,7 +277,7 @@ export function SantriForm({
     }
 
     void loadOptions()
-  }, [selectedKodeTahun])
+  }, [selectedKodeTahun, selectedKodeUnit])
 
   const updateField = (key: keyof SantriFormState, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }))

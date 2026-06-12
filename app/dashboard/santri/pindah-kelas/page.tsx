@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { dataSantriService } from "@/lib/services/santri.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ArrowLeft, CheckCircle2 } from "lucide-react"
 
@@ -187,15 +188,15 @@ export default function SantriPindahKelasPage() {
     setIsLoading(true)
     try {
       const result = await dataSantriService.getAll({ page: 1, per_page: 300, kode_kelas: kodeKelas })
-      const mapped = result.data
-        .map((item) => ({
+      const mapped = (result.data as any[])
+        .map((item: any) => ({
           id: toNumber(item.id_santri ?? item.id, -1),
           nomorInduk: toText(item.nomor_induk),
           namaLengkap: toText(item.nama_lengkap_santri),
           jenisKelamin: toText(item.jenis_kelamin).toUpperCase(),
           status: toText(item.status).toUpperCase(),
         }))
-        .filter((item) => item.id > 0)
+        .filter((item: any) => item.id > 0)
 
       setRows(mapped)
     } catch (error) {

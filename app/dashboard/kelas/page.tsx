@@ -35,6 +35,7 @@ import { dataKelasService, DataKelasApiItem } from "@/lib/services/kelas.service
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import { ArrowUpDown, ChevronDown, Download, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -151,6 +152,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 export default function KelasPage() {
   const { toast } = useToast()
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
 
   const [rows, setRows] = useState<KelasRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -174,7 +176,6 @@ export default function KelasPage() {
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
 
   const [keyword, setKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
 
@@ -193,8 +194,8 @@ export default function KelasPage() {
     const options: Array<{ value: string; label: string }> = []
     
     let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun)
-    if (unitFilter !== "all") {
-      source = source.filter((option) => option.kodeUnit === unitFilter)
+    if (selectedKodeUnit) {
+      source = source.filter((option) => option.kodeUnit === selectedKodeUnit)
     }
 
     for (const option of source) {
@@ -204,7 +205,7 @@ export default function KelasPage() {
     }
 
     return options
-  }, [unitFilter, kelasOptions])
+  }, [selectedKodeUnit, kelasOptions, selectedKodeTahun])
 
   const allVisibleSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
   const someVisibleSelected = visibleRows.some((row) => selectedIds.includes(row.id))
@@ -226,7 +227,7 @@ export default function KelasPage() {
 
       const q = keyword.trim()
       if (q) params.q = q
-      if (unitFilter !== "all") params.kode_unit = unitFilter
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
 
@@ -310,11 +311,10 @@ export default function KelasPage() {
   useEffect(() => {
     if (!isInitDone) return
     void fetchRows()
-  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, selectedKodeTahun, statusFilter])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, selectedKodeUnit, kelasFilter, selectedKodeTahun, statusFilter])
 
   const resetFilter = () => {
     setKeyword("")
-    setUnitFilter("all")
     setKelasFilter("all")
     setStatusFilter("all")
     setCurrentPage(1)
@@ -506,7 +506,7 @@ export default function KelasPage() {
       try {
         const blob = await dataKelasService.exportExcel({
           q: keyword.trim() || undefined,
-          kode_unit: unitFilter === "all" ? undefined : unitFilter,
+          kode_unit: selectedKodeUnit || undefined,
           tahun_ajaran: selectedKodeTahun || undefined,
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
         })
@@ -534,7 +534,10 @@ export default function KelasPage() {
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">DAFTAR KELAS</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (open) setFormData({ ...defaultFormState, kodeUnit: selectedKodeUnit || "", tahunAjaran: selectedKodeTahun || "" })
+          }}>
             <DialogTrigger asChild>
               <Button className="h-10 gap-2 px-4">
                 <PlusCircle className="h-4 w-4" />
@@ -551,9 +554,9 @@ export default function KelasPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>Kode Unit</Label>
-                    <Select value={formData.kodeUnit} onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value }))}>
+                    <Select disabled={!!selectedKodeUnit} value={formData.kodeUnit} onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value }))}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih unit" />
+                        <SelectValue placeholder={selectedKodeUnit ? "Pilih Unit" : "Pilih unit terlebih dahulu"} />
                       </SelectTrigger>
                       <SelectContent>
                         {unitOptions.map((option) => (
@@ -599,11 +602,12 @@ export default function KelasPage() {
                   <div className="space-y-2">
                     <Label>Tahun Ajaran</Label>
                     <Select
+                      disabled={!!selectedKodeTahun}
                       value={formData.tahunAjaran}
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, tahunAjaran: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih tahun ajaran" />
+                        <SelectValue placeholder={selectedKodeTahun ? "Pilih Tahun Ajaran" : "Pilih tahun ajaran"} />
                       </SelectTrigger>
                       <SelectContent>
                         {tahunOptions.map((option) => (
@@ -677,7 +681,7 @@ export default function KelasPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="kelas-keyword">Kata Kunci</Label>
                   <Input
@@ -689,28 +693,6 @@ export default function KelasPage() {
                       setCurrentPage(1)
                     }}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Pilih Unit</Label>
-                  <Select
-                    value={unitFilter}
-                    onValueChange={(value) => {
-                      setUnitFilter(value)
-                      setCurrentPage(1)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>

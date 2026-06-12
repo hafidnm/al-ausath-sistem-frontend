@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { authService } from "@/lib/services/auth.service"
 import { getCachedUser } from "@/lib/auth-cache"
 import { TahunAjaranProvider, useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { UnitProvider, useUnit } from "@/contexts/unit-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -55,6 +56,7 @@ import {
   CreditCard,
   BookMarked,
   Landmark,
+  Building2 as UnitIcon,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
 
@@ -91,6 +93,61 @@ function TahunAjaranSelector() {
               {ta.status === "AKTIF" && (
                 <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
                   Aktif
+                </span>
+              )}
+            </DropdownMenuItem>
+          )
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function UnitSelector() {
+  const { allUnit, selectedUnit, setSelectedUnit, isLoading } = useUnit()
+
+  // Only show if there's more than one unit
+  if (isLoading || allUnit.length <= 1) return null
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium hidden sm:flex">
+          <UnitIcon className="w-3.5 h-3.5 text-indigo-500" />
+          <span className="max-w-[100px] truncate">
+            {selectedUnit?.nama_unit ?? "Semua Unit"}
+          </span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-52">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Pilih Jenjang / Unit</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className={cn("cursor-pointer text-sm", !selectedUnit && "font-semibold text-primary")}
+          onClick={() => setSelectedUnit(null)}
+        >
+          Semua Unit
+          {!selectedUnit && (
+            <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">
+              Aktif
+            </span>
+          )}
+        </DropdownMenuItem>
+        {allUnit.map((unit) => {
+          const id = unit.id_unit ?? unit.id
+          const selectedId = selectedUnit?.id_unit ?? selectedUnit?.id
+          const isActive = id === selectedId
+          return (
+            <DropdownMenuItem
+              key={id}
+              className={cn("cursor-pointer text-sm", isActive && "font-semibold text-primary")}
+              onClick={() => setSelectedUnit(unit)}
+            >
+              {unit.nama_unit}
+              {isActive && (
+                <span className="ml-auto text-[10px] bg-indigo-500/10 text-indigo-600 px-1.5 py-0.5 rounded-full">
+                  Dipilih
                 </span>
               )}
             </DropdownMenuItem>
@@ -270,6 +327,7 @@ export default function DashboardLayout({
   }
 
   return (
+    <UnitProvider>
     <TahunAjaranProvider>
     <div className="min-h-screen bg-background">
       {/* Mobile Sidebar Overlay */}
@@ -464,6 +522,8 @@ export default function DashboardLayout({
               </div>
               {/* Tahun Ajaran Global Selector */}
               <TahunAjaranSelector />
+              {/* Unit / Jenjang Global Selector */}
+              <UnitSelector />
             </div>
 
             <div className="flex items-center gap-2">
@@ -517,5 +577,6 @@ export default function DashboardLayout({
       </div>
     </div>
     </TahunAjaranProvider>
+    </UnitProvider>
   )
 }

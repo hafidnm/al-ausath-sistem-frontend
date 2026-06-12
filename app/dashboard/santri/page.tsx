@@ -46,6 +46,7 @@ import { dataKelasService } from "@/lib/services/kelas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataUnitService } from "@/lib/services/unit.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { DataSantriApiItem, DataSantriListParams, DataSantriPayload, dataSantriService } from "@/lib/services/santri.service"
 import {
@@ -221,14 +222,13 @@ export default function SantriPage() {
   const [rows, setRows] = useState<SantriRow[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("AKTIF")
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
-  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
 
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
 
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
@@ -265,11 +265,11 @@ export default function SantriPage() {
 
   const filteredKelasOptions = useMemo(() => {
     let filtered = kelasOptions.filter(option => option.tahunAjaran === selectedKodeTahun)
-    if (selectedUnit !== "all") {
-      filtered = filtered.filter((option) => option.kodeUnit === selectedUnit)
+    if (selectedKodeUnit) {
+      filtered = filtered.filter((option) => option.kodeUnit === selectedKodeUnit)
     }
     return filtered
-  }, [kelasOptions, selectedUnit, selectedKodeTahun])
+  }, [kelasOptions, selectedKodeUnit, selectedKodeTahun])
 
   const stats = useMemo(() => {
     return {
@@ -291,7 +291,7 @@ export default function SantriPage() {
 
       const query = searchQuery.trim()
       if (query) params.q = query
-      if (selectedUnit !== "all") params.kode_unit = selectedUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
@@ -313,7 +313,7 @@ export default function SantriPage() {
 
       const summaryBaseParams: DataSantriListParams = {}
       if (query) summaryBaseParams.q = query
-      if (selectedUnit !== "all") summaryBaseParams.kode_unit = selectedUnit
+      if (selectedKodeUnit) summaryBaseParams.kode_unit = selectedKodeUnit
       if (selectedKelas !== "all") summaryBaseParams.kode_kelas = selectedKelas
       if (selectedKodeTahun) summaryBaseParams.tahun_ajaran = selectedKodeTahun
 
@@ -362,13 +362,7 @@ export default function SantriPage() {
           tahunAjaran: k.tahun_ajaran,
         }))
 
-        const mappedUnit: UnitOption[] = (initData.unit || []).map((u: any) => ({
-          value: u.kode_unit,
-          label: u.nama_unit || u.kode_unit
-        }))
-
         setKelasOptions(mappedKelas)
-        setUnitOptions(mappedUnit)
         
         initDoneRef.current = true
         // Langsung eksekusi fetch pertama agar aman
@@ -387,7 +381,7 @@ export default function SantriPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus, rowsPerPage])
+  }, [searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun, selectedStatus, rowsPerPage])
 
   useEffect(() => {
     if (selectedKelas === "all") return
@@ -395,7 +389,7 @@ export default function SantriPage() {
     if (!existsInCurrentUnit) {
       setSelectedKelas("all")
     }
-  }, [selectedUnit, filteredKelasOptions, selectedKelas])
+  }, [selectedKodeUnit, filteredKelasOptions, selectedKelas])
 
   useEffect(() => {
     setSelectedIds([])
@@ -405,7 +399,7 @@ export default function SantriPage() {
     if (!initDoneRef.current) return
     if (!selectedKodeTahun) return
     void fetchRows()
-  }, [currentPage, rowsPerPage, searchQuery, selectedUnit, selectedKelas, selectedKodeTahun, selectedStatus])
+  }, [currentPage, rowsPerPage, searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun, selectedStatus])
 
   const resetAddForm = () => {
     setFormData(defaultForm)
@@ -519,7 +513,7 @@ export default function SantriPage() {
       const query = searchQuery.trim()
 
       if (query) params.q = query
-      if (selectedUnit !== "all") params.kode_unit = selectedUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedStatus !== "all") params.status = selectedStatus
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
@@ -633,7 +627,7 @@ export default function SantriPage() {
               <SelectValue placeholder="Pilih kelas" />
             </SelectTrigger>
             <SelectContent>
-              {kelasOptions.map((option) => (
+              {filteredKelasOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -873,22 +867,7 @@ export default function SantriPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Pilih Unit</Label>
-                  <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
 
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>

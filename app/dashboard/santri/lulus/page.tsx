@@ -21,10 +21,11 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useToast } from "@/hooks/use-toast"
 import { DataSantriApiItem, DataSantriListParams, dataSantriService } from "@/lib/services/santri.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
-import { dataUnitService } from "@/lib/services/unit.service"
+import { useUnit } from "@/contexts/unit-context"
 import {
   ArrowLeft, Download, Eye, GraduationCap, MoreHorizontal, RefreshCw, Search, Trash2, Undo2, Users,
 } from "lucide-react"
@@ -96,20 +97,16 @@ export default function SantriLulusPage() {
   const [isBulkLoading, setIsBulkLoading] = useState(false)
 
   const [searchQuery, setSearchQuery] = useState("")
-  const [selectedUnit, setSelectedUnit] = useState("all")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedTahunLulus, setSelectedTahunLulus] = useState("all")
   const [rowsPerPage, setRowsPerPage] = useState("10")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
 
-  const [unitOptions, setUnitOptions] = useState<{ value: string; label: string }[]>([])
-  const [kelasOptions, setKelasOptions] = useState<{ value: string; label: string; kodeUnit: string }[]>([])
-  const tahunOptions = useMemo(() => {
-    const cur = new Date().getFullYear()
-    return Array.from({ length: 20 }, (_, i) => String(cur - i))
-  }, [])
+  const [kelasOptions, setKelasOptions] = useState<{ value: string; label: string; kodeUnit: string; tahunAjaran: string }[]>([])
+  
+  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const isAllChecked = rows.length > 0 && rows.every(r => selectedIds.includes(r.id))
@@ -118,9 +115,11 @@ export default function SantriLulusPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false)
 
   /* ─── filtered kelas ──────────────────────────────────────────── */
-  const filteredKelas = useMemo(() =>
-    selectedUnit === "all" ? kelasOptions : kelasOptions.filter(k => k.kodeUnit === selectedUnit),
-    [kelasOptions, selectedUnit])
+  const filteredKelas = useMemo(() => {
+    let filtered = kelasOptions.filter(k => k.tahunAjaran === selectedKodeTahun)
+    if (selectedKodeUnit) filtered = filtered.filter(k => k.kodeUnit === selectedKodeUnit)
+    return filtered
+  }, [kelasOptions, selectedKodeUnit, selectedKodeTahun])
 
   /* ─── fetch ─────────────────────────────────────────────────── */
   const fetchRows = async () => {
@@ -132,17 +131,12 @@ export default function SantriLulusPage() {
         per_page: Number(rowsPerPage),
       }
       if (searchQuery.trim()) params.q = searchQuery.trim()
-      if (selectedUnit !== "all") params.kode_unit = selectedUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       const result = await dataSantriService.getAll(params)
       let data = result.data.map(normalizeRow).filter(r => r.id > 0)
-
-      // filter tahun lulus di client (backend tidak support langsung)
-      if (selectedTahunLulus !== "all") {
-        const tahun = parseInt(selectedTahunLulus, 10)
-        data = data.filter(r => r.tahunLulus === tahun)
-      }
 
       setRows(data)
       setTotalItems(toNumber(result.meta?.total, data.length))
@@ -157,25 +151,23 @@ export default function SantriLulusPage() {
 
   const loadOptions = async () => {
     try {
-      const [unitRes, kelasRes] = await Promise.all([
-        dataUnitService.getAll({ page: 1, per_page: 300 }),
+      const [kelasRes] = await Promise.all([
         dataKelasService.getAll({ page: 1, per_page: 300 }),
       ])
-      setUnitOptions(unitRes.data.map(u => ({ value: toText(u.kode_unit), label: toText(u.nama_unit) || toText(u.kode_unit) })).filter(u => u.value))
       const seen = new Set<string>()
-      const kelas: { value: string; label: string; kodeUnit: string }[] = []
+      const kelas: { value: string; label: string; kodeUnit: string; tahunAjaran: string }[] = []
       for (const k of kelasRes.data) {
         const v = toText(k.kode_kelas)
-        if (v && !seen.has(v)) { seen.add(v); kelas.push({ value: v, label: toText(k.nama_kelas) || v, kodeUnit: toText(k.kode_unit || k.unit?.kode_unit) }) }
+        if (v && !seen.has(v)) { seen.add(v); kelas.push({ value: v, label: toText(k.nama_kelas) || v, kodeUnit: toText(k.kode_unit || k.unit?.kode_unit), tahunAjaran: toText(k.tahun_ajaran) }) }
       }
       setKelasOptions(kelas)
     } catch { /* ignore */ }
   }
 
   useEffect(() => { void loadOptions() }, [])
-  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedUnit, selectedKelas, selectedTahunLulus, rowsPerPage])
-  useEffect(() => { if (selectedKelas !== "all" && !filteredKelas.some(k => k.value === selectedKelas)) setSelectedKelas("all") }, [selectedUnit])
-  useEffect(() => { void fetchRows() }, [currentPage, rowsPerPage, searchQuery, selectedUnit, selectedKelas, selectedTahunLulus])
+  useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun, rowsPerPage])
+  useEffect(() => { if (selectedKelas !== "all" && !filteredKelas.some(k => k.value === selectedKelas)) setSelectedKelas("all") }, [selectedKodeUnit, selectedKodeTahun])
+  useEffect(() => { void fetchRows() }, [currentPage, rowsPerPage, searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun])
 
   /* ─── actions ────────────────────────────────────────────────── */
   const handleBatalLulus = async (ids: number[]) => {
@@ -228,8 +220,9 @@ export default function SantriLulusPage() {
     try {
       const params: Omit<DataSantriListParams, "per_page" | "page"> = { status: "LULUS" }
       if (searchQuery.trim()) params.q = searchQuery.trim()
-      if (selectedUnit !== "all") params.kode_unit = selectedUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKelas !== "all") params.kode_kelas = selectedKelas
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       const blob = await dataSantriService.exportExcel(params)
       downloadBlob(blob, `alumni-lulus-${new Date().toISOString().slice(0, 10)}.csv`)
     } catch (e) {
@@ -303,33 +296,14 @@ export default function SantriLulusPage() {
                 <Input className="pl-9" placeholder="Cari santri..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label>Unit</Label>
-              <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-                <SelectTrigger><SelectValue placeholder="Semua Unit" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Unit</SelectItem>
-                  {unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
+
+            <div className="space-y-1 lg:col-span-2">
               <Label>Kelas</Label>
               <Select value={selectedKelas} onValueChange={setSelectedKelas}>
                 <SelectTrigger><SelectValue placeholder="Semua Kelas" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
                   {filteredKelas.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Tahun Lulus</Label>
-              <Select value={selectedTahunLulus} onValueChange={setSelectedTahunLulus}>
-                <SelectTrigger><SelectValue placeholder="Semua Tahun" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Tahun</SelectItem>
-                  {tahunOptions.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
