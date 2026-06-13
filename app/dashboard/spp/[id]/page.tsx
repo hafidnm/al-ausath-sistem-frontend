@@ -86,7 +86,19 @@ type InvoiceRow = {
   catatan_bayar?: string | null
 }
 
-const StatusBadge = ({ statusKey }: { statusKey: string }) => {
+const StatusBadge = ({ statusKey, jenisTagihan }: { statusKey: string; jenisTagihan?: string }) => {
+  // Issue 11: Highlight Infaq status
+  if (jenisTagihan === 'INFAQ') {
+    switch (statusKey) {
+      case "lunas":
+        return <Badge className="bg-purple-500/15 text-purple-700 border-0 text-xs">Lunas</Badge>
+      case "menunggu_konfirmasi":
+        return <Badge className="bg-purple-500/15 text-purple-700 border-0 text-xs">Konfirmasi Infaq</Badge>
+      default:
+        return <Badge className="bg-purple-500/15 text-purple-700 border-0 text-xs">Infaq - Menunggu</Badge>
+    }
+  }
+  
   switch (statusKey) {
     case "lunas":
       return <Badge className="bg-emerald-500/15 text-emerald-700 border-0 text-xs">Lunas</Badge>
@@ -177,7 +189,7 @@ function InvoiceTable({
                   {formatCurrency(row.jumlah_tunggakan)}
                 </TableCell>
                 <TableCell className="text-center">
-                  <StatusBadge statusKey={row.status_key} />
+                  <StatusBadge statusKey={row.status_key} jenisTagihan={row.jenis_tagihan} />
                 </TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
@@ -360,6 +372,16 @@ export default function SppTagihanDetailPage() {
     [data],
   )
 
+  // Issue 10: Calculate tunggakan breakdown by type
+  const tunggakanByType = useMemo(() => {
+    const breakdown: Record<string, number> = {};
+    (data?.invoice ?? []).forEach((inv: InvoiceRow) => {
+      const type = inv.jenis_tagihan || 'Lainnya';
+      breakdown[type] = (breakdown[type] || 0) + (inv.jumlah_tunggakan || 0);
+    });
+    return breakdown;
+  }, [data?.invoice]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-muted-foreground gap-2">
@@ -388,6 +410,13 @@ export default function SppTagihanDetailPage() {
   const totalTagihan = data.ringkasan?.total_tagihan ?? 0
   const totalDibayar = data.ringkasan?.total_dibayar ?? 0
   const totalTunggakan = data.ringkasan?.total_tunggakan ?? 0
+
+  // Issue 10: Summary cards and tunggakan breakdown
+  const tunggakanCards = Object.entries(tunggakanByType).map(([type, amount]) => ({
+    label: type,
+    amount,
+    color: type === 'SPP' ? 'text-blue-600' : type === 'INFAQ' ? 'text-purple-600' : 'text-amber-600'
+  }))
 
   return (
     <div className="space-y-6">
@@ -437,6 +466,35 @@ export default function SppTagihanDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Issue 7 & 10: Tunggakan Calculation & Breakdown by Type */}
+      {Object.keys(tunggakanByType).length > 0 && (
+        <>
+          <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-blue-900">
+              <p className="font-semibold">Perhitungan Tunggakan Otomatis</p>
+              <p className="text-xs mt-1">Sistem secara otomatis menghitung tunggakan dari SPP, Infaq, dan tagihan lainnya yang belum dibayar. Rincian di bawah menunjukkan breakdown per jenis tagihan.</p>
+            </div>
+          </div>
+          <Card className="border-border/50">
+            <CardHeader>
+              <CardTitle className="text-base">Rincian Tunggakan per Jenis Tagihan</CardTitle>
+              <CardDescription>Breakdown tunggakan berdasarkan jenis (SPP, Infaq, Lainnya)</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {tunggakanCards.map((card) => (
+                  <div key={card.label} className="border rounded-lg p-4 space-y-1">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold">{card.label}</p>
+                    <p className={`text-lg font-bold ${card.color}`}>{formatCurrency(card.amount)}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Main Content: Profil + Daftar Tagihan */}
       <div className="grid md:grid-cols-3 gap-6">
@@ -506,6 +564,19 @@ export default function SppTagihanDetailPage() {
                   </Badge>
                 </div>
               </div>
+
+              {/* Issue 8: Transfer Student SPP Info */}
+              {data.profil?.is_pindah && (
+                <div className="mt-4 pt-4 border-t">
+                  <Badge className="bg-amber-500/15 text-amber-600 border-0 text-xs px-2 mb-2">Siswa Pindahan</Badge>
+                  <div className="text-xs space-y-1">
+                    <p className="text-muted-foreground">SPP dihitung berdasarkan tanggal masuk. Konsultasikan dengan admin untuk detail biaya awal.</p>
+                    {data.profil?.tanggal_masuk && (
+                      <p className="font-semibold text-foreground">Tanggal Masuk: {formatDate(data.profil.tanggal_masuk)}</p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -517,11 +588,37 @@ export default function SppTagihanDetailPage() {
           </CardHeader>
           <CardContent>
             {data.profil?.sumber === 'ppdb' && (
-              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
-                <p className="font-semibold">Tagihan PPDB / Infaq</p>
-                <p className="mt-1 text-xs text-emerald-800">
-                  Pilihan infaq PPDB akan muncul di daftar tagihan ini setelah pendaftar dinyatakan diterima.
-                </p>
+              <div className="mb-4 space-y-3">
+                {/* Issue 11: Infaq Display Highlight */}
+                <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-sm text-purple-900">
+                  <div className="flex items-start gap-2">
+                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold">Tagihan Infaq (Sumbangan Sukarela)</p>
+                      <p className="mt-1 text-xs text-purple-800">
+                        Infaq akan ditampilkan sebagai tagihan terpisah sesuai pilihan Anda saat registrasi.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {/* Issue 9: Uang Gedung + SPP Bundling Info */}
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
+                  <div className="flex items-start gap-2">
+                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-semibold">Uang Gedung + SPP Bulan Pertama (Tergabung)</p>
+                      <p className="mt-1 text-xs text-emerald-800">
+                        Saat pembayaran awal, Uang Gedung dan SPP bulan pertama dijadikan satu tagihan. Lihat rincian tagihan di bawah untuk detail.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm text-blue-900">
+                  <p className="font-semibold">Status Tagihan PPDB</p>
+                  <p className="mt-1 text-xs text-blue-800">
+                    Semua tagihan PPDB akan muncul di daftar ini setelah pendaftar dinyatakan diterima.
+                  </p>
+                </div>
               </div>
             )}
             <Tabs defaultValue="belum-lunas" className="space-y-4">

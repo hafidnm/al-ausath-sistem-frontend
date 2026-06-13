@@ -375,11 +375,20 @@ export default function PpdbDetailPage() {
                 { label: 'Kartu Keluarga (KK)', url: pendaftar.fileKkPath, type: 'kk' },
                 { label: 'Rekomendasi Ustadz', url: pendaftar.fileSuratRekomendasiPath, type: 'rekomendasi' },
                 { label: 'Surat Pernyataan', url: pendaftar.suratPernyataanFilePath, type: 'surat_pernyataan' },
+                // Issue 5: Add teacher parent proof document
+                { label: 'Bukti Orang Tua / Guru', url: pendaftar.buktiOrtuGuruUrl, type: 'bukti_ortu_guru' },
               ].map((doc) => {
                 const documentUrl = getDocumentUrl(doc.url)
                 return (
                   <div key={doc.type} className="border border-border rounded-lg p-4 space-y-3">
-                    <p className="font-medium text-sm">{doc.label}</p>
+                    <div className="flex items-start justify-between">
+                      <p className="font-medium text-sm">{doc.label}</p>
+                      {doc.type === 'bukti_ortu_guru' && pendaftar.buktiOrtuGuruVerified !== undefined && (
+                        <Badge variant={pendaftar.buktiOrtuGuruVerified ? "default" : "outline"} className="text-xs">
+                          {pendaftar.buktiOrtuGuruVerified ? 'Terverifikasi' : 'Menunggu'}
+                        </Badge>
+                      )}
+                    </div>
                     {documentUrl ? (
                       <>
                         <div className="flex gap-2">

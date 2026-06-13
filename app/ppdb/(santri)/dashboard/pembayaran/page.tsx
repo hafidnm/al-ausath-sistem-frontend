@@ -7,8 +7,16 @@ import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Downlo
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalPembayaranStatus } from '@/hooks/ppdb/santri';
+import { usePpdbAvailableKelas } from '@/hooks/ppdb/santri/use-ppdb-available-kelas';
 import api from '@/lib/axios';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import type { PpdbPortalBillingInfo } from '@/types/ppdb/portal';
@@ -29,6 +37,11 @@ export default function PpdbPembayaranPage() {
   const { toast } = useToast();
   const { data, loading, fetchPembayaranStatus } = usePpdbPortalPembayaranStatus();
   const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
+  
+  // Issue 3: Available kelas selection
+  const [selectedJenjang, setSelectedJenjang] = useState('');
+  const [selectedKelas, setSelectedKelas] = useState('');
+  const { data: availableKelas, loading: kelasLoading } = usePpdbAvailableKelas(selectedJenjang, Boolean(selectedJenjang));
   
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -198,14 +211,57 @@ export default function PpdbPembayaranPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-lg border border-border bg-background p-3">
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">Status PPDB</p>
                 <p className="mt-1 font-semibold">{isPpdbAccepted ? 'Diterima' : (data?.statusVerifikasi || 'Menunggu')}</p>
               </div>
-              <div className="rounded-lg border border-border bg-background p-3">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Infaq Bulanan</p>
-                <p className="mt-1 font-semibold">{infaqSummary}</p>
+              <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3">
+                <p className="text-xs uppercase tracking-wide text-purple-700 font-semibold">Infaq Bulanan (Sumbangan)</p>
+                <p className="mt-1 font-semibold text-purple-900">{infaqSummary}</p>
+              </div>
+            </div>
+
+            {/* Issue 9: Uang Gedung + SPP Bundling Info */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4 space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-emerald-900">
+                  <p className="font-semibold">Tagihan Awal: Uang Gedung + SPP Bulan Pertama (Tergabung)</p>
+                  <p className="text-xs mt-1">Saat pembayaran awal, Uang Gedung dan SPP bulan pertama akan dijadikan satu tagihan untuk kemudahan. Tagihan SPP bulan-bulan berikutnya terpisah dan disesuaikan dengan kalender akademik.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Issue 3: Available kelas selection */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border rounded-lg p-4 bg-muted/50">
+              <div className="space-y-2">
+                <Label htmlFor="jenjang-select" className="text-sm font-medium">Pilih Jenjang</Label>
+                <Select value={selectedJenjang} onValueChange={setSelectedJenjang}>
+                  <SelectTrigger id="jenjang-select">
+                    <SelectValue placeholder="Pilih jenjang..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MI">MI (Madrasah Ibtidaiyah)</SelectItem>
+                    <SelectItem value="MTS">MTs (Madrasah Tsanawiyah)</SelectItem>
+                    <SelectItem value="MA">MA (Madrasah Aliyah)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="kelas-select" className="text-sm font-medium">Pilih Kelas</Label>
+                <Select value={selectedKelas} onValueChange={setSelectedKelas} disabled={!selectedJenjang || kelasLoading}>
+                  <SelectTrigger id="kelas-select">
+                    <SelectValue placeholder={kelasLoading ? "Memuat..." : "Pilih kelas..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableKelas.map((k) => (
+                      <SelectItem key={String(k.id)} value={String(k.id)}>
+                        {k.nama_kelas} {k.kuota_sisa !== undefined ? `(Sisa: ${k.kuota_sisa})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

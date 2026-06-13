@@ -52,12 +52,17 @@ interface PpdbTableProps {
   searchQuery: string
   selectedStatus: string
   selectedProgram: string
+  // Issue 6: Add kelas filter props
+  selectedKelas?: string
+  selectedStatusKelas?: string
   programOptions: string[]
   verificationLoading: boolean
   deleteLoading: boolean
   onSearchChange: (val: string) => void
   onStatusChange: (val: string) => void
   onProgramChange: (val: string) => void
+  onKelasChange?: (val: string) => void
+  onStatusKelasChange?: (val: string) => void
   onDetail: (item: PpdbDetail) => void
   onVerifikasi: (item: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => void
   onDelete: (item: PpdbDetail) => void
@@ -110,12 +115,17 @@ export function PpdbTable({
   searchQuery,
   selectedStatus,
   selectedProgram,
+  // Issue 6: Destructure kelas filter props
+  selectedKelas = "all",
+  selectedStatusKelas = "all",
   programOptions,
   verificationLoading,
   deleteLoading,
   onSearchChange,
   onStatusChange,
   onProgramChange,
+  onKelasChange,
+  onStatusKelasChange,
   onDetail,
   onVerifikasi,
   onDelete,
@@ -166,6 +176,29 @@ export function PpdbTable({
                 <SelectItem value="Ditolak">Ditolak</SelectItem>
               </SelectContent>
             </Select>
+            {/* Issue 6: Add kelas filters */}
+            {onKelasChange && (
+              <Select value={selectedKelas} onValueChange={onKelasChange}>
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue placeholder="Kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+            {onStatusKelasChange && (
+              <Select value={selectedStatusKelas} onValueChange={onStatusKelasChange}>
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue placeholder="Status Kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Status</SelectItem>
+                  <SelectItem value="available">Tersedia</SelectItem>
+                  <SelectItem value="full">Penuh</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
           </div>
         </div>
       </CardHeader>

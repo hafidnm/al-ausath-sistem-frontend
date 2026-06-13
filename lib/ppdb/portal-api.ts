@@ -306,6 +306,26 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
     buktiSppUrl: pickText(sources, ['bukti_spp_url', 'buktiSppUrl', 'bukti_spp_path', 'buktiSppPath']),
     nomorIndukGenerated: pickText(sources, ['nomor_induk_generated', 'nomorIndukGenerated', 'nis_generated', 'nis']),
     kodeKelasDiterima: pickText(sources, ['kode_kelas_diterima', 'kodeKelasDiterima', 'kelas_diterima']),
+    // Issue 5: Bukti orang tua guru
+    buktiOrtuGuruUrl: pickText(sources, ['bukti_ortu_guru_url', 'buktiOrtuGuruUrl', 'bukti_ortu_guru_path']) || undefined,
+    buktiOrtuGuruVerified: (() => {
+      const v = pickValue(sources, ['bukti_ortu_guru_verified', 'buktiOrtuGuruVerified']);
+      if (v === null || v === undefined) return null;
+      return asBool(v);
+    })(),
+    // Issue 4: Sibling support — daftar semua pendaftaran dalam akun yang sama
+    daftarPendaftaran: (() => {
+      const raw = dataRoot.daftar_pendaftaran ?? root.daftar_pendaftaran;
+      if (!Array.isArray(raw)) return undefined;
+      return raw.map((item) => {
+        const r = asRecord(item);
+        return {
+          id_pendaftaran: asString(r.id_pendaftaran ?? r.pendaftaran_id ?? r.id),
+          nama_calon: asString(r.nama_calon ?? r.nama_lengkap ?? r.nama),
+          step: asString(r.step ?? r.tahap),
+        };
+      });
+    })(),
   };
 };
 
@@ -330,8 +350,12 @@ const normalizeTesStatus = (payload: unknown): PpdbPortalTesStatus => {
     tesDescription: asString(row.tesDescription ?? row.tes_description),
     step: normalizeStep(row.step),
     message: asString(row.message),
+    // Issue 1: RTL/Arab support
+    is_rtl: asBool(row.is_rtl ?? row.isRtl) || undefined,
+    bahasa: (row.bahasa === 'ar' ? 'ar' : row.bahasa === 'id' ? 'id' : undefined),
   };
 };
+
 
 const resolveToken = (payload: unknown): string => {
   const row = resolveData(payload);
@@ -524,7 +548,51 @@ export const ppdbPortalApi = {
     return response.data as { message: string };
   },
 
+  /**
+   * Issue 4: Satu email untuk beberapa siswa — daftarkan sibling baru
+   * POST /api/ppdb/pendaftaran/tambah-siswa
+   */
+  async tambahSiswaPpdb(namaCalon: string, program: string): Promise<{ id_pendaftaran: string; no_pendaftaran: string; message: string }> {
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/pendaftaran/tambah-siswa`, {
+      nama_calon: namaCalon,
+      program_pendaftaran: program,
+      jenjang: program,
+    });
+    const row = resolveData(response.data);
+    return {
+      id_pendaftaran: asString(row.id_pendaftaran ?? row.pendaftaran_id ?? row.id),
+      no_pendaftaran: asString(row.no_pendaftaran ?? row.nomor_pendaftaran),
+      message: asString(row.message || asRecord(response.data).message || 'Pendaftaran siswa baru berhasil'),
+    };
+  },
+
+  /**
+   * Issue 5: Upload bukti orang tua guru
+   * POST /api/ppdb/form (multipart dengan field bukti_ortu_guru)
+   */
+  async uploadBuktiOrtuGuru(file: File): Promise<unknown> {
+    const formData = new FormData();
+    formData.append('bukti_ortu_guru', file);
+    formData.append('_method', 'PUT');
+    const response = await api.post(`${PPDB_PORTAL_BASE_PATH}/form`, formData, {
+      headers: { Accept: 'application/json', 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  /**
+   * Issue 3: Pemilihan kelas dipermudah
+   * GET /api/ppdb/available-kelas
+   */
+  async getAvailableKelas(params?: { jenjang?: string }): Promise<Array<{ id?: string | number; kode_kelas?: string; nama_kelas?: string; tahun_ajaran?: string; kuota_sisa?: number }>> {
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/available-kelas`, { params });
+    const data = resolveData(response.data);
+    const list = Array.isArray(data.data) ? data.data : Array.isArray(data.kelas) ? data.kelas : Array.isArray(data) ? data : [];
+    return list;
+  },
+
   logout() {
     clearStoredPpdbToken();
   },
 };
+
