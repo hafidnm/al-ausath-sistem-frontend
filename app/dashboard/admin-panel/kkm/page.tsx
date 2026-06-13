@@ -6,6 +6,8 @@ import { KkmFilters } from "./components/kkm-filters"
 import { KkmHeader } from "./components/kkm-header"
 import { KkmTable } from "./components/kkm-table"
 import { KkmItem, kkmService } from "@/lib/services/kkm.service"
+import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
+import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 
 export default function KkmPage() {
   const router = useRouter()
@@ -13,10 +15,19 @@ export default function KkmPage() {
   const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("all")
   const [kodeUnit, setKodeUnit] = useState("all")
+  const [kodeKelas, setKodeKelas] = useState("all")
   const [perPage, setPerPage] = useState("10")
   const [items, setItems] = useState<KkmItem[]>([])
+  const [kelasList, setKelasList] = useState<KelasItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+
+  // Ambil daftar kelas untuk opsi dropdown filter
+  useEffect(() => {
+    kelasService.getAll({ status: "AKTIF" })
+      .then(setKelasList)
+      .catch(() => setKelasList([]))
+  }, [])
 
   const fetchKkm = useCallback(async () => {
     try {
@@ -31,45 +42,57 @@ export default function KkmPage() {
         per_page: perPage,
       }
 
+      let data: KkmItem[]
+
       if (!queryTrimmed) {
-        const data = await kkmService.getAll(sharedParams)
-        setItems(data)
-        return
-      }
-
-      const normalizedQuery = queryTrimmed.toLowerCase()
-
-      // 1) Coba backend yang mendukung q (search umum)
-      let data = await kkmService.getAll({
-        ...sharedParams,
-        q: queryTrimmed,
-      })
-
-      // 2) Fallback backend yang hanya mendukung kode_mapel
-      if (data.length === 0) {
-        data = await kkmService.getAll({
-          ...sharedParams,
-          kode_mapel: queryTrimmed,
-        })
-      }
-
-      // 3) Fallback terakhir: ambil dataset filter lain lalu cari di frontend
-      if (data.length === 0) {
         data = await kkmService.getAll(sharedParams)
+      } else {
+        const normalizedQuery = queryTrimmed.toLowerCase()
+
+        // 1) Coba backend yang mendukung q (search umum)
+        data = await kkmService.getAll({ ...sharedParams, q: queryTrimmed })
+
+        // 2) Fallback backend yang hanya mendukung kode_mapel
+        if (data.length === 0) {
+          data = await kkmService.getAll({ ...sharedParams, kode_mapel: queryTrimmed })
+        }
+
+        // 3) Fallback terakhir: ambil dataset filter lain lalu cari di frontend
+        if (data.length === 0) {
+          data = await kkmService.getAll(sharedParams)
+        }
+
+        data = data.filter((item) => (
+          item.kode_mapel.toLowerCase().includes(normalizedQuery)
+          || (item.mapel ?? "").toLowerCase().includes(normalizedQuery)
+        ))
       }
 
-      const filtered = data.filter((item) => (
-        item.kode_mapel.toLowerCase().includes(normalizedQuery)
-        || (item.mapel ?? "").toLowerCase().includes(normalizedQuery)
-      ))
+      // Filter berdasarkan kelas jika dipilih (client-side via kelas-mapel)
+      if (kodeKelas !== "all") {
+        const kelasMapelRes = await dataKelasMapelService.getAll({
+          kode_kelas: kodeKelas,
+          tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
+          semester: semester === "all" ? undefined : Number(semester),
+          per_page: 500,
+        })
+        const kodeMapelDiKelas = new Set(
+          kelasMapelRes.data
+            .map((km) => (km.kode_mapel ?? "").toUpperCase())
+            .filter(Boolean)
+        )
+        data = data.filter((item) =>
+          kodeMapelDiKelas.has(item.kode_mapel.toUpperCase())
+        )
+      }
 
-      setItems(filtered)
+      setItems(data)
     } catch (err: any) {
       setError(err?.response?.data?.message || "Gagal memuat data KKM")
     } finally {
       setIsLoading(false)
     }
-  }, [kodeUnit, perPage, query, semester, tahunAjaran])
+  }, [kodeUnit, kodeKelas, perPage, query, semester, tahunAjaran])
 
   useEffect(() => {
     fetchKkm()
@@ -101,6 +124,9 @@ export default function KkmPage() {
         onSemesterChange={setSemester}
         kodeUnit={kodeUnit}
         onKodeUnitChange={setKodeUnit}
+        kodeKelas={kodeKelas}
+        onKodeKelasChange={setKodeKelas}
+        kelasList={kelasList}
         perPage={perPage}
         onPerPageChange={setPerPage}
       />
