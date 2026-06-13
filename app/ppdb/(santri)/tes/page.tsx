@@ -18,8 +18,14 @@ import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppd
 const getImageUrl = (path?: string): string | null => {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  const base = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/?$/, '');
-  return `${base}/storage/${path.replace(/^\//, '')}`;
+  
+  // Get base URL from API_URL (e.g., http://localhost:8000/api → http://localhost:8000)
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const base = apiUrl.replace(/\/api\/?$/, '');
+  
+  // Handle both relative paths (ppdb/tes_soal/img.jpg) and /storage/ prefixes
+  const cleanPath = path.replace(/^\/storage\/?/, '').replace(/^\//, '');
+  return `${base}/storage/${cleanPath}`;
 };
 
 export default function PpdbTesPage() {
@@ -186,13 +192,13 @@ export default function PpdbTesPage() {
                       <h3 className="font-semibold border-b pb-2">Lembar Jawaban</h3>
                       {data.formSchema.map((q, idx) => (
                         <div key={q.id} className="space-y-3">
-                          <Label className={`text-base font-medium flex items-start gap-2 ${data.is_rtl ? 'flex-row-reverse text-right' : ''}`}
-                            dir={data.is_rtl ? 'rtl' : 'ltr'}>
+                          <Label className={`text-base font-medium flex items-start gap-2 ${q.bahasa === 'ar' ? 'flex-row-reverse text-right' : ''}`}
+                            dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}>
                             <span>{idx + 1}.</span> <span>{q.question}</span>
                           </Label>
                           {/* Issue 2: Gambar pendukung soal */}
                           {q.image_url && getImageUrl(q.image_url) && (
-                            <div className={data.is_rtl ? 'flex justify-end' : ''}>
+                            <div className={q.bahasa === 'ar' ? 'flex justify-end' : ''}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={getImageUrl(q.image_url) || ''}
@@ -209,10 +215,10 @@ export default function PpdbTesPage() {
                                 value={answersMap[q.id] || ''}
                                 onValueChange={(val) => setAnswersMap(prev => ({ ...prev, [q.id]: val }))}
                                 className="space-y-2"
-                                dir={data.is_rtl ? 'rtl' : 'ltr'}
+                                dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
                               >
                                 {q.options.map((opt, i) => (
-                                  <div key={i} className={`flex items-center space-x-2 ${data.is_rtl ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                                  <div key={i} className={`flex items-center space-x-2 ${q.bahasa === 'ar' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                                     <RadioGroupItem value={opt} id={`q-${q.id}-opt-${i}`} />
                                     <Label htmlFor={`q-${q.id}-opt-${i}`} className="font-normal cursor-pointer">{opt}</Label>
                                   </div>
@@ -223,9 +229,9 @@ export default function PpdbTesPage() {
                                 disabled={submitLoading || data.tesSubmitted}
                                 value={answersMap[q.id] || ''}
                                 onChange={(e) => setAnswersMap(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                placeholder={data.is_rtl ? 'اكتب إجابتك هنا...' : 'Ketik jawaban Anda...'}
-                                className={`min-h-[100px] ${data.is_rtl ? 'text-right' : ''}`}
-                                dir={data.is_rtl ? 'rtl' : 'ltr'}
+                                placeholder={q.bahasa === 'ar' ? 'اكتب إجابتك هنا...' : 'Ketik jawaban Anda...'}
+                                className={`min-h-[100px] ${q.bahasa === 'ar' ? 'text-right' : ''}`}
+                                dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
                               />
                             )}
                           </div>

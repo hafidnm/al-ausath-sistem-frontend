@@ -17,7 +17,54 @@ import {
 import { Input } from "@/components/ui/input"
 import { Loader2, Plus, Trash2, ImagePlus, X, Globe } from "lucide-react"
 import type { TesKonfigurasiJenjangKey, TesKonfigurasiJenjang, TestQuestion, TestQuestionType } from "@/types/ppdb/admin"
+import type { TesKonfigurasiJenjangKey, TesKonfigurasiJenjang, TestQuestion, TestQuestionType } from "@/types/ppdb/admin"
 import api from "@/lib/axios"
+
+// Helper: Construct full image URL from backend path
+const getImageUrl = (path?: string): string | null => {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  
+  // Get base URL from API_URL (e.g., http://localhost:8000/api → http://localhost:8000)
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+  const base = apiUrl.replace(/\/api\/?$/, '');
+  
+  // Handle both relative paths (ppdb/tes_soal/img.jpg) and /storage/ prefixes
+  const cleanPath = path.replace(/^\/storage\/?/, '').replace(/^\//, '');
+  return `${base}/storage/${cleanPath}`;
+};
+
+// Helper: Auto-transliterasi A/B/C ke Bahasa Arab jika pilihan dimulai dengan huruf Latin
+const autoTransliterateOptions = (text: string, bahasa: 'id' | 'ar' = 'id'): string[] => {
+  if (bahasa !== 'ar') return text.split('\n');
+  
+  const lines = text.split('\n');
+  const arabicChoices: Record<string, string> = {
+    'a': 'أ',
+    'b': 'ب',
+    'c': 'ج',
+    'd': 'د',
+    'e': 'ه',
+    'f': 'و',
+    'g': 'ز',
+    'h': 'ح',
+  };
+  
+  return lines.map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+    
+    // Jika baris dimulai dengan huruf tunggal (A, B, C, dll), transliterasi
+    const match = trimmed.match(/^([a-hA-H])\s*[\.\):\-]?\s*(.*)/);
+    if (match) {
+      const letter = match[1].toLowerCase();
+      const rest = match[2];
+      const arabicLetter = arabicChoices[letter];
+      return rest ? `${arabicLetter} - ${rest}` : arabicLetter;
+    }
+    return line;
+  });
+};
 
 const tesJenjangOptions: Array<{ value: TesKonfigurasiJenjangKey; label: string }> = [
   { value: "MI", label: "MI" },
@@ -92,14 +139,16 @@ export function PpdbTesKonfigurasiCard({
     try {
       const formData = new FormData()
       formData.append('gambar', file)
-      const response = await api.post('/administrasi/ppdb/tes-konfigurasi/upload-gambar', formData, {
+      const response = await api.post('/administrasi/ppdb/tes/konfigurasi/upload-gambar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      const url = (response.data as any)?.url ?? (response.data as any)?.data?.url ?? ''
+      // Backend return file_url (format: /storage/ppdb/tes_soal/...)
+      const url = (response.data as any)?.file_url ?? (response.data as any)?.url ?? ''
       if (url) {
         handleUpdateQuestion(index, { image_url: url })
       }
-    } catch {
+    } catch (error) {
+      console.error('Image upload error:', error)
       alert('Gagal mengunggah gambar soal.')
     }
   }
@@ -143,22 +192,9 @@ export function PpdbTesKonfigurasiCard({
             <Label htmlFor="tes-bahasa" className="flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5" /> Bahasa Soal
             </Label>
-            <Select
-              value={activeConfig.bahasa ?? 'id'}
-              onValueChange={(v) => handleBahasaChange(v as 'id' | 'ar')}
-              disabled={isLoading || isSaving}
-            >
-              <SelectTrigger id="tes-bahasa">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="id">Bahasa Indonesia</SelectItem>
-                <SelectItem value="ar">العربية (Arab — RTL)</SelectItem>
-              </SelectContent>
-            </Select>
-            {activeConfig.is_rtl && (
-              <p className="text-xs text-amber-600">⚠️ Soal akan ditampilkan dengan tata letak kanan-ke-kiri (RTL).</p>
-            )}
+            <p className="text-xs text-muted-foreground italic">
+              💡 Pilih bahasa per soal (setiap soal bisa berbeda bahasa)
+            </p>
           </div>
 
           <div className="sm:col-span-1 flex items-center justify-between rounded-lg border border-border/70 px-4 py-3">
@@ -197,12 +233,7 @@ export function PpdbTesKonfigurasiCard({
             <div className="flex items-center justify-between">
               <div>
                 <Label className="text-base">Daftar Soal Tes</Label>
-                <p className="text-xs text-muted-foreground mt-1">Buat form dinamis yang diisi oleh pendaftar jenjang ini.</p>
-                {activeConfig.bahasa === 'ar' && (
-                  <Badge variant="outline" className="mt-1 text-amber-700 border-amber-300 bg-amber-50">
-                    🌙 Mode Bahasa Arab — soal akan tampil RTL
-                  </Badge>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">Buat form dinamis yang diisi oleh pendaftar jenjang ini. Setiap soal bisa memiliki bahasa berbeda.</p>
               </div>
               <Button onClick={handleAddQuestion} size="sm" variant="outline" disabled={isLoading || isSaving}>
                 <Plus className="w-4 h-4 mr-2" /> Tambah Soal
@@ -227,9 +258,9 @@ export function PpdbTesKonfigurasiCard({
                             <Label className="mb-2 block">Pertanyaan {idx + 1}</Label>
                             <Input
                               value={q.question}
-                              placeholder={activeConfig.bahasa === 'ar' ? 'اكتب السؤال هنا...' : 'Tuliskan pertanyaan...'}
-                              dir={activeConfig.is_rtl ? 'rtl' : 'ltr'}
-                              className={activeConfig.is_rtl ? 'text-right font-arabic' : ''}
+                              placeholder={q.bahasa === 'ar' ? 'اكتب السؤال هنا...' : 'Tuliskan pertanyaan...'}
+                              dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
+                              className={q.bahasa === 'ar' ? 'text-right font-arabic' : ''}
                               onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUpdateQuestion(idx, { question: e.target.value })}
                               disabled={isLoading || isSaving}
                             />
@@ -250,6 +281,25 @@ export function PpdbTesKonfigurasiCard({
                               </SelectContent>
                             </Select>
                           </div>
+                          {/* Per-question language selection */}
+                          <div className="w-full sm:w-[180px]">
+                            <Label className="mb-2 block flex items-center gap-1.5">
+                              <Globe className="w-3.5 h-3.5" /> Bahasa
+                            </Label>
+                            <Select
+                              value={q.bahasa ?? 'id'}
+                              disabled={isLoading || isSaving}
+                              onValueChange={(v) => handleUpdateQuestion(idx, { bahasa: v as 'id' | 'ar' })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="id">Bahasa Indonesia</SelectItem>
+                                <SelectItem value="ar">العربية (Arab)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
 
                         {/* Issue 2: Upload gambar pendukung soal */}
@@ -258,7 +308,7 @@ export function PpdbTesKonfigurasiCard({
                             {q.image_url ? (
                               <div className="relative inline-block">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={q.image_url} alt="Gambar soal" className="max-h-28 rounded border border-border/50 object-cover" />
+                                <img src={getImageUrl(q.image_url) || ''} alt="Gambar soal" className="max-h-28 rounded border border-border/50 object-cover" />
                                 <button
                                   type="button"
                                   onClick={() => handleUpdateQuestion(idx, { image_url: undefined })}
@@ -298,13 +348,21 @@ export function PpdbTesKonfigurasiCard({
                           <div className="pl-4 border-l-2 border-primary/20 space-y-2">
                             <Label className="text-xs text-muted-foreground uppercase tracking-wider">Opsi Pilihan Ganda (Satu baris per opsi)</Label>
                             <Textarea
-                              className={`min-h-[80px] ${activeConfig.is_rtl ? 'text-right' : ''}`}
-                              dir={activeConfig.is_rtl ? 'rtl' : 'ltr'}
-                              placeholder={activeConfig.bahasa === 'ar' ? 'الخيار الأول\nالخيار الثاني\nالخيار الثالث' : 'Ketik opsi satu, tekan ENTER\nKetik opsi dua, dst...'}
+                              className={`min-h-[80px] ${q.bahasa === 'ar' ? 'text-right' : ''}`}
+                              dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
+                              placeholder={q.bahasa === 'ar' ? 'الخيار الأول\nالخيار الثاني\nالخيار الثالث' : 'Ketik opsi satu, tekan ENTER\nKetik opsi dua, dst...'}
                               value={q.options ? q.options.join("\n") : ""}
-                              onChange={(e) => handleUpdateQuestion(idx, { options: e.target.value.split("\n") })}
+                              onChange={(e) => {
+                                const rawText = e.target.value;
+                                // Auto-transliterasi jika bahasa Arab
+                                const transliterated = autoTransliterateOptions(rawText, q.bahasa as 'id' | 'ar');
+                                handleUpdateQuestion(idx, { options: transliterated });
+                              }}
                               disabled={isLoading || isSaving}
                             />
+                            {q.bahasa === 'ar' && (
+                              <p className="text-xs text-amber-600">💡 Ketik A/B/C akan otomatis menjadi ا/ب/ج</p>
+                            )}
                           </div>
                         )}
                       </div>

@@ -55,6 +55,7 @@ export interface UpdatePpdbRequest {
 }
 
 export interface PpdbDetail {
+  buktiOrtuGuruUrl: any;
   id: string;
   pendaftaranId?: string;
   userId?: string;
@@ -149,12 +150,18 @@ export interface TestQuestion {
   options?: string[];
   /** URL gambar pendukung soal (opsional) */
   image_url?: string;
+  /** Bahasa soal per-pertanyaan: 'id' (Indonesia) atau 'ar' (Arab) */
+  bahasa?: 'id' | 'ar';
 }
 
 export interface UpdateTesKonfigurasiRequest {
   fiturSoalAktif: boolean;
   soalTes?: string;
   formSchema?: TestQuestion[];
+  /** Global bahasa untuk jenjang (deprecated, use per-question bahasa instead) */
+  bahasa?: 'id' | 'ar';
+  /** Global RTL flag untuk jenjang (deprecated, use per-question bahasa instead) */
+  is_rtl?: boolean;
 }
 
 export type TesKonfigurasiJenjangKey = 'MI' | 'MTS' | 'MA';
