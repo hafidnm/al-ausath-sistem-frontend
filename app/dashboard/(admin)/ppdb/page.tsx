@@ -55,7 +55,7 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type TesConfigState = { fiturSoalAktif: boolean; soalTes: string; formSchema?: TestQuestion[] }
+type TesConfigState = { fiturSoalAktif: boolean; soalTes: string; formSchema?: TestQuestion[]; bahasa?: 'id' | 'ar'; is_rtl?: boolean }
 type TesConfigMap = Record<TesKonfigurasiJenjangKey, TesConfigState>
 
 const emptyTesConfig: TesConfigMap = {
@@ -102,6 +102,9 @@ export default function PpdbPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedProgram, setSelectedProgram] = useState("all")
+  // Issue 6: Class and class status filters
+  const [selectedKelas, setSelectedKelas] = useState("all")
+  const [selectedStatusKelas, setSelectedStatusKelas] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
 
   // Tes konfigurasi state
@@ -117,6 +120,9 @@ export default function PpdbPage() {
     q: searchQuery || undefined,
     status_verifikasi: selectedStatus === "all" ? undefined : selectedStatus.toLowerCase(),
     jenjang: selectedProgram === "all" ? undefined : selectedProgram,
+    // Issue 6: Add class filters
+    kelas: selectedKelas === "all" ? undefined : selectedKelas,
+    status_kelas: selectedStatusKelas === "all" ? undefined : selectedStatusKelas,
   })
   const { create: createPendaftar, loading: createLoading } = useCreatePpdb()
   const { deleteItem: deletePendaftar, loading: deleteLoading } = useDeletePpdb()
@@ -418,11 +424,15 @@ export default function PpdbPage() {
         fiturSoalAktif: draft.fiturSoalAktif,
         soalTes: draft.soalTes.trim(),
         formSchema: normalizedFormSchema,
+        bahasa: draft.bahasa,
+        is_rtl: draft.is_rtl,
       })
       updateTesConfigDraft(jenjang, {
         fiturSoalAktif: Boolean(updated.fiturSoalAktif),
         soalTes: updated.soalTes || "",
         formSchema: updated.formSchema || normalizedFormSchema,
+        bahasa: updated.bahasa,
+        is_rtl: updated.is_rtl,
       })
       alert(`Konfigurasi tes jenjang ${jenjang} berhasil diperbarui`)
     } catch (err) { alert(getErrorMessage(err, "Gagal memperbarui konfigurasi tes")) }
@@ -541,12 +551,17 @@ export default function PpdbPage() {
             searchQuery={searchQuery}
             selectedStatus={selectedStatus}
             selectedProgram={selectedProgram}
+            // Issue 6: Add kelas filters
+            selectedKelas={selectedKelas}
+            selectedStatusKelas={selectedStatusKelas}
             programOptions={programOptions}
             verificationLoading={verificationLoading}
             deleteLoading={deleteLoading}
             onSearchChange={(val) => { setSearchQuery(val); setCurrentPage(1) }}
             onStatusChange={(val) => { setSelectedStatus(val); setCurrentPage(1) }}
             onProgramChange={(val) => { setSelectedProgram(val); setCurrentPage(1) }}
+            onKelasChange={(val) => { setSelectedKelas(val); setCurrentPage(1) }}
+            onStatusKelasChange={(val) => { setSelectedStatusKelas(val); setCurrentPage(1) }}
             onDetail={handleOpenDetail}
             onVerifikasi={handleVerifikasi}
             onDelete={handleDeletePendaftar}
@@ -584,11 +599,15 @@ export default function PpdbPage() {
                   fiturSoalAktif: checked,
                   soalTes: draft.soalTes.trim(),
                   formSchema: normalizedFormSchema,
+                  bahasa: draft.bahasa,
+                  is_rtl: draft.is_rtl,
                 })
                 updateTesConfigDraft(jenjang, {
                   fiturSoalAktif: Boolean(updated.fiturSoalAktif),
                   soalTes: updated.soalTes || "",
                   formSchema: updated.formSchema || normalizedFormSchema,
+                  bahasa: updated.bahasa,
+                  is_rtl: updated.is_rtl,
                 })
               } catch (err) {
                 // Revert on failure
@@ -600,6 +619,7 @@ export default function PpdbPage() {
             }}
             onSoalChange={(jenjang, soal) => updateTesConfigDraft(jenjang, { soalTes: soal })}
             onFormSchemaChange={(jenjang, schema) => updateTesConfigDraft(jenjang, { formSchema: schema })}
+            onConfigPatch={(jenjang, patch) => updateTesConfigDraft(jenjang, patch)}
             onSave={handleUpdateTesConfig}
           />
         </TabsContent>

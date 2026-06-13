@@ -101,7 +101,14 @@ export default function PpdbDashboardPage() {
     kk?: string;
     rekomendasi?: string;
     suratPernyataan?: string;
+    buktiOrtuGuru?: string;
   }>({});
+
+  // Isu 5: Teacher proof upload file
+  const [buktiOrtuGuruFile, setBuktiOrtuGuruFile] = useState<File | null>(null);
+
+  // Isu 4: Multi-student selector (satu email untuk beberapa siswa)
+  const [selectedPendaftaranId, setSelectedPendaftaranId] = useState<number | null>(null);
 
   const clearAutoSaveTimer = useCallback(() => {
     if (!autoSaveTimerRef.current) return;
@@ -111,6 +118,7 @@ export default function PpdbDashboardPage() {
 
   const resetPendingFiles = useCallback(() => {
     setFiles(initialPpdbDashboardFiles);
+    setBuktiOrtuGuruFile(null);
     setFilePreviewUrls((prev) => {
       Object.values(prev).forEach((url) => {
         if (url?.startsWith('blob:')) {
@@ -515,6 +523,40 @@ export default function PpdbDashboardPage() {
           </div>
         </div>
 
+        {/* Multi-student selector (Isu 4) */}
+        {data?.daftarPendaftaran && data.daftarPendaftaran.length > 1 && (
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="student-selector" className="text-sm font-medium mb-2 block">
+                    Pilih Siswa/Calon Santri
+                  </Label>
+                  <Select
+                    value={selectedPendaftaranId ? String(selectedPendaftaranId) : ''}
+                    onValueChange={(v) => setSelectedPendaftaranId(v ? Number(v) : null)}
+                  >
+                    <SelectTrigger id="student-selector">
+                      <SelectValue placeholder="Pilih siswa..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {data.daftarPendaftaran.map((pendaftar) => (
+                        <SelectItem key={pendaftar.id_pendaftaran} value={String(pendaftar.id_pendaftaran)}>
+                          {pendaftar.nama_calon || pendaftar.namaCalon || 'Calon Santri'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-6">
+                  <Info className="w-4 h-4" />
+                  <span>Satu email untuk {data.daftarPendaftaran.length} siswa</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="bg-primary/5 border-primary/10">
             <CardContent className="p-4">
@@ -854,6 +896,49 @@ export default function PpdbDashboardPage() {
                     </a>
                   ) : null}
                 </div>
+
+                {/* Isu 5: Bukti Orang Tua/Guru Upload */}
+                <div className="space-y-2">
+                  <Label htmlFor="bukti-ortu-guru">Bukti Orang Tua / Guru (Jika berlaku)</Label>
+                  <Input
+                    id="bukti-ortu-guru"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      setBuktiOrtuGuruFile(file);
+                      setFilePreviewUrls((prev) => {
+                        const currentUrl = prev.buktiOrtuGuru;
+                        if (currentUrl?.startsWith('blob:')) {
+                          URL.revokeObjectURL(currentUrl);
+                        }
+                        return {
+                          ...prev,
+                          buktiOrtuGuru: file ? URL.createObjectURL(file) : undefined,
+                        };
+                      });
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">Untuk orang tua/wali yang berprofesi sebagai guru</p>
+                  {filePreviewUrls.buktiOrtuGuru && (
+                    <div className="space-y-1">
+                      {buktiOrtuGuruFile?.type === 'application/pdf' ? (
+                        <iframe src={filePreviewUrls.buktiOrtuGuru} className="w-full h-36 rounded border border-border/50" title="Preview Bukti Orang Tua/Guru" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={filePreviewUrls.buktiOrtuGuru} alt="Preview Bukti Orang Tua/Guru" className="max-h-28 rounded border border-border/50 object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                      )}
+                    </div>
+                  )}
+                  {data?.buktiOrtuGuruUrl && !filePreviewUrls.buktiOrtuGuru ? (
+                    <a href={data.buktiOrtuGuruUrl} target="_blank" rel="noreferrer" download
+                      className="text-xs text-primary hover:underline inline-flex items-center gap-1">
+                      <Paperclip className="w-3 h-3" />
+                      Lihat Bukti Orang Tua/Guru Tersimpan
+                    </a>
+                  ) : null}
+                </div>
               </div>
 
               {[
@@ -862,6 +947,7 @@ export default function PpdbDashboardPage() {
                 { label: 'Akta/KK', value: data?.berkasAktaKkUrl },
                 { label: 'Rekomendasi Ustadz', value: data?.berkasRekomendasiUstadzUrl },
                 { label: 'Surat Pernyataan', value: data?.berkasSuratPernyataanUrl },
+                { label: 'Bukti Orang Tua/Guru', value: data?.buktiOrtuGuruUrl },
               ].some((item) => Boolean(item.value)) ? (
                 <div className="rounded-lg border border-border p-4 bg-background space-y-3">
                   <div>
@@ -877,6 +963,7 @@ export default function PpdbDashboardPage() {
                       { label: 'Akta/KK', value: data?.berkasAktaKkUrl },
                       { label: 'Rekomendasi Ustadz', value: data?.berkasRekomendasiUstadzUrl },
                       { label: 'Surat Pernyataan', value: data?.berkasSuratPernyataanUrl },
+                      { label: 'Bukti Orang Tua/Guru', value: data?.buktiOrtuGuruUrl },
                     ]
                       .filter((item) => Boolean(item.value))
                       .map((item) => (

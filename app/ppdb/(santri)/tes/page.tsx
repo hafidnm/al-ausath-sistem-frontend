@@ -14,6 +14,14 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppdb/santri';
 
+// Issue 2: Construct full image URL from backend path
+const getImageUrl = (path?: string): string | null => {
+  if (!path) return null;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  const base = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/api\/?$/, '');
+  return `${base}/storage/${path.replace(/^\//, '')}`;
+};
+
 export default function PpdbTesPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -178,9 +186,22 @@ export default function PpdbTesPage() {
                       <h3 className="font-semibold border-b pb-2">Lembar Jawaban</h3>
                       {data.formSchema.map((q, idx) => (
                         <div key={q.id} className="space-y-3">
-                          <Label className="text-base font-medium flex items-start gap-2">
+                          <Label className={`text-base font-medium flex items-start gap-2 ${data.is_rtl ? 'flex-row-reverse text-right' : ''}`}
+                            dir={data.is_rtl ? 'rtl' : 'ltr'}>
                             <span>{idx + 1}.</span> <span>{q.question}</span>
                           </Label>
+                          {/* Issue 2: Gambar pendukung soal */}
+                          {q.image_url && getImageUrl(q.image_url) && (
+                            <div className={data.is_rtl ? 'flex justify-end' : ''}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={getImageUrl(q.image_url) || ''}
+                                alt={`Gambar soal ${idx + 1}`}
+                                className="max-h-48 rounded-lg border border-border/50 object-contain"
+                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                              />
+                            </div>
+                          )}
                           <div className="pl-6">
                             {q.type === 'multiple_choice' && q.options ? (
                               <RadioGroup
@@ -188,9 +209,10 @@ export default function PpdbTesPage() {
                                 value={answersMap[q.id] || ''}
                                 onValueChange={(val) => setAnswersMap(prev => ({ ...prev, [q.id]: val }))}
                                 className="space-y-2"
+                                dir={data.is_rtl ? 'rtl' : 'ltr'}
                               >
                                 {q.options.map((opt, i) => (
-                                  <div key={i} className="flex items-center space-x-2">
+                                  <div key={i} className={`flex items-center space-x-2 ${data.is_rtl ? 'flex-row-reverse space-x-reverse' : ''}`}>
                                     <RadioGroupItem value={opt} id={`q-${q.id}-opt-${i}`} />
                                     <Label htmlFor={`q-${q.id}-opt-${i}`} className="font-normal cursor-pointer">{opt}</Label>
                                   </div>
@@ -201,8 +223,9 @@ export default function PpdbTesPage() {
                                 disabled={submitLoading || data.tesSubmitted}
                                 value={answersMap[q.id] || ''}
                                 onChange={(e) => setAnswersMap(prev => ({ ...prev, [q.id]: e.target.value }))}
-                                placeholder="Ketik jawaban Anda..."
-                                className="min-h-[100px]"
+                                placeholder={data.is_rtl ? 'اكتب إجابتك هنا...' : 'Ketik jawaban Anda...'}
+                                className={`min-h-[100px] ${data.is_rtl ? 'text-right' : ''}`}
+                                dir={data.is_rtl ? 'rtl' : 'ltr'}
                               />
                             )}
                           </div>

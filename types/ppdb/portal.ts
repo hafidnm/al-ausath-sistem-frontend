@@ -85,6 +85,8 @@ export interface PpdbPortalFormRequest {
   dokumen_rekomendasi_ustadz?: File | null;
   dokumenSuratPernyataan?: File | null;
   dokumen_surat_pernyataan?: File | null;
+  /** Bukti dokumen orang tua guru (untuk diskon anak guru) */
+  bukti_ortu_guru?: File | null;
   fileAktaPath?: string;
   file_akta_path?: string;
   fileKkPath?: string;
@@ -175,6 +177,12 @@ export interface PpdbPortalDashboard {
   buktiSppUrl?: string;
   nomorIndukGenerated?: string;
   kodeKelasDiterima?: string;
+  /** URL dokumen bukti orang tua guru */
+  buktiOrtuGuruUrl?: string;
+  /** Status verifikasi bukti orang tua guru oleh admin */
+  buktiOrtuGuruVerified?: boolean | null;
+  /** Daftar pendaftaran lain dalam akun yang sama (untuk sibling) */
+  daftarPendaftaran?: Array<{ id_pendaftaran: string; nama_calon: string; step: string }>;
 }
 
 export interface PpdbPortalBillingOption {
@@ -213,6 +221,10 @@ export interface PpdbPortalTesStatus {
   tesDescription: string;
   step: PpdbPortalStep;
   message: string;
+  /** Apakah soal menggunakan tata letak RTL (Arab) */
+  is_rtl?: boolean;
+  /** Bahasa soal: 'id' atau 'ar' */
+  bahasa?: 'id' | 'ar';
 }
 
 export interface PpdbPortalTesJawabRequest {
