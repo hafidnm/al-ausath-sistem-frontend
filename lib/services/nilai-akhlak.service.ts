@@ -20,6 +20,13 @@ export interface GetNilaiAkhlakParams {
   per_page?: string
 }
 
+export interface GetAkhlakKelasIndexParams {
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+  aspek?: string
+}
+
 export interface UpsertNilaiAkhlakPayload {
   nomor_induk: string
   tahun_ajaran: string
@@ -103,6 +110,11 @@ export const nilaiAkhlakService = {
   async getAll(params: GetNilaiAkhlakParams): Promise<NilaiAkhlakItem[]> {
     const response = await api.get("/akademik/nilai-akhlak", { params })
     return extractList(response.data).map(normalizeNilaiAkhlakItem)
+  },
+
+  async getKelasIndex(params: GetAkhlakKelasIndexParams): Promise<any[]> {
+    const response = await api.get('/akademik/nilai-akhlak/kelas', { params })
+    return response.data.data
   },
 
   async getAllBar(params?: GetNilaiAkhlakParams): Promise<NilaiAkhlakItem[]> {
