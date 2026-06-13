@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import {
   Search,
   Save,
@@ -67,13 +69,21 @@ export default function NilaiPage() {
   const [selectedKelas, setSelectedKelas] = useState("")
   const [selectedMapel, setSelectedMapel] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false)
   const [nilaiData, setNilaiData] = useState(initialNilaiData)
   const [hasChanges, setHasChanges] = useState(false)
 
-  const filteredData = nilaiData.filter((item) =>
-    item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.nis.includes(searchQuery)
-  )
+  const filteredData = nilaiData.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || item.nis.includes(searchQuery)
+    if (!matchesSearch) return false
+
+    if (showIncompleteOnly) {
+      const isComplete = item.tugas1 != null && item.tugas2 != null && item.uts != null && item.uas != null
+      return !isComplete
+    }
+
+    return true
+  })
 
   const handleNilaiChange = (id: number, field: string, value: string) => {
     const numValue = value === "" ? null : Number(value)
@@ -256,14 +266,26 @@ export default function NilaiPage() {
                 </CardTitle>
                 <CardDescription>Semester Ganjil 2024/2025</CardDescription>
               </div>
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Cari santri..."
-                  className="pl-9"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="incomplete-mode"
+                    checked={showIncompleteOnly}
+                    onCheckedChange={setShowIncompleteOnly}
+                  />
+                  <Label htmlFor="incomplete-mode" className="text-sm font-medium cursor-pointer">
+                    Belum Lengkap Saja
+                  </Label>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Cari santri..."
+                    className="pl-9"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -288,12 +310,20 @@ export default function NilaiPage() {
                     const rata = calculateRata(item)
                     const predikat = getPredikat(rata)
                     const isBelowKKM = rata !== "-" && parseFloat(rata) < 75
+                    const isEmpty = item.tugas1 == null && item.tugas2 == null && item.uts == null && item.uas == null
 
                     return (
-                      <TableRow key={item.id} className="border-border">
+                      <TableRow key={item.id} className={`border-border ${isEmpty ? 'bg-destructive/5 hover:bg-destructive/10' : ''}`}>
                         <TableCell className="text-muted-foreground">{index + 1}</TableCell>
                         <TableCell className="text-foreground font-mono text-sm">{item.nis}</TableCell>
-                        <TableCell className="text-foreground font-medium">{item.name}</TableCell>
+                        <TableCell className="text-foreground font-medium">
+                          {item.name}
+                          {isEmpty && (
+                            <Badge variant="outline" className="ml-2 text-destructive border-destructive/30 text-[10px] uppercase">
+                              Kosong
+                            </Badge>
+                          )}
+                        </TableCell>
                         <TableCell>
                           <Input
                             type="number"

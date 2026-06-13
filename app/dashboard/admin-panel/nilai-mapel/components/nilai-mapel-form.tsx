@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -14,29 +14,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, Plus, Trash2, Check } from "lucide-react"
 import {
-  NilaiMapelTugasItem,
-  NilaiMapelUlanganItem,
-  UpsertNilaiMapelPayload,
-} from "@/lib/services/nilai-mapel.service"
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2 } from "lucide-react"
+
+import { nilaiMapelService, UpsertNilaiMapelPayload } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
 import { bobotNilaiService } from "@/lib/services/bobot-nilai.service"
+import { kelasService } from "@/lib/services/kelas.service"
+import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { authService } from "@/lib/services/auth.service"
-import { santriService, type SantriItem } from "@/lib/services/santri.service"
-import { mataPelajaranService, type MataPelajaranItem } from "@/lib/services/mata-pelajaran.service"
-import { semesterOptions, tahunAjaranOptions, jenisTugasOptions } from "../utils/constants"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
+import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 
-interface NilaiMapelFormProps {
-  initialNomorInduk?: string
-  onSubmit?: (data: UpsertNilaiMapelPayload) => Promise<void> | void
-  onCancel?: () => void
+interface SantriRow {
+  id: number
+  nomor_induk: string
+  nama_santri: string
+  tugas1: string
+  tugas2: string
+  tugas3: string
+  uh1: string
+  uh2: string
+  uh3: string
+  uas: string
+  keterangan: string
+  isDirty: boolean
+  originalNilai?: any
 }
-
-type TugasFormItem = Omit<NilaiMapelTugasItem, "nilai"> & { nilai: string }
-type UlanganFormItem = Omit<NilaiMapelUlanganItem, "nilai"> & { nilai: string }
 
 const extractPetugasInputId = (me: any): number | undefined => {
   const candidates = [
@@ -51,888 +62,375 @@ const extractPetugasInputId = (me: any): number | undefined => {
     me?.user?.id,
     me?.id,
   ]
-
   for (const candidate of candidates) {
     const id = Number(candidate)
-    if (Number.isFinite(id) && id > 0) {
-      return id
-    }
+    if (Number.isFinite(id) && id > 0) return id
   }
-
   return undefined
 }
 
-const defaultTugas: TugasFormItem[] = [
-  { nilai: "", jenis: "PR" },
-  { nilai: "", jenis: "TUGAS_PENGGANTI" },
-  { nilai: "", jenis: "MODUL_KOMPETENSI" },
-]
-
-const defaultUlangan: UlanganFormItem[] = [
-  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
-  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
-  { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true },
-]
-
-const normalizeNilaiInput = (value: string): number => {
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed)) return 0
-  return Math.max(0, Math.min(100, parsed))
+const parseNilai = (val: string): number => {
+  const n = Number(val)
+  return isNaN(n) ? 0 : Math.max(0, Math.min(100, n))
 }
 
-const toErrorMessage = (error: any): string => {
-  const message = error?.response?.data?.message
-  const errors = error?.response?.data?.errors
-
-  if (typeof message === "string" && message) return message
-
-  if (errors && typeof errors === "object") {
-    const firstField = Object.keys(errors)[0]
-    const firstValue = errors[firstField]
-
-    if (Array.isArray(firstValue) && firstValue.length > 0) {
-      return String(firstValue[0])
-    }
-
-    if (typeof firstValue === "string") {
-      return firstValue
-    }
-  }
-
-  return "Gagal menyimpan nilai mapel"
-}
-
-const normalizeUnitCode = (value?: string | null): string => (value ?? "").trim().toUpperCase()
-
-export function NilaiMapelForm({ initialNomorInduk = "", onSubmit, onCancel }: NilaiMapelFormProps) {
-  const [selectedNomorInduk, setSelectedNomorInduk] = useState(initialNomorInduk)
-  const [selectedNama, setSelectedNama] = useState("")
-  const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
-  const [selectedSantriKodeUnit, setSelectedSantriKodeUnit] = useState("")
-  const [isHydratingSantriUnit, setIsHydratingSantriUnit] = useState(false)
-  const [searchInput, setSearchInput] = useState("")
-  const [santriResults, setSantriResults] = useState<SantriItem[]>([])
-  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
-  const [santriSearchError, setSantriSearchError] = useState("")
-  const [openSantriPopover, setOpenSantriPopover] = useState(false)
-  const [kodeMapel, setKodeMapel] = useState("")
-  const [mapelSearchInput, setMapelSearchInput] = useState("")
-  const [mapelResults, setMapelResults] = useState<MataPelajaranItem[]>([])
-  const [isLoadingMapel, setIsLoadingMapel] = useState(false)
-  const [mapelSearchError, setMapelSearchError] = useState("")
-  const [openMapelPopover, setOpenMapelPopover] = useState(false)
-  const [selectedNamaMapel, setSelectedNamaMapel] = useState("")
-  const [selectedMapelId, setSelectedMapelId] = useState<number | null>(null)
-  const [isKodeMapelManual, setIsKodeMapelManual] = useState(true)
+export function NilaiMapelForm() {
+  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
+  const [mapelOptions, setMapelOptions] = useState<{value: string, label: string}[]>([])
+  
   const [kodeKelas, setKodeKelas] = useState("")
-  const [isKodeKelasManual, setIsKodeKelasManual] = useState(true)
-  const [tahunAjaran, setTahunAjaran] = useState("")
-  const [semester, setSemester] = useState("")
-  const [keterangan, setKeterangan] = useState("")
-  const [ujianAkhir, setUjianAkhir] = useState("")
-  const [tugas, setTugas] = useState<TugasFormItem[]>(defaultTugas)
-  const [ulangan, setUlangan] = useState<UlanganFormItem[]>(defaultUlangan)
-  const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
+  const [kodeMapel, setKodeMapel] = useState("")
+  const [tahunAjaran, setTahunAjaran] = useState("2024/2025")
+  const [semester, setSemester] = useState("1")
+
+  const [santris, setSantris] = useState<SantriRow[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false)
+  
   const [nilaiKkm, setNilaiKkm] = useState<number | undefined>(undefined)
-  const [isLoadingKkm, setIsLoadingKkm] = useState(false)
   const [bobot, setBobot] = useState({ tugas: 20, ulangan: 30, ujian: 50 })
-  const [isLoadingBobot, setIsLoadingBobot] = useState(false)
-  const [isUserReady, setIsUserReady] = useState(false)
+  const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [successMsg, setSuccessMsg] = useState("")
 
-  const normalizeCode = (value: string): string => value.trim().toUpperCase()
-
-  const applySelectedSantri = (santri: SantriItem) => {
-    const normalizedSantriId = Number.isFinite(santri.id) && santri.id > 0 ? santri.id : null
-
-    setSelectedNomorInduk(santri.nomor_induk)
-    setSelectedNama(santri.nama_lengkap ?? "")
-    setSelectedSantriId(normalizedSantriId)
-    setSelectedSantriKodeUnit(normalizeUnitCode(santri.kode_unit))
-
-    // Reset mapel when santri changes to avoid cross-unit selection.
-    setKodeMapel("")
-    setSelectedNamaMapel("")
-    setSelectedMapelId(null)
-    setMapelSearchInput("")
-    setMapelResults([])
-
-    const kodeKelasSantri = santri.kode_kelas ?? santri.kelas
-
-    if (kodeKelasSantri) {
-      setKodeKelas(kodeKelasSantri)
-      setIsKodeKelasManual(false)
-    } else {
-      setIsKodeKelasManual(true)
-    }
-
-    setSearchInput("")
-    setOpenSantriPopover(false)
-  }
-
-  const applySelectedMapel = (mapel: MataPelajaranItem) => {
-    setKodeMapel(mapel.kode_mapel)
-    setSelectedNamaMapel(mapel.nama_mapel ?? "")
-    setSelectedMapelId(mapel.id)
-    setIsKodeMapelManual(false)
-    setMapelSearchInput("")
-    setOpenMapelPopover(false)
-  }
-
+  // Load User, Kelas, Mapel
   useEffect(() => {
-    const loadUser = async () => {
-      const me = await authService.me()
-      const id = extractPetugasInputId(me)
-      setPetugasInputId(id)
-      setIsUserReady(true)
-    }
-
-    loadUser()
+    authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
+    kelasService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setKelasOptions(res.map(k => ({ value: k.kode_kelas, label: k.nama_kelas ?? k.kode_kelas }))))
+      .catch(console.error)
+    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setMapelOptions(res.map(m => ({ value: m.kode_mapel, label: m.nama_mapel ?? m.kode_mapel }))))
+      .catch(console.error)
   }, [])
 
+  // Load KKM and Bobot when mapel/ta/semester change
   useEffect(() => {
-    if (!searchInput.trim()) {
-      setSantriResults([])
-      setSantriSearchError("")
-      return
-    }
-
-    let cancelled = false
-
-    const searchSantri = async () => {
-      try {
-        setIsLoadingSantri(true)
-        setSantriSearchError("")
-        // Search API support both nomor_induk and nama
-        const results = await santriService.search(searchInput.trim())
-        if (!cancelled) {
-          setSantriResults(results)
-        }
-      } catch {
-        if (!cancelled) {
-          setSantriResults([])
-          setSantriSearchError("Gagal mengambil data santri dari server")
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSantri(false)
-        }
-      }
-    }
-
-    const timer = setTimeout(searchSantri, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [searchInput])
-
-  useEffect(() => {
-    const query = searchInput.trim().toLowerCase()
-    if (!query || selectedSantriId) return
-
-    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-    if (exact) {
-      applySelectedSantri(exact)
-    }
-  }, [santriResults, searchInput, selectedSantriId])
-
-  useEffect(() => {
-    const query = mapelSearchInput.trim().toLowerCase()
-    if (!query || selectedMapelId) return
-
-    const exact = mapelResults.find(
-      (item) => item.kode_mapel.trim().toLowerCase() === query || item.nama_mapel?.trim().toLowerCase() === query
-    )
-    if (exact) {
-      applySelectedMapel(exact)
-    }
-  }, [mapelResults, mapelSearchInput, selectedMapelId])
-
-  useEffect(() => {
-    if (!selectedNomorInduk.trim() || selectedSantriKodeUnit) return
-
-    let cancelled = false
-
-    const hydrateSelectedSantriUnit = async () => {
-      try {
-        setIsHydratingSantriUnit(true)
-
-        const nomorInduk = selectedNomorInduk.trim()
-        const rows = await santriService.getAll({
-          q: nomorInduk,
-          per_page: "10",
-        })
-
-        const matched = rows.find((row) => row.nomor_induk.trim() === nomorInduk)
-        const kodeUnitFromList = normalizeUnitCode(matched?.kode_unit)
-
-        if (!cancelled && kodeUnitFromList) {
-          setSelectedSantriKodeUnit(kodeUnitFromList)
-          return
-        }
-
-        if (selectedSantriId && selectedSantriId > 0) {
-          const detail = await santriService.getById(selectedSantriId)
-          const kodeUnit = normalizeUnitCode(detail.kode_unit)
-
-          if (!cancelled && kodeUnit) {
-            setSelectedSantriKodeUnit(kodeUnit)
-          }
-        }
-      } catch {
-        // Keep graceful fallback to existing validation message.
-      } finally {
-        if (!cancelled) {
-          setIsHydratingSantriUnit(false)
-        }
-      }
-    }
-
-    hydrateSelectedSantriUnit()
-
-    return () => {
-      cancelled = true
-    }
-  }, [selectedNomorInduk, selectedSantriId, selectedSantriKodeUnit])
-
-  useEffect(() => {
-    if (!mapelSearchInput.trim()) {
-      setMapelResults([])
-      setMapelSearchError("")
-      return
-    }
-
-    if (!selectedNomorInduk.trim()) {
-      setMapelResults([])
-      setMapelSearchError("Pilih santri terlebih dahulu agar mapel terfilter sesuai unit")
-      return
-    }
-
-    if (isHydratingSantriUnit) {
-      setMapelResults([])
-      setMapelSearchError("Memuat unit santri...")
-      return
-    }
-
-    if (!selectedSantriKodeUnit) {
-      setMapelResults([])
-      setMapelSearchError("Unit santri belum ditemukan, silakan pilih ulang data santri")
-      return
-    }
-
-    let cancelled = false
-
-    const searchMapel = async () => {
-      try {
-        setIsLoadingMapel(true)
-        setMapelSearchError("")
-        const results = await mataPelajaranService.search(mapelSearchInput.trim(), 20, {
-          kode_unit: selectedSantriKodeUnit,
-        })
-        if (!cancelled) {
-          const filtered = results.filter((item) => {
-            const mapelKodeUnit = (item.kode_unit ?? "").trim().toUpperCase()
-            return mapelKodeUnit === selectedSantriKodeUnit
-          })
-          setMapelResults(filtered)
-
-          if (filtered.length === 0) {
-            setMapelSearchError("Tidak ada mapel aktif untuk unit santri yang dipilih")
-          }
-        }
-      } catch {
-        if (!cancelled) {
-          setMapelResults([])
-          setMapelSearchError("Gagal mengambil data mata pelajaran dari server")
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingMapel(false)
-        }
-      }
-    }
-
-    const timer = setTimeout(searchMapel, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [isHydratingSantriUnit, mapelSearchInput, selectedNomorInduk, selectedSantriKodeUnit])
-
-  useEffect(() => {
-    const kodeMapelTrimmed = kodeMapel.trim()
-    if (!kodeMapelTrimmed || !tahunAjaran || !semester) {
-      setNilaiKkm(undefined)
-      return
-    }
-
-    let cancelled = false
-
-    const loadKkm = async () => {
-      try {
-        setIsLoadingKkm(true)
-        let rows = await kkmService.getAll({
-          kode_mapel: kodeMapelTrimmed,
-          tahun_ajaran: tahunAjaran,
-          semester: Number(semester),
-          per_page: "10",
-        })
-
-        // Fallback: beberapa backend mengabaikan/mismatch filter tahun/semester.
-        // Ambil by kode_mapel lalu pilih baris paling relevan di frontend.
-        if (rows.length === 0) {
-          rows = await kkmService.getAll({
-            kode_mapel: kodeMapelTrimmed,
-            per_page: "50",
-          })
-        }
-
-        if (cancelled) return
-
-        const kodeMapelNormalized = normalizeCode(kodeMapelTrimmed)
-        const selected = rows.find((row) => (
-          normalizeCode(row.kode_mapel) === kodeMapelNormalized
-          && row.tahun_ajaran === tahunAjaran
-          && String(row.semester) === semester
-        ))
-          ?? rows.find((row) => normalizeCode(row.kode_mapel) === kodeMapelNormalized)
-          ?? rows[0]
-
-        setNilaiKkm(selected?.nilai_kkm)
-      } catch {
-        if (!cancelled) {
-          setNilaiKkm(undefined)
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingKkm(false)
-        }
-      }
-    }
-
-    loadKkm()
-
-    return () => {
-      cancelled = true
-    }
+    if (!kodeMapel || !tahunAjaran || !semester) return
+    kkmService.getAll({ kode_mapel: kodeMapel, tahun_ajaran: tahunAjaran, semester: Number(semester) })
+      .then(res => {
+        if (res.length > 0) setNilaiKkm(res[0].nilai_kkm)
+        else setNilaiKkm(75) // default
+      })
+      .catch(() => setNilaiKkm(75))
+      
+    bobotNilaiService.getAll({ tahun_ajaran: tahunAjaran, semester: Number(semester) })
+      .then(res => {
+        const b = res.data?.[0]
+        if (b) setBobot({ tugas: b.bobot_harian, ulangan: b.bobot_uts, ujian: b.bobot_uas })
+      })
+      .catch(console.error)
   }, [kodeMapel, tahunAjaran, semester])
 
+  // Fetch Data Santri and existing Nilai
   useEffect(() => {
-    if (!tahunAjaran || !semester) {
-      setBobot({ tugas: 20, ulangan: 30, ujian: 50 })
+    if (!kodeKelas || !kodeMapel || !tahunAjaran || !semester) {
+      setSantris([])
       return
     }
 
-    let cancelled = false
+    setIsLoading(true)
+    setError("")
+    setSuccessMsg("")
 
-    const loadBobot = async () => {
-      try {
-        setIsLoadingBobot(true)
-        const response = await bobotNilaiService.getAll({
-          tahun_ajaran: tahunAjaran,
-          semester: Number(semester),
-          per_page: "1",
+    nilaiMapelService.getKelasIndex({ kode_kelas: kodeKelas, kode_mapel: kodeMapel, tahun_ajaran: tahunAjaran, semester: Number(semester) })
+      .then(data => {
+        const rows: SantriRow[] = data.map(item => {
+          const n = item.nilai
+          const tugas = n?.tugas || []
+          const ulangan = n?.ulangan || []
+          
+          let t1 = tugas[0]?.nilai?.toString() || ""
+          let t2 = tugas[1]?.nilai?.toString() || ""
+          let t3 = tugas[2]?.nilai?.toString() || ""
+          let uh1 = ulangan[0]?.nilai?.toString() || ""
+          let uh2 = ulangan[1]?.nilai?.toString() || ""
+          let uh3 = ulangan[2]?.nilai?.toString() || ""
+          let uas = (n?.ujian_akhir ?? n?.nilai_uas)?.toString() || ""
+
+          if (!t1 && !t2 && !t3 && n?.nilai_harian != null) {
+            t1 = n.nilai_harian.toString()
+            t2 = n.nilai_harian.toString()
+            t3 = n.nilai_harian.toString()
+          }
+          if (!uh1 && !uh2 && !uh3 && n?.nilai_uts != null) {
+            uh1 = n.nilai_uts.toString()
+            uh2 = n.nilai_uts.toString()
+            uh3 = n.nilai_uts.toString()
+          }
+
+          return {
+            id: item.id,
+            nomor_induk: item.nomor_induk,
+            nama_santri: item.nama_santri,
+            tugas1: t1,
+            tugas2: t2,
+            tugas3: t3,
+            uh1: uh1,
+            uh2: uh2,
+            uh3: uh3,
+            uas: uas,
+            keterangan: n?.keterangan || "",
+            isDirty: false,
+            originalNilai: n,
+          }
         })
+        setSantris(rows)
+      })
+      .catch(err => {
+        console.error(err)
+        setError("Gagal memuat data santri untuk kelas ini.")
+      })
+      .finally(() => setIsLoading(false))
 
-        if (cancelled) return
+  }, [kodeKelas, kodeMapel, tahunAjaran, semester])
 
-        const bobotItem = response.data?.[0]
-        if (bobotItem) {
-          setBobot({
-            tugas: bobotItem.bobot_harian,
-            ulangan: bobotItem.bobot_uts,
-            ujian: bobotItem.bobot_uas,
-          })
-        } else {
-          setBobot({ tugas: 20, ulangan: 30, ujian: 50 })
-        }
-      } catch {
-        if (!cancelled) {
-          setBobot({ tugas: 20, ulangan: 30, ujian: 50 })
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingBobot(false)
-        }
+  const handleInputChange = (nomor_induk: string, field: keyof SantriRow, value: string) => {
+    setSantris(prev => prev.map(s => {
+      if (s.nomor_induk === nomor_induk) {
+        return { ...s, [field]: value, isDirty: true }
       }
-    }
-
-    loadBobot()
-
-    return () => {
-      cancelled = true
-    }
-  }, [tahunAjaran, semester])
-
-  const preview = useMemo(() => {
-    const tugasForCalc: NilaiMapelTugasItem[] = tugas.map((item) => ({
-      ...item,
-      nilai: normalizeNilaiInput(item.nilai),
+      return s
     }))
-    const ulanganForCalc: NilaiMapelUlanganItem[] = ulangan.map((item) => ({
-      ...item,
-      nilai: normalizeNilaiInput(item.nilai),
-    }))
-
-    const raw = calculateRaporRaw(tugasForCalc, ulanganForCalc, normalizeNilaiInput(ujianAkhir), bobot)
-    const normalized = normalizeRaporDisplay(raw)
-    const status = statusKkm(normalized.nilai, nilaiKkm ?? 75)
-
-    return {
-      raw,
-      nilai: normalized.nilai,
-      isRed: normalized.isRed,
-      status,
-    }
-  }, [bobot, nilaiKkm, tugas, ulangan, ujianAkhir])
-
-  const updateTugas = (index: number, patch: Partial<TugasFormItem>) => {
-    setTugas((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
   }
 
-  const updateUlangan = (index: number, patch: Partial<UlanganFormItem>) => {
-    setUlangan((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)))
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!selectedNomorInduk.trim() || !kodeMapel.trim() || !kodeKelas.trim() || !tahunAjaran || !semester) {
-      setError("Nomor induk, kode mapel, kode kelas, tahun ajaran, dan semester wajib diisi")
-      return
-    }
-
-    if (tugas.length < 3) {
-      setError("Minimal 3 item tugas wajib diisi")
-      return
-    }
-
-    if (ulangan.length < 3) {
-      setError("Minimal 3 item ulangan wajib diisi")
-      return
-    }
-
-    if (ulangan.some((item) => !item.soal_disusun_pengajar || !item.diawasi_pengajar)) {
-      setError("Setiap ulangan wajib memiliki soal disusun pengajar dan diawasi pengajar")
-      return
-    }
-
-    if (!isUserReady) {
-      setError("Data user belum siap, tunggu sebentar lalu coba simpan lagi")
-      return
-    }
-
+  const handleSave = async () => {
     if (!petugasInputId) {
-      setError("ID petugas input tidak ditemukan dari akun login. Silakan refresh halaman atau cek data akun petugas")
+      setError("ID Petugas tidak ditemukan.")
       return
     }
 
-    if (nilaiKkm == null) {
-      setError("KKM mapel belum ditemukan. Pastikan KKM mapel sudah disetting untuk tahun ajaran dan semester ini")
+    const dirtyRows = santris.filter(s => s.isDirty)
+    if (dirtyRows.length === 0) {
+      setError("Tidak ada perubahan untuk disimpan.")
       return
     }
+
+    setIsSaving(true)
+    setError("")
+    setSuccessMsg("")
 
     try {
-      setIsSubmitting(true)
-      setError("")
-
-      const tugasPayload: NilaiMapelTugasItem[] = tugas.map((item) => ({
-        ...item,
-        nilai: normalizeNilaiInput(item.nilai),
-      }))
-      const ulanganPayload: NilaiMapelUlanganItem[] = ulangan.map((item) => ({
-        ...item,
-        nilai: normalizeNilaiInput(item.nilai),
-      }))
-
-      await onSubmit?.({
-        nomor_induk: selectedNomorInduk.trim(),
-        kode_mapel: kodeMapel.trim(),
-        kode_kelas: kodeKelas.trim(),
-        tahun_ajaran: tahunAjaran,
-        semester: Number(semester),
-        id_petugas_input: petugasInputId,
-        keterangan: keterangan.trim() || undefined,
-        tugas: tugasPayload,
-        ulangan: ulanganPayload,
-        ujian_akhir: normalizeNilaiInput(ujianAkhir),
-      })
-    } catch (err) {
-      setError(toErrorMessage(err))
+      for (const row of dirtyRows) {
+        const payload: UpsertNilaiMapelPayload = {
+          nomor_induk: row.nomor_induk,
+          kode_mapel: kodeMapel,
+          kode_kelas: kodeKelas,
+          tahun_ajaran: tahunAjaran,
+          semester: Number(semester),
+          id_petugas_input: petugasInputId,
+          keterangan: row.keterangan || undefined,
+          tugas: [
+            { nilai: parseNilai(row.tugas1), jenis: "PR" },
+            { nilai: parseNilai(row.tugas2), jenis: "TUGAS_PENGGANTI" },
+            { nilai: parseNilai(row.tugas3), jenis: "MODUL_KOMPETENSI" },
+          ],
+          ulangan: [
+            { nilai: parseNilai(row.uh1), soal_disusun_pengajar: true, diawasi_pengajar: true },
+            { nilai: parseNilai(row.uh2), soal_disusun_pengajar: true, diawasi_pengajar: true },
+            { nilai: parseNilai(row.uh3), soal_disusun_pengajar: true, diawasi_pengajar: true },
+          ],
+          ujian_akhir: parseNilai(row.uas)
+        }
+        await nilaiMapelService.upsert(payload)
+      }
+      
+      setSuccessMsg(`Berhasil menyimpan nilai untuk ${dirtyRows.length} santri.`)
+      // Reset dirty flag
+      setSantris(prev => prev.map(s => ({ ...s, isDirty: false })))
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menyimpan beberapa nilai.")
     } finally {
-      setIsSubmitting(false)
+      setIsSaving(false)
     }
   }
 
+  const filteredSantris = useMemo(() => {
+    return santris.filter(s => {
+      const matchSearch = s.nama_santri.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.nomor_induk.includes(searchQuery)
+      const isIncomplete = !s.tugas1 || !s.tugas2 || !s.tugas3 || !s.uh1 || !s.uh2 || !s.uh3 || !s.uas
+      return matchSearch && (showIncompleteOnly ? isIncomplete : true)
+    })
+  }, [santris, searchQuery, showIncompleteOnly])
+
   return (
-    <Card className="border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg text-foreground">Input Nilai Mapel</CardTitle>
-        <CardDescription>Minimal 3 tugas dan 3 ulangan, serta validasi aturan nilai rapor</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <Alert className="bg-destructive/10 border-destructive/30">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              <AlertDescription className="text-destructive ml-2">{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Filter Input Nilai</CardTitle>
+          <CardDescription>Pilih kelas dan mata pelajaran untuk memulai input nilai massal.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Nomor Induk</Label>
-              <div className="relative">
-                <Input
-                  placeholder="Cari berdasarkan nomor induk atau nama..."
-                  value={selectedNomorInduk && !searchInput ? `${selectedNomorInduk}${selectedNama ? " - " + selectedNama : ""}` : searchInput}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return
-                    e.preventDefault()
-
-                    const query = searchInput.trim().toLowerCase()
-                    if (!query || santriResults.length === 0) return
-
-                    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-                    applySelectedSantri(exact ?? santriResults[0])
-                  }}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setSearchInput(value)
-                    setSelectedNomorInduk("")
-                    setSelectedNama("")
-                    setSelectedSantriId(null)
-                      setSelectedSantriKodeUnit("")
-                    setIsKodeKelasManual(true)
-                      setKodeMapel("")
-                      setSelectedNamaMapel("")
-                      setSelectedMapelId(null)
-                      setMapelSearchInput("")
-                      setMapelResults([])
-                      setMapelSearchError("")
-                    setOpenSantriPopover(true)
-                  }}
-                  onFocus={() => setOpenSantriPopover(true)}
-                  onBlur={() => {
-                    setTimeout(() => setOpenSantriPopover(false), 120)
-                  }}
-                />
-
-                {openSantriPopover && (searchInput.trim() || isLoadingSantri || santriResults.length > 0) && (
-                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
-                    {isLoadingSantri && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari santri...</div>
-                    )}
-
-                    {!isLoadingSantri && santriSearchError && (
-                      <div className="px-2 py-4 text-center text-sm text-destructive">{santriSearchError}</div>
-                    )}
-
-                    {!isLoadingSantri && !santriSearchError && santriResults.length === 0 && searchInput.trim() && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada santri ditemukan</div>
-                    )}
-
-                    {!isLoadingSantri && santriResults.length > 0 && (
-                      <div className="max-h-60 overflow-auto">
-                        {santriResults.map((santri) => (
-                          <button
-                            key={santri.id}
-                            type="button"
-                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applySelectedSantri(santri)}
-                          >
-                            <Check
-                              className={`mt-0.5 h-4 w-4 ${
-                                selectedNomorInduk === santri.nomor_induk ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">{santri.nomor_induk} - {santri.nama_lengkap}</div>
-                              {(santri.kode_kelas ?? santri.kelas) && (
-                                <div className="text-xs text-muted-foreground">{santri.kode_kelas ?? santri.kelas}</div>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Label>Kelas</Label>
+              <Select value={kodeKelas} onValueChange={setKodeKelas}>
+                <SelectTrigger><SelectValue placeholder="Pilih Kelas" /></SelectTrigger>
+                <SelectContent>
+                  {kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
-              <Label>Kode Mapel</Label>
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <Input
-                    placeholder="Cari berdasarkan kode atau nama mapel..."
-                    value={kodeMapel && !mapelSearchInput ? `${kodeMapel}${selectedNamaMapel ? " - " + selectedNamaMapel : ""}` : mapelSearchInput}
-                    disabled={!isKodeMapelManual && Boolean(selectedMapelId) && Boolean(kodeMapel.trim())}
-                    onKeyDown={(e) => {
-                      if (e.key !== "Enter") return
-                      e.preventDefault()
-
-                      const query = mapelSearchInput.trim().toLowerCase()
-                      if (!query || mapelResults.length === 0) return
-
-                      const exact = mapelResults.find((item) => item.kode_mapel.trim().toLowerCase() === query || item.nama_mapel?.trim().toLowerCase() === query)
-                      applySelectedMapel(exact ?? mapelResults[0])
-                    }}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setMapelSearchInput(value)
-                      setKodeMapel("")
-                      setSelectedNamaMapel("")
-                      setSelectedMapelId(null)
-                      setIsKodeMapelManual(true)
-                      setOpenMapelPopover(true)
-                    }}
-                  onFocus={() => setOpenMapelPopover(true)}
-                  onBlur={() => {
-                    setTimeout(() => setOpenMapelPopover(false), 120)
-                  }}
-                />
-
-                {openMapelPopover && (mapelSearchInput.trim() || isLoadingMapel || mapelResults.length > 0) && (
-                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
-                    {isLoadingMapel && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari mapel...</div>
-                    )}
-
-                    {!isLoadingMapel && mapelSearchError && (
-                      <div className="px-2 py-4 text-center text-sm text-destructive">{mapelSearchError}</div>
-                    )}
-
-                    {!isLoadingMapel && !mapelSearchError && mapelResults.length === 0 && mapelSearchInput.trim() && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada mata pelajaran ditemukan</div>
-                    )}
-
-                    {!isLoadingMapel && mapelResults.length > 0 && (
-                      <div className="max-h-60 overflow-auto">
-                        {mapelResults.map((mapel) => (
-                          <button
-                            key={mapel.id}
-                            type="button"
-                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applySelectedMapel(mapel)}
-                          >
-                            <Check
-                              className={`mt-0.5 h-4 w-4 ${
-                                selectedMapelId === mapel.id ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">{mapel.kode_mapel} - {mapel.nama_mapel}</div>
-                              {mapel.kelompok_mapel && (
-                                <div className="text-xs text-muted-foreground">{mapel.kelompok_mapel}</div>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-                </div>
-                {!isKodeMapelManual && Boolean(selectedMapelId) && Boolean(kodeMapel.trim()) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="bg-transparent"
-                    onClick={() => setIsKodeMapelManual(true)}
-                  >
-                    Ubah Manual
-                  </Button>
-                )}
-              </div>
-              {!isKodeMapelManual && Boolean(selectedMapelId) && selectedNamaMapel && (
-                <p className="text-xs text-muted-foreground">Kode mapel diisi otomatis dari opsi mapel yang tersedia.</p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label>Kode Kelas</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={kodeKelas}
-                  onChange={(e) => setKodeKelas(e.target.value)}
-                  placeholder="KLS-10A"
-                  disabled={!isKodeKelasManual && Boolean(selectedSantriId) && Boolean(kodeKelas.trim())}
-                />
-                {!isKodeKelasManual && Boolean(selectedSantriId) && Boolean(kodeKelas.trim()) && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="bg-transparent"
-                    onClick={() => setIsKodeKelasManual(true)}
-                  >
-                    Ubah Manual
-                  </Button>
-                )}
-              </div>
-              {!isKodeKelasManual && Boolean(selectedSantriId) && Boolean(kodeKelas.trim()) && (
-                <p className="text-xs text-muted-foreground">Kode kelas diisi otomatis dari data santri.</p>
-              )}
+              <Label>Mata Pelajaran</Label>
+              <Select value={kodeMapel} onValueChange={setKodeMapel}>
+                <SelectTrigger><SelectValue placeholder="Pilih Mapel" /></SelectTrigger>
+                <SelectContent>
+                  {mapelOptions.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
               <Select value={tahunAjaran} onValueChange={setTahunAjaran}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih tahun ajaran" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Pilih TA" /></SelectTrigger>
                 <SelectContent>
-                  {tahunAjaranOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
+                  {tahunAjaranOptions.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Semester</Label>
               <Select value={semester} onValueChange={setSemester}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih semester" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Pilih Semester" /></SelectTrigger>
                 <SelectContent>
-                  {semesterOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
+                  {semesterOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Ujian Akhir</Label>
-              <Input type="number" min={0} max={100} placeholder="0" value={ujianAkhir} onChange={(e) => setUjianAkhir(e.target.value)} />
-            </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Komponen Tugas</h3>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="bg-transparent"
-                onClick={() => setTugas((prev) => [...prev, { nilai: "", jenis: "PR" }])}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Tambah Tugas
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {successMsg && (
+        <Alert className="bg-emerald-50 text-emerald-900 border-emerald-200">
+          <CheckCircle className="h-4 w-4 text-emerald-600" />
+          <AlertDescription>{successMsg}</AlertDescription>
+        </Alert>
+      )}
+
+      {kodeKelas && kodeMapel && (
+        <Card>
+          <CardHeader className="pb-0">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div>
+                <CardTitle>Data Santri</CardTitle>
+                <CardDescription>
+                  KKM: {nilaiKkm ?? "-"} | Bobot: T({bobot.tugas}%) U({bobot.ulangan}%) UAS({bobot.ujian}%)
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch id="incomplete-mode" checked={showIncompleteOnly} onCheckedChange={setShowIncompleteOnly} />
+                  <Label htmlFor="incomplete-mode">Belum Lengkap</Label>
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Cari santri..." 
+                    className="pl-9" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Nama Santri</TableHead>
+                      <TableHead className="w-[80px]">T1</TableHead>
+                      <TableHead className="w-[80px]">T2</TableHead>
+                      <TableHead className="w-[80px]">T3</TableHead>
+                      <TableHead className="w-[80px]">UH1</TableHead>
+                      <TableHead className="w-[80px]">UH2</TableHead>
+                      <TableHead className="w-[80px]">UH3</TableHead>
+                      <TableHead className="w-[80px]">UAS</TableHead>
+                      <TableHead className="w-[80px]">Akhir</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSantris.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                          Tidak ada data santri.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSantris.map(s => {
+                        const isKosong = !s.tugas1 && !s.tugas2 && !s.tugas3 && !s.uh1 && !s.uh2 && !s.uh3 && !s.uas
+                        
+                        // Calculate Preview
+                        const t = [{ nilai: parseNilai(s.tugas1), jenis: "PR" as const }, { nilai: parseNilai(s.tugas2), jenis: "PR" as const }, { nilai: parseNilai(s.tugas3), jenis: "PR" as const }]
+                        const u = [{ nilai: parseNilai(s.uh1), soal_disusun_pengajar: true, diawasi_pengajar: true }, { nilai: parseNilai(s.uh2), soal_disusun_pengajar: true, diawasi_pengajar: true }, { nilai: parseNilai(s.uh3), soal_disusun_pengajar: true, diawasi_pengajar: true }]
+                        const uasVal = parseNilai(s.uas)
+                        
+                        const raw = calculateRaporRaw(t, u, uasVal, bobot)
+                        const norm = normalizeRaporDisplay(raw)
+                        const status = statusKkm(norm.nilai, nilaiKkm ?? 75)
+
+                        return (
+                          <TableRow key={s.nomor_induk} className={isKosong ? "bg-destructive/5" : ""}>
+                            <TableCell>
+                              <div className="font-medium text-sm">{s.nama_santri}</div>
+                              <div className="text-xs text-muted-foreground">{s.nomor_induk}</div>
+                            </TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas1} onChange={e => handleInputChange(s.nomor_induk, "tugas1", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas2} onChange={e => handleInputChange(s.nomor_induk, "tugas2", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas3} onChange={e => handleInputChange(s.nomor_induk, "tugas3", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh1} onChange={e => handleInputChange(s.nomor_induk, "uh1", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh2} onChange={e => handleInputChange(s.nomor_induk, "uh2", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh3} onChange={e => handleInputChange(s.nomor_induk, "uh3", e.target.value)} /></TableCell>
+                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uas} onChange={e => handleInputChange(s.nomor_induk, "uas", e.target.value)} /></TableCell>
+                            <TableCell className="text-center font-semibold">
+                              {!isKosong ? norm.nilai : "-"}
+                            </TableCell>
+                            <TableCell>
+                              {!isKosong ? (
+                                <span className={`text-xs px-2 py-1 rounded-full ${status.isPassed ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
+                                  {status.label}
+                                </span>
+                              ) : (
+                                <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive">KOSONG</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleSave} disabled={isSaving || santris.filter(s => s.isDirty).length === 0} className="gap-2">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Simpan Perubahan
               </Button>
             </div>
-            <div className="space-y-2">
-              {tugas.map((item, index) => (
-                <div key={`tugas-${index}`} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 rounded-md border border-border/50">
-                  <Select value={item.jenis} onValueChange={(value) => updateTugas(index, { jenis: value as NilaiMapelTugasItem["jenis"] })}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {jenisTugasOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input type="number" min={0} max={100} placeholder="0" value={item.nilai} onChange={(e) => updateTugas(index, { nilai: e.target.value })} />
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      disabled={tugas.length <= 3}
-                      onClick={() => setTugas((prev) => prev.filter((_, idx) => idx !== index))}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-foreground">Komponen Ulangan</h3>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="bg-transparent"
-                onClick={() => setUlangan((prev) => [...prev, { nilai: "", soal_disusun_pengajar: true, diawasi_pengajar: true }])}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Tambah Ulangan
-              </Button>
-            </div>
-            <div className="space-y-2">
-              {ulangan.map((item, index) => (
-                <div key={`ulangan-${index}`} className="grid grid-cols-1 md:grid-cols-4 gap-3 p-3 rounded-md border border-border/50">
-                  <Input type="number" min={0} max={100} placeholder="0" value={item.nilai} onChange={(e) => updateUlangan(index, { nilai: e.target.value })} />
-                  <Label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={item.soal_disusun_pengajar} onCheckedChange={(checked) => updateUlangan(index, { soal_disusun_pengajar: Boolean(checked) })} />
-                    Soal disusun pengajar
-                  </Label>
-                  <Label className="flex items-center gap-2 text-sm">
-                    <Checkbox checked={item.diawasi_pengajar} onCheckedChange={(checked) => updateUlangan(index, { diawasi_pengajar: Boolean(checked) })} />
-                    Diawasi pengajar
-                  </Label>
-                  <div className="flex justify-end">
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant="ghost"
-                      disabled={ulangan.length <= 3}
-                      onClick={() => setUlangan((prev) => prev.filter((_, idx) => idx !== index))}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Keterangan (opsional)</Label>
-            <Textarea value={keterangan} onChange={(e) => setKeterangan(e.target.value)} placeholder="Catatan input nilai" />
-          </div>
-
-          <div className="rounded-md border border-border/50 p-4 bg-muted/20">
-            <h4 className="font-semibold text-foreground mb-2">Preview Nilai Rapor</h4>
-            <div className="grid sm:grid-cols-4 gap-3 text-sm">
-              <div>
-                <p className="text-muted-foreground">Rapor Raw ({bobot.tugas}/{bobot.ulangan}/{bobot.ujian})</p>
-                <p className="font-semibold text-foreground">{preview.raw.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Rapor Tampil</p>
-                <p className={preview.isRed ? "font-semibold text-destructive" : "font-semibold text-primary"}>{preview.nilai}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">KKM Aktif</p>
-                <p className="font-semibold text-foreground">{isLoadingKkm ? "Memuat..." : (nilaiKkm ?? "Belum diset")}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Status KKM</p>
-                <p className="font-semibold text-foreground">{preview.status}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground">Flag Merah</p>
-                <p className="font-semibold text-foreground">{preview.isRed ? "YA" : "TIDAK"}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-4 border-t border-border/50">
-            <div className="flex-1" />
-            <Button type="button" variant="outline" className="bg-transparent" onClick={onCancel}>Batal</Button>
-            <Button type="submit" disabled={isSubmitting || !isUserReady}>{isSubmitting ? "Menyimpan..." : "Simpan Nilai"}</Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }

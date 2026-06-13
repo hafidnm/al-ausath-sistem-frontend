@@ -44,6 +44,13 @@ export interface GetNilaiMapelParams {
   per_page?: string
 }
 
+export interface GetKelasIndexParams {
+  kode_kelas: string
+  kode_mapel: string
+  tahun_ajaran: string
+  semester: number
+}
+
 export interface ShowNilaiMapelParams {
   nomor_induk: string
   tahun_ajaran?: string
@@ -238,6 +245,11 @@ export const nilaiMapelService = {
     const response = await api.get("/akademik/nilai-mapel", { params })
     const items = extractList(response.data).map(normalizeNilaiMapelItem)
     return Promise.all(items.map(enrichNilaiMapelItem))
+  },
+
+  async getKelasIndex(params: GetKelasIndexParams): Promise<any[]> {
+    const response = await api.get('/akademik/nilai-mapel/kelas', { params })
+    return response.data.data
   },
 
   async getByKodeMapel(kodeMapel: string, params: ShowNilaiMapelParams): Promise<NilaiMapelItem> {
