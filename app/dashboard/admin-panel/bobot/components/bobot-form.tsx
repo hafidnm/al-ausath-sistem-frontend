@@ -3,11 +3,13 @@
 import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertTriangle, Check } from "lucide-react"
+import { AlertTriangle, BookMarked, Check } from "lucide-react"
 import { validateBobotTotal } from "../utils/helpers"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 export interface BobotFormValues {
   tahunAjaran: string
@@ -26,7 +28,11 @@ interface BobotFormProps {
 }
 
 export function BobotForm({ isEdit = false, isSubmitting = false, initialData, onSubmit, onCancel }: BobotFormProps) {
-  const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahunAjaran ?? "2025/2026")
+  const { selectedTahunAjaran } = useTahunAjaran()
+
+  // Gunakan tahun ajaran dari context (header), atau dari initialData jika mode edit
+  const tahunAjaran = initialData?.tahunAjaran ?? selectedTahunAjaran?.nama_tahun ?? ""
+
   const [semester, setSemester] = useState(initialData?.semester ?? 1)
   const [bobotHarian, setBobotHarian] = useState(initialData?.bobotHarian ?? 20)
   const [bobotUts, setBobotUts] = useState(initialData?.bobotUts ?? 30)
@@ -42,7 +48,7 @@ export function BobotForm({ isEdit = false, isSubmitting = false, initialData, o
     e.preventDefault()
     
     if (!tahunAjaran.trim()) {
-      setError("Tahun ajaran wajib diisi")
+      setError("Tahun ajaran belum dipilih di header")
       return
     }
 
@@ -119,18 +125,12 @@ export function BobotForm({ isEdit = false, isSubmitting = false, initialData, o
               <Label htmlFor="tahun_ajaran" className="text-foreground">
                 Tahun Ajaran
               </Label>
-              <Input
-                id="tahun_ajaran"
-                type="text"
-                placeholder="2025/2026"
-                value={tahunAjaran}
-                onChange={(e) => {
-                  setTahunAjaran(e.target.value)
-                  setError("")
-                }}
-                className="border-border/50"
-              />
-              <p className="text-xs text-muted-foreground">Format contoh: 2025/2026</p>
+              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+                <BookMarked className="w-4 h-4 text-primary shrink-0" />
+                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+                <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Diambil dari pilihan Tahun Ajaran di header.</p>
             </div>
 
             <div className="space-y-2">
