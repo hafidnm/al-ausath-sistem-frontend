@@ -22,7 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked } from "lucide-react"
 
 import { nilaiMapelService, UpsertNilaiMapelPayload } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
@@ -31,7 +32,8 @@ import { kelasService } from "@/lib/services/kelas.service"
 import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
 import { authService } from "@/lib/services/auth.service"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
-import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface SantriRow {
   id: number
@@ -75,12 +77,14 @@ const parseNilai = (val: string): number => {
 }
 
 export function NilaiMapelForm() {
+  const { selectedTahunAjaran } = useTahunAjaran()
+
   const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
   const [mapelOptions, setMapelOptions] = useState<{value: string, label: string}[]>([])
   
   const [kodeKelas, setKodeKelas] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState("2024/2025")
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
   const [semester, setSemester] = useState("1")
 
   const [santris, setSantris] = useState<SantriRow[]>([])
@@ -286,12 +290,11 @@ export function NilaiMapelForm() {
             </div>
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
-              <Select value={tahunAjaran} onValueChange={setTahunAjaran}>
-                <SelectTrigger><SelectValue placeholder="Pilih TA" /></SelectTrigger>
-                <SelectContent>
-                  {tahunAjaranOptions.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+                <BookMarked className="w-4 h-4 text-primary shrink-0" />
+                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+                <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Semester</Label>
