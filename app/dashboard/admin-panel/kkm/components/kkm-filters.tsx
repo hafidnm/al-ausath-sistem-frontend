@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select"
 import { Search } from "lucide-react"
 import { semesterOptions, tahunAjaranOptions, unitOptions } from "../utils/constants"
+import { KelasItem } from "@/lib/services/kelas.service"
 
 interface KkmFiltersProps {
   query: string
@@ -21,6 +22,9 @@ interface KkmFiltersProps {
   onSemesterChange: (value: string) => void
   kodeUnit: string
   onKodeUnitChange: (value: string) => void
+  kodeKelas: string
+  onKodeKelasChange: (value: string) => void
+  kelasList: KelasItem[]
   perPage: string
   onPerPageChange: (value: string) => void
 }
@@ -34,6 +38,9 @@ export function KkmFilters({
   onSemesterChange,
   kodeUnit,
   onKodeUnitChange,
+  kodeKelas,
+  onKodeKelasChange,
+  kelasList,
   perPage,
   onPerPageChange,
 }: KkmFiltersProps) {
@@ -83,6 +90,20 @@ export function KkmFilters({
               <SelectItem value="all">Semua</SelectItem>
               {unitOptions.map((item) => (
                 <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={kodeKelas} onValueChange={onKodeKelasChange}>
+            <SelectTrigger className="w-full lg:w-40">
+              <SelectValue placeholder="Kelas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Kelas</SelectItem>
+              {kelasList.map((kelas) => (
+                <SelectItem key={kelas.kode_kelas} value={kelas.kode_kelas}>
+                  {kelas.nama_kelas ?? kelas.kode_kelas}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>

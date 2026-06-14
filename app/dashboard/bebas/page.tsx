@@ -91,6 +91,25 @@ interface Santri {
   kode_kelas: string
 }
 
+// Normalize API response to UI interface
+function normalizeTagihanBebas(item: any): TagihanBebas {
+  const totalTagihan = Number(item.total_tagihan || item.nominal_tagihan || 0)
+  const sisa = Number(item.sisa || 0)
+  const nominalBayar = sisa > 0 ? totalTagihan - sisa : Number(item.nominal_bayar || 0)
+  
+  return {
+    id_bebas: item.id_bebas || item.id_admin_bebas || item.id,
+    id_santri: item.id_santri,
+    nama_tagihan: item.nama_tagihan || item.deskripsi || "",
+    nominal_tagihan: totalTagihan,
+    nominal_bayar: nominalBayar,
+    status_lunas: item.status_lunas === "lunas" || item.status === "BELUM_LUNAS" ? "lunas" : "belum_lunas",
+    created_at: item.created_at,
+    santri: item.santri,
+    pembayaran: item.pembayaran,
+  }
+}
+
 export default function AdministrasiBebasPage() {
   const { toast } = useToast()
   const [data, setData] = useState<TagihanBebas[]>([])
@@ -119,9 +138,14 @@ export default function AdministrasiBebasPage() {
 
   // Modals
   const [createOpen, setCreateOpen] = useState(false)
+  const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false)
   const [detailOpen, setDetailOpen] = useState(false)
   const [bayarOpen, setBayarOpen] = useState(false)
   const [selectedTagihan, setSelectedTagihan] = useState<TagihanBebas | null>(null)
+
+  // Bulk generation state
+  const [bulkGenerateLoading, setBulkGenerateLoading] = useState(false)
+  const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([])
 
   // Form states
   const [newTagihan, setNewTagihan] = useState({
@@ -131,6 +155,7 @@ export default function AdministrasiBebasPage() {
   })
   const [newPembayaran, setNewPembayaran] = useState({
     nominal_bayar: "",
+    metode_bayar: "",
     catatan: "",
   })
 
@@ -140,7 +165,9 @@ export default function AdministrasiBebasPage() {
     try {
       // Fetch bills
       const res = await api.get("/administrasi/bebas")
-      setData(res.data?.data || res.data || [])
+      const rawData = res.data?.data || res.data || []
+      const normalizedData = Array.isArray(rawData) ? rawData.map(normalizeTagihanBebas) : []
+      setData(normalizedData)
     } catch (error) {
       console.error(error)
       toast({
@@ -288,7 +315,9 @@ export default function AdministrasiBebasPage() {
   // Action: Create Tagihan
   const handleCreateTagihan = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newTagihan.id_santri || !newTagihan.nama_tagihan || !newTagihan.nominal_tagihan) {
+    const description = newTagihan.nama_tagihan.trim()
+
+    if (!newTagihan.id_santri || !description || !newTagihan.nominal_tagihan) {
       toast({
         title: "Validasi Gagal",
         description: "Harap isi semua kolom wajib.",
@@ -301,8 +330,8 @@ export default function AdministrasiBebasPage() {
     try {
       await api.post("/administrasi/bebas", {
         id_santri: Number(newTagihan.id_santri),
-        nama_tagihan: newTagihan.nama_tagihan,
-        nominal_tagihan: Number(newTagihan.nominal_tagihan),
+        deskripsi: description,
+        total_tagihan: Number(newTagihan.nominal_tagihan),
       })
 
       toast({
@@ -326,12 +355,13 @@ export default function AdministrasiBebasPage() {
   // Action: Add Payment / Installment
   const handleAddPembayaran = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedTagihan || !newPembayaran.nominal_bayar) return
+    if (!selectedTagihan || !newPembayaran.nominal_bayar || !newPembayaran.metode_bayar) return
 
     setActionLoading(true)
     try {
-      const result = await api.post(`/administrasi/bebas/${selectedTagihan.id_bebas}/pembayaran`, {
+      const result: any = await api.post(`/administrasi/bebas/${selectedTagihan.id_bebas}/pembayaran`, {
         nominal_bayar: Number(newPembayaran.nominal_bayar),
+        metode_bayar: newPembayaran.metode_bayar,
         catatan: newPembayaran.catatan,
       })
 
@@ -341,7 +371,7 @@ export default function AdministrasiBebasPage() {
       })
 
       setBayarOpen(false)
-      setNewPembayaran({ nominal_bayar: "", catatan: "" })
+      setNewPembayaran({ nominal_bayar: "", metode_bayar: "", catatan: "" })
       fetchAllData()
 
       // Automatically open receipt PDF if generated
@@ -400,6 +430,10 @@ export default function AdministrasiBebasPage() {
           <Button variant="outline" size="sm" onClick={fetchAllData} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+          <Button size="sm" onClick={() => setBulkGenerateOpen(true)} variant="outline" className="border-primary text-primary hover:bg-primary/10">
+            <FileDown className="w-4 h-4 mr-2" />
+            Generate Massal
           </Button>
           <Button size="sm" onClick={() => setCreateOpen(true)} className="bg-primary hover:bg-primary/90 text-white">
             <Plus className="w-4 h-4 mr-2" />
@@ -817,6 +851,24 @@ export default function AdministrasiBebasPage() {
               </div>
 
               <div className="space-y-1">
+                <Label htmlFor="metode_bayar">Metode Pembayaran *</Label>
+                <Select
+                  value={newPembayaran.metode_bayar}
+                  onValueChange={(val) => setNewPembayaran({ ...newPembayaran, metode_bayar: val })}
+                >
+                  <SelectTrigger id="metode_bayar">
+                    <SelectValue placeholder="Pilih metode pembayaran..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tunai">Tunai</SelectItem>
+                    <SelectItem value="transfer_bank">Transfer Bank</SelectItem>
+                    <SelectItem value="e_wallet">E-Wallet</SelectItem>
+                    <SelectItem value="cek">Cek</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
                 <Label htmlFor="catatan">Catatan / Keterangan (Opsional)</Label>
                 <Input
                   id="catatan"
@@ -934,6 +986,160 @@ export default function AdministrasiBebasPage() {
           <DialogFooter suppressHydrationWarning>
             <Button variant="outline" onClick={() => setDetailOpen(false)}>
               Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Dialog: Bulk Generate Admin Bebas (Isu 12) */}
+      <Dialog open={bulkGenerateOpen} onOpenChange={setBulkGenerateOpen}>
+        <DialogContent className="sm:max-w-[600px]" suppressHydrationWarning>
+          <DialogHeader>
+            <DialogTitle>Generate Tagihan Administrasi Bebas Massal</DialogTitle>
+            <DialogDescription>
+              Pilih santri untuk dibuatkan tagihan administrasi bebas secara massal.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Student Selection Filters */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Unit/Jenjang</Label>
+                <Select value={selectedJenjang} onValueChange={handleJenjangChange}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {units.map((unit) => (
+                      <SelectItem key={unit.kode_unit} value={unit.kode_unit}>
+                        {unit.nama_unit || unit.kode_unit}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Kelas</Label>
+                <Select value={selectedKelas} onValueChange={handleKelasChange} disabled={!selectedJenjang}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Kelas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((kelas) => (
+                      <SelectItem key={kelas.id_kelas} value={kelas.kode_kelas}>
+                        {kelas.nama_kelas || kelas.kode_kelas}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Jenis Kelamin</Label>
+                <Select value={selectedGender} onValueChange={handleGenderChange} disabled={!selectedKelas}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih Jenis Kelamin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="L">Laki-laki</SelectItem>
+                    <SelectItem value="P">Perempuan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Student List for Selection */}
+            {students.length > 0 && (
+              <div className="space-y-2">
+                <Label>Pilih Santri ({students.length} santri)</Label>
+                <div className="border rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto bg-muted/20">
+                  {students.map((student) => (
+                    <div key={student.id_santri} className="flex items-center gap-3 p-2 rounded hover:bg-white/50 transition">
+                      <input
+                        type="checkbox"
+                        id={`student-${student.id_santri}`}
+                        checked={selectedStudentIds.includes(student.id_santri)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedStudentIds([...selectedStudentIds, student.id_santri])
+                          } else {
+                            setSelectedStudentIds(selectedStudentIds.filter((id) => id !== student.id_santri))
+                          }
+                        }}
+                        className="rounded"
+                      />
+                      <label htmlFor={`student-${student.id_santri}`} className="flex-1 cursor-pointer text-sm">
+                        <div className="font-medium">{student.nama_lengkap_santri}</div>
+                        <div className="text-xs text-muted-foreground">{student.nomor_induk}</div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (selectedStudentIds.length === students.length) {
+                      setSelectedStudentIds([])
+                    } else {
+                      setSelectedStudentIds(students.map((s) => s.id_santri))
+                    }
+                  }}
+                >
+                  {selectedStudentIds.length === students.length ? "Batal Pilih Semua" : "Pilih Semua"}
+                </Button>
+              </div>
+            )}
+
+            {students.length === 0 && selectedJenjang && (
+              <p className="text-sm text-muted-foreground italic">Silakan pilih kelas dan jenis kelamin untuk menampilkan daftar santri.</p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkGenerateOpen(false)}>
+              Batal
+            </Button>
+            <Button
+              onClick={async () => {
+                if (selectedStudentIds.length === 0) {
+                  toast({
+                    title: "Pilih Santri",
+                    description: "Silakan pilih minimal satu santri.",
+                    variant: "destructive",
+                  })
+                  return
+                }
+
+                setBulkGenerateLoading(true)
+                try {
+                  await api.post("/api/bebas/bulk", { student_ids: selectedStudentIds })
+                  toast({
+                    title: "Sukses",
+                    description: `Berhasil membuat ${selectedStudentIds.length} tagihan administrasi bebas.`,
+                  })
+                  setBulkGenerateOpen(false)
+                  setSelectedStudentIds([])
+                  setSelectedJenjang("")
+                  setSelectedKelas("")
+                  setSelectedGender("")
+                  await fetchAllData()
+                } catch (error: any) {
+                  toast({
+                    title: "Error",
+                    description: error.response?.data?.message || error.message,
+                    variant: "destructive",
+                  })
+                } finally {
+                  setBulkGenerateLoading(false)
+                }
+              }}
+              disabled={bulkGenerateLoading || selectedStudentIds.length === 0}
+              className="bg-primary text-white hover:bg-primary/90"
+            >
+              {bulkGenerateLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Generate {selectedStudentIds.length > 0 && `(${selectedStudentIds.length})`}
             </Button>
           </DialogFooter>
         </DialogContent>

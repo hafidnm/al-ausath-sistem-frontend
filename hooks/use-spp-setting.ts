@@ -2,13 +2,25 @@ import { useCallback } from 'react';
 import { sppService, type SppSetting, type SppSettingQuery, type CreateSppSettingRequest, type UpdateSppSettingRequest } from '@/lib/services/spp.service';
 import { useAsyncQuery, useAsyncMutation } from '@/hooks/shared/use-async-request';
 
+const DEFAULT_SETTING_QUERY: SppSettingQuery = {
+  per_page: 100,
+};
+
 export function useSppSettings(query?: SppSettingQuery) {
-  const fetcher = useCallback(() => sppService.getSettings(query).then(r => r.data), [query]);
+  const fetcher = useCallback(
+    (params?: SppSettingQuery) =>
+      sppService.getSettings({
+        ...DEFAULT_SETTING_QUERY,
+        ...query,
+        ...params,
+      }).then((r) => r.data),
+    [query],
+  );
   const { data, loading, error, run } = useAsyncQuery(fetcher, [] as SppSetting[], {
     fallbackError: 'Gagal memuat pengaturan SPP',
   });
 
-  const fetchSettings = useCallback(async () => run(), [run]);
+  const fetchSettings = useCallback(async (params?: SppSettingQuery) => run(params), [run]);
   return { data, loading, error, fetchSettings };
 }
 

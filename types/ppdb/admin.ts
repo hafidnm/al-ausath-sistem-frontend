@@ -55,6 +55,7 @@ export interface UpdatePpdbRequest {
 }
 
 export interface PpdbDetail {
+  buktiOrtuGuruUrl: any;
   id: string;
   pendaftaranId?: string;
   userId?: string;
@@ -106,6 +107,8 @@ export interface PpdbDetail {
   isAnakGuru?: boolean;
   pilihanUangGedung?: number | null;
   pilihanInfaqBulanan?: number | null;
+  buktiOrtuGuruPath?: string;
+  buktiOrtuGuruVerified?: boolean | null;
 }
 
 export interface PpdbListResponse {
@@ -145,12 +148,20 @@ export interface TestQuestion {
   type: TestQuestionType;
   question: string;
   options?: string[];
+  /** URL gambar pendukung soal (opsional) */
+  image_url?: string;
+  /** Bahasa soal per-pertanyaan: 'id' (Indonesia) atau 'ar' (Arab) */
+  bahasa?: 'id' | 'ar';
 }
 
 export interface UpdateTesKonfigurasiRequest {
   fiturSoalAktif: boolean;
   soalTes?: string;
   formSchema?: TestQuestion[];
+  /** Global bahasa untuk jenjang (deprecated, use per-question bahasa instead) */
+  bahasa?: 'id' | 'ar';
+  /** Global RTL flag untuk jenjang (deprecated, use per-question bahasa instead) */
+  is_rtl?: boolean;
 }
 
 export type TesKonfigurasiJenjangKey = 'MI' | 'MTS' | 'MA';
@@ -160,12 +171,18 @@ export interface TesKonfigurasiJenjang {
   fiturSoalAktif: boolean;
   soalTes?: string;
   formSchema?: TestQuestion[];
+  /** Bahasa soal: 'id' (Indonesia) atau 'ar' (Arab) */
+  bahasa?: 'id' | 'ar';
+  /** Apakah soal menggunakan tata letak RTL */
+  is_rtl?: boolean;
 }
 
 export interface UpdateTesKonfigurasiJenjangRequest {
   fiturSoalAktif: boolean;
   soalTes?: string;
   formSchema?: TestQuestion[];
+  bahasa?: 'id' | 'ar';
+  is_rtl?: boolean;
 }
 
 export interface UpdateVerificationRequest {

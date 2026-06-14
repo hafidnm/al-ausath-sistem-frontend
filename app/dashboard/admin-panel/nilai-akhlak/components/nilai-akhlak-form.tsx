@@ -1,11 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -13,48 +14,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle, Check } from "lucide-react"
-import { santriService, type SantriItem } from "@/lib/services/santri.service"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2 } from "lucide-react"
+
+import { nilaiAkhlakService, UpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
+import { kelasService } from "@/lib/services/kelas.service"
 import { authService } from "@/lib/services/auth.service"
 import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 
-interface NilaiAkhlakFormPayload {
+interface SantriRow {
+  id: number
   nomor_induk: string
-  tahun_ajaran: string
-  semester: number
-  nilai_angka: number
-  aspek?: string
-  deskripsi?: string
-  id_petugas_input?: number
-}
-
-interface NilaiAkhlakFormProps {
-  initialData?: Partial<NilaiAkhlakFormPayload>
-  onSubmit?: (data: NilaiAkhlakFormPayload) => Promise<void> | void
-  onCancel?: () => void
-}
-
-const toErrorMessage = (error: any): string => {
-  const message = error?.response?.data?.message
-  const errors = error?.response?.data?.errors
-
-  if (typeof message === "string" && message) return message
-
-  if (errors && typeof errors === "object") {
-    const firstField = Object.keys(errors)[0]
-    const firstValue = errors[firstField]
-
-    if (Array.isArray(firstValue) && firstValue.length > 0) {
-      return String(firstValue[0])
-    }
-
-    if (typeof firstValue === "string") {
-      return firstValue
-    }
-  }
-
-  return "Gagal menyimpan nilai akhlak"
+  nama_santri: string
+  nilai_angka: string
+  deskripsi: string
+  isDirty: boolean
+  originalNilai?: any
 }
 
 const extractPetugasInputId = (me: any): number | undefined => {
@@ -70,322 +52,299 @@ const extractPetugasInputId = (me: any): number | undefined => {
     me?.user?.id,
     me?.id,
   ]
-
   for (const candidate of candidates) {
     const id = Number(candidate)
-    if (Number.isFinite(id) && id > 0) {
-      return id
-    }
+    if (Number.isFinite(id) && id > 0) return id
   }
-
   return undefined
 }
 
-export function NilaiAkhlakForm({ initialData, onSubmit, onCancel }: NilaiAkhlakFormProps) {
-  const [nomorInduk, setNomorInduk] = useState(initialData?.nomor_induk ?? "")
-  const [selectedNama, setSelectedNama] = useState("")
-  const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
-  const [searchInput, setSearchInput] = useState("")
-  const [santriResults, setSantriResults] = useState<SantriItem[]>([])
-  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
-  const [santriSearchError, setSantriSearchError] = useState("")
-  const [openSantriPopover, setOpenSantriPopover] = useState(false)
-  const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
-  const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
-  const [nilaiAngka, setNilaiAngka] = useState(initialData?.nilai_angka != null ? String(initialData.nilai_angka) : "")
-  const [aspek, setAspek] = useState(initialData?.aspek ?? "AKHLAK")
-  const [deskripsi, setDeskripsi] = useState(initialData?.deskripsi ?? "")
+const parseNilai = (val: string): number => {
+  const n = Number(val)
+  return isNaN(n) ? 0 : Math.max(0, Math.min(100, n))
+}
+
+export function NilaiAkhlakForm() {
+  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
+  
+  const [kodeKelas, setKodeKelas] = useState("")
+  const [tahunAjaran, setTahunAjaran] = useState("2024/2025")
+  const [semester, setSemester] = useState("1")
+  const [aspek, setAspek] = useState("AKHLAK")
+
+  const [santris, setSantris] = useState<SantriRow[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showIncompleteOnly, setShowIncompleteOnly] = useState(false)
+  
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
-  const [isUserReady, setIsUserReady] = useState(false)
+
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [successMsg, setSuccessMsg] = useState("")
 
-  const parsedNilaiAngka = Number(nilaiAngka)
-
-  const applySelectedSantri = (santri: SantriItem) => {
-    setNomorInduk(santri.nomor_induk)
-    setSelectedNama(santri.nama_lengkap ?? "")
-    setSelectedSantriId(santri.id)
-    setSearchInput("")
-    setOpenSantriPopover(false)
-    setError("")
-  }
-
+  // Load User & Kelas
   useEffect(() => {
-    const loadUser = async () => {
-      const me = await authService.me()
-      const id = extractPetugasInputId(me)
-      setPetugasInputId(id)
-      setIsUserReady(true)
-    }
-
-    loadUser()
+    authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
+    kelasService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setKelasOptions(res.map(k => ({ value: k.kode_kelas, label: k.nama_kelas ?? k.kode_kelas }))))
+      .catch(console.error)
   }, [])
 
+  // Fetch Data Santri and existing Nilai
   useEffect(() => {
-    if (!initialData) return
-
-    setNomorInduk(initialData.nomor_induk ?? "")
-    setSelectedNama("")
-    setSelectedSantriId(null)
-    setSearchInput("")
-    setTahunAjaran(initialData.tahun_ajaran ?? "")
-    setSemester(String(initialData.semester ?? ""))
-    setNilaiAngka(initialData.nilai_angka != null ? String(initialData.nilai_angka) : "")
-    setAspek(initialData.aspek ?? "AKHLAK")
-    setDeskripsi(initialData.deskripsi ?? "")
-  }, [initialData])
-
-  useEffect(() => {
-    if (!searchInput.trim()) {
-      setSantriResults([])
-      setSantriSearchError("")
+    if (!kodeKelas || !tahunAjaran || !semester || !aspek) {
+      setSantris([])
       return
     }
 
-    let cancelled = false
+    setIsLoading(true)
+    setError("")
+    setSuccessMsg("")
 
-    const searchSantri = async () => {
-      try {
-        setIsLoadingSantri(true)
-        setSantriSearchError("")
-        const results = await santriService.search(searchInput.trim())
+    nilaiAkhlakService.getKelasIndex({ kode_kelas: kodeKelas, tahun_ajaran: tahunAjaran, semester: Number(semester), aspek })
+      .then(data => {
+        const rows: SantriRow[] = data.map(item => {
+          const n = item.nilai_akhlak
+          return {
+            id: item.id,
+            nomor_induk: item.nomor_induk,
+            nama_santri: item.nama_santri,
+            nilai_angka: n?.nilai_angka?.toString() || "",
+            deskripsi: n?.deskripsi || "",
+            isDirty: false,
+            originalNilai: n,
+          }
+        })
+        setSantris(rows)
+      })
+      .catch(err => {
+        console.error(err)
+        setError("Gagal memuat data santri untuk kelas ini.")
+      })
+      .finally(() => setIsLoading(false))
 
-        if (!cancelled) {
-          setSantriResults(results)
-        }
-      } catch {
-        if (!cancelled) {
-          setSantriResults([])
-          setSantriSearchError("Gagal mengambil data santri dari server")
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSantri(false)
-        }
+  }, [kodeKelas, tahunAjaran, semester, aspek])
+
+  const handleInputChange = (nomor_induk: string, field: keyof SantriRow, value: string) => {
+    setSantris(prev => prev.map(s => {
+      if (s.nomor_induk === nomor_induk) {
+        return { ...s, [field]: value, isDirty: true }
       }
-    }
+      return s
+    }))
+  }
 
-    const timer = setTimeout(searchSantri, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [searchInput])
-
-  useEffect(() => {
-    const query = searchInput.trim().toLowerCase()
-    if (!query || selectedSantriId) return
-
-    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-    if (exact) {
-      applySelectedSantri(exact)
-    }
-  }, [santriResults, searchInput, selectedSantriId])
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!nomorInduk.trim() || !tahunAjaran || !semester) {
-      setError("Nomor induk, tahun ajaran, dan semester wajib diisi")
-      return
-    }
-
-    if (!Number.isFinite(parsedNilaiAngka) || parsedNilaiAngka < 0 || parsedNilaiAngka > 100) {
-      setError("Nilai angka harus di antara 0 sampai 100")
-      return
-    }
-
-    if (!isUserReady) {
-      setError("Data user belum siap, tunggu sebentar lalu coba simpan lagi")
-      return
-    }
-
+  const handleSave = async () => {
     if (!petugasInputId) {
-      setError("ID petugas input tidak ditemukan dari akun login. Silakan refresh halaman atau cek data akun petugas")
+      setError("ID Petugas tidak ditemukan.")
       return
     }
+
+    const dirtyRows = santris.filter(s => s.isDirty)
+    if (dirtyRows.length === 0) {
+      setError("Tidak ada perubahan untuk disimpan.")
+      return
+    }
+
+    setIsSaving(true)
+    setError("")
+    setSuccessMsg("")
 
     try {
-      setIsSubmitting(true)
-      setError("")
-
-      await onSubmit?.({
-        nomor_induk: nomorInduk.trim(),
-        tahun_ajaran: tahunAjaran,
-        semester: Number(semester),
-        nilai_angka: parsedNilaiAngka,
-        aspek: aspek || "AKHLAK",
-        deskripsi: deskripsi.trim() || undefined,
-        id_petugas_input: petugasInputId,
-      })
-    } catch (err) {
-      setError(toErrorMessage(err))
+      for (const row of dirtyRows) {
+        if (!row.nilai_angka) continue // Skip if empty (unless we want to allow deleting?)
+        const payload: UpsertNilaiAkhlakPayload = {
+          nomor_induk: row.nomor_induk,
+          tahun_ajaran: tahunAjaran,
+          semester: Number(semester),
+          aspek: aspek || "AKHLAK",
+          nilai_angka: parseNilai(row.nilai_angka),
+          deskripsi: row.deskripsi.trim() || undefined,
+          id_petugas_input: petugasInputId,
+        }
+        await nilaiAkhlakService.upsert(payload)
+      }
+      
+      setSuccessMsg(`Berhasil menyimpan nilai untuk ${dirtyRows.length} santri.`)
+      // Reset dirty flag
+      setSantris(prev => prev.map(s => ({ ...s, isDirty: false })))
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal menyimpan beberapa nilai.")
     } finally {
-      setIsSubmitting(false)
+      setIsSaving(false)
     }
   }
 
+  const filteredSantris = useMemo(() => {
+    return santris.filter(s => {
+      const matchSearch = s.nama_santri.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          s.nomor_induk.includes(searchQuery)
+      const isIncomplete = !s.nilai_angka
+      return matchSearch && (showIncompleteOnly ? isIncomplete : true)
+    })
+  }, [santris, searchQuery, showIncompleteOnly])
+
   return (
-    <Card className="border-border/50">
-      <CardHeader>
-        <CardTitle className="text-lg text-foreground">Input Nilai Akhlak</CardTitle>
-        <CardDescription>Form sederhana nilai akhlak berbasis angka tanpa komponen turunan</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <Alert className="bg-destructive/10 border-destructive/30">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              <AlertDescription className="text-destructive ml-2">{error}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-4">
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Filter Input Nilai Akhlak</CardTitle>
+          <CardDescription>Pilih kelas dan kriteria untuk memulai input nilai massal.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label>Nomor Induk</Label>
-              <div className="relative">
-                <Input
-                  value={nomorInduk && !searchInput ? `${nomorInduk}${selectedNama ? " - " + selectedNama : ""}` : searchInput}
-                  onKeyDown={(e) => {
-                    if (e.key !== "Enter") return
-                    e.preventDefault()
-
-                    const query = searchInput.trim().toLowerCase()
-                    if (!query || santriResults.length === 0) return
-
-                    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-                    applySelectedSantri(exact ?? santriResults[0])
-                  }}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setSearchInput(value)
-                    setNomorInduk("")
-                    setSelectedNama("")
-                    setSelectedSantriId(null)
-                    setOpenSantriPopover(true)
-                    setError("")
-                  }}
-                  onFocus={() => setOpenSantriPopover(true)}
-                  onBlur={() => {
-                    setTimeout(() => setOpenSantriPopover(false), 120)
-                  }}
-                  placeholder="Cari berdasarkan nomor induk atau nama..."
-                />
-
-                {openSantriPopover && (searchInput.trim() || isLoadingSantri || santriResults.length > 0) && (
-                  <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
-                    {isLoadingSantri && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari santri...</div>
-                    )}
-
-                    {!isLoadingSantri && santriSearchError && (
-                      <div className="px-2 py-4 text-center text-sm text-destructive">{santriSearchError}</div>
-                    )}
-
-                    {!isLoadingSantri && !santriSearchError && santriResults.length === 0 && searchInput.trim() && (
-                      <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada santri ditemukan</div>
-                    )}
-
-                    {!isLoadingSantri && santriResults.length > 0 && (
-                      <div className="max-h-60 overflow-auto">
-                        {santriResults.map((santri) => (
-                          <button
-                            key={santri.id}
-                            type="button"
-                            className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
-                            onMouseDown={(e) => e.preventDefault()}
-                            onClick={() => applySelectedSantri(santri)}
-                          >
-                            <Check
-                              className={`mt-0.5 h-4 w-4 ${
-                                nomorInduk === santri.nomor_induk ? "opacity-100" : "opacity-0"
-                              }`}
-                            />
-                            <div className="flex-1">
-                              <div className="font-medium">{santri.nomor_induk} - {santri.nama_lengkap}</div>
-                              {(santri.kode_kelas ?? santri.kelas) && (
-                                <div className="text-xs text-muted-foreground">{santri.kode_kelas ?? santri.kelas}</div>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Label>Kelas</Label>
+              <Select value={kodeKelas} onValueChange={setKodeKelas}>
+                <SelectTrigger><SelectValue placeholder="Pilih Kelas" /></SelectTrigger>
+                <SelectContent>
+                  {kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
               <Select value={tahunAjaran} onValueChange={setTahunAjaran}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih tahun ajaran" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Pilih TA" /></SelectTrigger>
                 <SelectContent>
-                  {tahunAjaranOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
+                  {tahunAjaranOptions.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>Semester</Label>
               <Select value={semester} onValueChange={setSemester}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih semester" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Pilih Semester" /></SelectTrigger>
                 <SelectContent>
-                  {semesterOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
+                  {semesterOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="space-y-2">
-              <Label>Nilai Angka</Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="0"
-                value={nilaiAngka}
-                onChange={(e) => {
-                  setNilaiAngka(e.target.value)
-                  setError("")
-                }}
-              />
-            </div>
-
             <div className="space-y-2">
               <Label>Aspek</Label>
-              <Input value={aspek} onChange={(e) => setAspek(e.target.value)} placeholder="AKHLAK" />
+              <Input value={aspek} onChange={(e) => setAspek(e.target.value)} placeholder="Misal: AKHLAK" />
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-2">
-            <Label>Deskripsi (opsional)</Label>
-            <Textarea
-              value={deskripsi}
-              onChange={(e) => setDeskripsi(e.target.value)}
-              placeholder="Catatan singkat terkait nilai akhlak"
-            />
-          </div>
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
 
-          <div className="flex gap-2 pt-4 border-t border-border/50">
-            <div className="flex-1" />
-            <Button type="button" variant="outline" className="bg-transparent" onClick={onCancel}>
-              Batal
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Menyimpan..." : "Simpan Nilai"}
-            </Button>
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+      {successMsg && (
+        <Alert className="bg-emerald-50 text-emerald-900 border-emerald-200">
+          <CheckCircle className="h-4 w-4 text-emerald-600" />
+          <AlertDescription>{successMsg}</AlertDescription>
+        </Alert>
+      )}
+
+      {kodeKelas && (
+        <Card>
+          <CardHeader className="pb-0">
+            <div className="flex flex-col sm:flex-row justify-between gap-4">
+              <div>
+                <CardTitle>Data Santri</CardTitle>
+                <CardDescription>
+                  Masukkan nilai akhlak angka (0-100) dan catatan.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <Switch id="incomplete-mode" checked={showIncompleteOnly} onCheckedChange={setShowIncompleteOnly} />
+                  <Label htmlFor="incomplete-mode">Belum Lengkap</Label>
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Cari santri..." 
+                    className="pl-9" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[200px]">Nama Santri</TableHead>
+                      <TableHead className="w-[120px]">Nilai (0-100)</TableHead>
+                      <TableHead>Deskripsi/Catatan Wali</TableHead>
+                      <TableHead className="w-[100px]">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredSantris.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                          Tidak ada data santri.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredSantris.map(s => {
+                        const isKosong = !s.nilai_angka
+                        
+                        return (
+                          <TableRow key={s.nomor_induk} className={isKosong ? "bg-destructive/5" : ""}>
+                            <TableCell>
+                              <div className="font-medium text-sm">{s.nama_santri}</div>
+                              <div className="text-xs text-muted-foreground">{s.nomor_induk}</div>
+                            </TableCell>
+                            <TableCell>
+                              <Input 
+                                type="number"
+                                min={0}
+                                max={100}
+                                className="h-8 w-20 px-2 text-center" 
+                                value={s.nilai_angka} 
+                                onChange={e => handleInputChange(s.nomor_induk, "nilai_angka", e.target.value)} 
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input 
+                                className="h-8 w-full px-2" 
+                                placeholder="Catatan opsional..."
+                                value={s.deskripsi} 
+                                onChange={e => handleInputChange(s.nomor_induk, "deskripsi", e.target.value)} 
+                              />
+                            </TableCell>
+                            <TableCell>
+                              {isKosong ? (
+                                <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive font-semibold">KOSONG</span>
+                              ) : (
+                                <span className="text-xs px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 font-semibold">TERISI</span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleSave} disabled={isSaving || santris.filter(s => s.isDirty).length === 0} className="gap-2">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                Simpan Perubahan
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   )
 }

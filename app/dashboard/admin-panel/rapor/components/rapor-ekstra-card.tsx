@@ -3,9 +3,24 @@
 import { Loader2, Plus, Save, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import type { RaporItem } from "@/lib/services/rapor.service"
+import { ekskulService, EkskulApiItem } from "@/lib/services/ekskul.service"
+import { useEffect, useState } from "react"
+
+const NILAI_EKSTRA_OPTIONS = [
+  { label: "A (Sangat Baik)", value: "A" },
+  { label: "B (Baik)", value: "B" },
+  { label: "C (Cukup)", value: "C" },
+  { label: "D (Kurang)", value: "D" },
+]
 
 export interface EkstraItem {
   nama: string
@@ -31,6 +46,14 @@ export function RaporEkstraCard({
   onEkstraListChange,
   onSaveEkstra,
 }: RaporEkstraCardProps) {
+  const [ekskulOptions, setEkskulOptions] = useState<EkskulApiItem[]>([])
+  
+  useEffect(() => {
+    ekskulService.getAll().then((res) => {
+      setEkskulOptions(res.data)
+    }).catch(console.error)
+  }, [])
+
   const handleAddRow = () => {
     onEkstraListChange((current) => [...current, { nama: "", nilai: "" }])
   }
@@ -79,24 +102,43 @@ export function RaporEkstraCard({
                 {index === 0 && (
                   <Label className="mb-2 block text-xs text-muted-foreground">Nama Kegiatan</Label>
                 )}
-                <Input
+                <Select
                   value={item.nama ?? ""}
-                  onChange={(e) => handleChange(index, "nama", e.target.value)}
+                  onValueChange={(val) => handleChange(index, "nama", val)}
                   disabled={isDisabled}
-                  placeholder="cth. Pramuka, Silat, Qiro'ah..."
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih kegiatan..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ekskulOptions.map((opt) => (
+                      <SelectItem key={opt.id_ekskul} value={opt.nama_ekskul}>
+                        {opt.nama_ekskul}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="w-28">
+              <div className="w-36">
                 {index === 0 && (
                   <Label className="mb-2 block text-xs text-muted-foreground">Nilai</Label>
                 )}
-                <Input
+                <Select
                   value={item.nilai ?? ""}
-                  onChange={(e) => handleChange(index, "nilai", e.target.value)}
+                  onValueChange={(val) => handleChange(index, "nilai", val)}
                   disabled={isDisabled}
-                  placeholder="A/B/C/D"
-                  className="text-center"
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih nilai" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {NILAI_EKSTRA_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <Button
                 type="button"
