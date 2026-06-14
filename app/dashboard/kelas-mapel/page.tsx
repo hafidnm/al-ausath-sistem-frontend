@@ -40,6 +40,7 @@ import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -169,6 +170,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 export default function MapelPage() {
   const { toast } = useToast()
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
 
   const [rows, setRows] = useState<KelasMapelRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -195,13 +197,17 @@ export default function MapelPage() {
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
 
   const [keyword, setKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [petugasFilter, setPetugasFilter] = useState("all")
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
-  const [formUnitFilter, setFormUnitFilter] = useState("all")
   const [editUnitFilter, setEditUnitFilter] = useState("all")
+
+  const [draftKeyword, setDraftKeyword] = useState("")
+  const [draftKelasFilter, setDraftKelasFilter] = useState("all")
+  const [draftPetugasFilter, setDraftPetugasFilter] = useState("all")
+  const [draftSemesterFilter, setDraftSemesterFilter] = useState("all")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<UiStatus | "all">("all")
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -212,27 +218,35 @@ export default function MapelPage() {
 
   const kelasByUnit = useMemo(() => {
     let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun)
-    if (unitFilter !== "all") {
-      source = source.filter((option) => option.kodeUnit === unitFilter)
+    if (selectedKodeUnit) {
+      source = source.filter((option) => option.kodeUnit === selectedKodeUnit)
     }
     return source
-  }, [kelasOptions, unitFilter, selectedKodeTahun])
+  }, [kelasOptions, selectedKodeUnit, selectedKodeTahun])
+
+  const draftKelasByUnit = useMemo(() => {
+    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun)
+    if (selectedKodeUnit) {
+      source = source.filter((option) => option.kodeUnit === selectedKodeUnit)
+    }
+    return source
+  }, [kelasOptions, selectedKodeUnit, selectedKodeTahun])
+
+  useEffect(() => {
+    if (draftKelasFilter !== "all" && !draftKelasByUnit.some((option) => option.value === draftKelasFilter)) {
+      setDraftKelasFilter("all")
+    }
+  }, [draftKelasFilter, draftKelasByUnit])
 
   const formKelasByUnit = useMemo(() => {
-    let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
-    if (formUnitFilter !== "all") {
-      source = source.filter((option) => option.kodeUnit === formUnitFilter)
-    }
-    return source
-  }, [kelasOptions, formUnitFilter, selectedKodeTahun])
+    if (!selectedKodeUnit) return []
+    return kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF" && option.kodeUnit === selectedKodeUnit)
+  }, [kelasOptions, selectedKodeUnit, selectedKodeTahun])
 
   const formMapelByUnit = useMemo(() => {
-    let source = mapelOptions.filter((option) => option.status === "AKTIF")
-    if (formUnitFilter !== "all") {
-      source = source.filter((option) => !option.kodeUnit || option.kodeUnit === formUnitFilter)
-    }
-    return source
-  }, [mapelOptions, formUnitFilter])
+    if (!selectedKodeUnit) return []
+    return mapelOptions.filter((option) => option.status === "AKTIF" && (!option.kodeUnit || option.kodeUnit === selectedKodeUnit))
+  }, [mapelOptions, selectedKodeUnit])
 
   const editKelasByUnit = useMemo(() => {
     let source = kelasOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
@@ -268,21 +282,6 @@ export default function MapelPage() {
     return map
   }, [kelasOptions])
 
-  const visibleRows = useMemo(() => {
-    let nextRows = rows
-
-    if (semesterFilter !== "all") {
-      const semester = Number(semesterFilter)
-      nextRows = nextRows.filter((row) => row.semester === semester)
-    }
-
-    if (unitFilter !== "all") {
-      nextRows = nextRows.filter((row) => kelasUnitMap.get(row.kodeKelas) === unitFilter)
-    }
-
-    return nextRows
-  }, [rows, semesterFilter, unitFilter, kelasUnitMap])
-
   const fetchRows = async () => {
     setIsLoading(true)
     try {
@@ -292,6 +291,7 @@ export default function MapelPage() {
         q?: string
         kode_kelas?: string
         kode_mapel?: string
+        kode_unit?: string
         id_petugas?: number
         tahun_ajaran?: string
         semester?: number
@@ -306,6 +306,7 @@ export default function MapelPage() {
       if (kelasFilter !== "all") params.kode_kelas = kelasFilter
       if (petugasFilter !== "all") params.id_petugas = toNumber(petugasFilter, 0)
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (semesterFilter !== "all") params.semester = Number(semesterFilter)
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
 
@@ -408,12 +409,13 @@ export default function MapelPage() {
     if (!isInitDone) return
     if (kelasFilter !== "all" && !kelasByUnit.some((option) => option.value === kelasFilter)) {
       setKelasFilter("all")
+      setDraftKelasFilter("all")
       setCurrentPage(1)
       return
     }
 
     void fetchRows()
-  }, [isInitDone, currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, petugasFilter, selectedKodeTahun, semesterFilter, statusFilter, kelasByUnit])
+  }, [isInitDone, currentPage, rowsPerPage, keyword, kelasFilter, petugasFilter, selectedKodeTahun, selectedKodeUnit, semesterFilter, statusFilter, kelasByUnit])
 
   useEffect(() => {
     if (!formData.kodeKelas) return
@@ -461,8 +463,12 @@ export default function MapelPage() {
   }, [isEditDialogOpen, editingFormData.kodeKelas, kelasTahunMap])
 
   const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftKelasFilter("all")
+    setDraftPetugasFilter("all")
+    setDraftSemesterFilter("all")
+    setDraftStatusFilter("all")
     setKeyword("")
-    setUnitFilter("all")
     setKelasFilter("all")
     setPetugasFilter("all")
     setSemesterFilter("all")
@@ -627,7 +633,7 @@ export default function MapelPage() {
   }
 
   const toggleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? visibleRows.map((row) => row.id) : [])
+    setSelectedIds(checked ? rows.map((row) => row.id) : [])
   }
 
   const toggleSelectRow = (id: number, checked: boolean) => {
@@ -690,6 +696,7 @@ export default function MapelPage() {
           kode_kelas: kelasFilter === "all" ? undefined : kelasFilter,
           id_petugas: petugasFilter === "all" ? undefined : toNumber(petugasFilter, 0),
           tahun_ajaran: selectedKodeTahun || undefined,
+          kode_unit: selectedKodeUnit || undefined,
           semester: semesterFilter === "all" ? undefined : Number(semesterFilter),
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
         })
@@ -707,9 +714,9 @@ export default function MapelPage() {
     void run()
   }
 
-  const visibleStart = visibleRows.length === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
-  const visibleEnd = visibleRows.length === 0 ? 0 : Math.min((currentPage - 1) * rowsLimit + visibleRows.length, totalItems)
-  const allSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
+  const visibleStart = rows.length === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
+  const visibleEnd = rows.length === 0 ? 0 : Math.min((currentPage - 1) * rowsLimit + rows.length, totalItems)
+  const allSelected = rows.length > 0 && rows.every((row) => selectedIds.includes(row.id))
 
   return (
     <div className="space-y-6">
@@ -735,13 +742,14 @@ export default function MapelPage() {
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label>Kode Unit</Label>
-                    <Select value={formUnitFilter} onValueChange={setFormUnitFilter}>
+                    <Select value={selectedKodeUnit || ""} disabled={!selectedKodeUnit} onValueChange={() => {}}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih unit" />
+                        <SelectValue placeholder={selectedKodeUnit ? "Pilih unit" : "Pilih unit di Header terlebih dahulu"} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Semua Unit</SelectItem>
-                        {unitOptions.map((option) => (
+                        {unitOptions
+                          .filter((option) => option.value === selectedKodeUnit)
+                          .map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.value} - {option.label}
                           </SelectItem>
@@ -898,56 +906,29 @@ export default function MapelPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                 <div className="space-y-2">
                   <Label htmlFor="mapel-keyword">Kata Kunci</Label>
                   <Input
                     id="mapel-keyword"
                     placeholder="Cari kode mapel / nama mapel"
-                    value={keyword}
-                    onChange={(event) => {
-                      setKeyword(event.target.value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftKeyword}
+                    onChange={(event) => setDraftKeyword(event.target.value)}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label>Kode Unit</Label>
-                  <Select
-                    value={unitFilter}
-                    onValueChange={(value) => {
-                      setUnitFilter(value)
-                      setCurrentPage(1)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.value} - {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
                 <div className="space-y-2">
                   <Label>Kelas</Label>
                   <Select
-                    value={kelasFilter}
-                    onValueChange={(value) => {
-                      setKelasFilter(value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftKelasFilter}
+                    onValueChange={(value) => setDraftKelasFilter(value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih kelas" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Semua Kelas</SelectItem>
-                      {kelasByUnit.map((option) => (
+                      {draftKelasByUnit.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
                         </SelectItem>
@@ -958,11 +939,8 @@ export default function MapelPage() {
                 <div className="space-y-2">
                   <Label>Nama Petugas</Label>
                   <Select
-                    value={petugasFilter}
-                    onValueChange={(value) => {
-                      setPetugasFilter(value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftPetugasFilter}
+                    onValueChange={(value) => setDraftPetugasFilter(value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih petugas" />
@@ -980,11 +958,8 @@ export default function MapelPage() {
                 <div className="space-y-2">
                   <Label>Semester</Label>
                   <Select
-                    value={semesterFilter}
-                    onValueChange={(value) => {
-                      setSemesterFilter(value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftSemesterFilter}
+                    onValueChange={(value) => setDraftSemesterFilter(value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih semester" />
@@ -999,11 +974,8 @@ export default function MapelPage() {
                 <div className="space-y-2">
                   <Label>Status</Label>
                   <Select
-                    value={statusFilter}
-                    onValueChange={(value) => {
-                      setStatusFilter(value as UiStatus | "all")
-                      setCurrentPage(1)
-                    }}
+                    value={draftStatusFilter}
+                    onValueChange={(value) => setDraftStatusFilter(value as UiStatus | "all")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih status" />
@@ -1017,9 +989,19 @@ export default function MapelPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
+              <div className="mt-6 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={() => {
+                  setKeyword(draftKeyword)
+                  setKelasFilter(draftKelasFilter)
+                  setPetugasFilter(draftPetugasFilter)
+                  setSemesterFilter(draftSemesterFilter)
+                  setStatusFilter(draftStatusFilter)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>
@@ -1094,14 +1076,14 @@ export default function MapelPage() {
               </TableHeader>
 
               <TableBody>
-                {visibleRows.length === 0 ? (
+                {rows.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="py-10 text-center text-muted-foreground">
                       {isLoading ? "Memuat data kelas mapel..." : "Data kelas mapel tidak ditemukan."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  visibleRows.map((row, index) => (
+                  rows.map((row, index) => (
                     <TableRow key={row.id}>
                       <TableCell className="text-center">
                         <input

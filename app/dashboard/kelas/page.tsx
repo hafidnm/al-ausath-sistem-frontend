@@ -179,6 +179,10 @@ export default function KelasPage() {
   const [kelasFilter, setKelasFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
 
+  const [draftKeyword, setDraftKeyword] = useState("")
+  const [draftKelasFilter, setDraftKelasFilter] = useState("all")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<UiStatus | "all">("all")
+
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -304,6 +308,7 @@ export default function KelasPage() {
     const exists = kelasFilterOptions.some((option) => option.value === kelasFilter)
     if (!exists) {
       setKelasFilter("all")
+      setDraftKelasFilter("all")
       setCurrentPage(1)
     }
   }, [kelasFilter, kelasFilterOptions])
@@ -314,6 +319,9 @@ export default function KelasPage() {
   }, [isInitDone, currentPage, rowsPerPage, keyword, selectedKodeUnit, kelasFilter, selectedKodeTahun, statusFilter])
 
   const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftKelasFilter("all")
+    setDraftStatusFilter("all")
     setKeyword("")
     setKelasFilter("all")
     setStatusFilter("all")
@@ -687,20 +695,18 @@ export default function KelasPage() {
                   <Input
                     id="kelas-keyword"
                     placeholder="Masukan kata kunci pencarian"
-                    value={keyword}
+                    value={draftKeyword}
                     onChange={(event) => {
-                      setKeyword(event.target.value)
-                      setCurrentPage(1)
+                      setDraftKeyword(event.target.value)
                     }}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>
                   <Select
-                    value={kelasFilter}
+                    value={draftKelasFilter}
                     onValueChange={(value) => {
-                      setKelasFilter(value)
-                      setCurrentPage(1)
+                      setDraftKelasFilter(value)
                     }}
                   >
                     <SelectTrigger>
@@ -719,10 +725,9 @@ export default function KelasPage() {
                 <div className="space-y-2">
                   <Label>Status</Label>
                   <Select
-                    value={statusFilter}
+                    value={draftStatusFilter}
                     onValueChange={(value) => {
-                      setStatusFilter(value as UiStatus | "all")
-                      setCurrentPage(1)
+                      setDraftStatusFilter(value as UiStatus | "all")
                     }}
                   >
                     <SelectTrigger>
@@ -737,9 +742,17 @@ export default function KelasPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
+              <div className="mt-6 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={() => {
+                  setKeyword(draftKeyword)
+                  setKelasFilter(draftKelasFilter)
+                  setStatusFilter(draftStatusFilter)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>

@@ -160,6 +160,10 @@ export default function GuruPage() {
   const [searchKeyword, setSearchKeyword] = useState("")
   const [statusFilter, setStatusFilter] = useState<GuruStatus | "all">("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
+
+  const [draftSearchKeyword, setDraftSearchKeyword] = useState("")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<GuruStatus | "all">("all")
+  const [draftRoleFilter, setDraftRoleFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("nama")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -296,9 +300,13 @@ export default function GuruPage() {
   }
 
   const resetFilter = () => {
+    setDraftSearchKeyword("")
+    setDraftStatusFilter("all")
+    setDraftRoleFilter("all")
     setSearchKeyword("")
     setStatusFilter("all")
     setRoleFilter("all")
+    setCurrentPage(1)
   }
 
   const openEditDialog = (id: number) => {
@@ -627,14 +635,14 @@ export default function GuruPage() {
                   <Input
                     id="search-keyword"
                     placeholder="Masukan kata kunci pencarian"
-                    value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
+                    value={draftSearchKeyword}
+                    onChange={(event) => setDraftSearchKeyword(event.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as GuruStatus | "all")}>
+                  <Select value={draftStatusFilter} onValueChange={(value) => setDraftStatusFilter(value as GuruStatus | "all")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
@@ -648,7 +656,7 @@ export default function GuruPage() {
 
                 <div className="space-y-2">
                   <Label>Peran Petugas</Label>
-                  <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <Select value={draftRoleFilter} onValueChange={setDraftRoleFilter}>
                     <SelectTrigger>
                       <SelectValue placeholder="Peran petugas" />
                     </SelectTrigger>
@@ -666,7 +674,15 @@ export default function GuruPage() {
 
               <div className="mt-4 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={() => {
+                  setSearchKeyword(draftSearchKeyword)
+                  setStatusFilter(draftStatusFilter)
+                  setRoleFilter(draftRoleFilter)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>

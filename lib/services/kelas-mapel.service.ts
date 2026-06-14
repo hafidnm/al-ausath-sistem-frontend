@@ -42,6 +42,7 @@ export interface DataKelasMapelListParams {
   q?: string
   kode_kelas?: string
   kode_mapel?: string
+  kode_unit?: string
   id_petugas?: number
   tahun_ajaran?: string
   semester?: number

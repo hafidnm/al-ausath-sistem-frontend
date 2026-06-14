@@ -318,6 +318,13 @@ export const dataSantriService = {
     }
   },
 
+  async getStats(
+    params?: Omit<DataSantriListParams, "per_page" | "page" | "status">,
+  ): Promise<{ total: number; aktif: number; lulus: number; keluar: number; cuti: number }> {
+    const response = await api.get(`${SANTRI_BASE_PATH}/stats`, { params })
+    return response.data
+  },
+
   async getById(id: number): Promise<DataSantriApiItem> {
     const response = await api.get<DataSantriShowApiResponse>(`${SANTRI_BASE_PATH}/${id}`)
     return extractItem(response.data)

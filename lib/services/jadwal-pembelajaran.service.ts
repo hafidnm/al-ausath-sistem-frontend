@@ -71,6 +71,9 @@ export interface DataJadwalPembelajaranApiItem {
 
 export interface DataJadwalPembelajaranListParams {
   q?: string
+  kode_unit?: string
+  kode_kelas?: string
+  kode_mapel?: string
   id_kelas_mapel?: number
   id_petugas?: number
   tahun_ajaran?: string

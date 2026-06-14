@@ -143,6 +143,7 @@ export interface KelasItem {
   nama_kelas?: string
   tahun_ajaran?: string
   kode_unit?: string
+  status?: string
 }
 
 export interface GetKelasParams {
@@ -341,6 +342,7 @@ const normalizeKelasItem = (raw: any): KelasItem => ({
     ?? raw?.tahun_ajaran_relasi?.tahun_ajaran,
   ),
   kode_unit: toText(raw?.kode_unit ?? raw?.kelas?.kode_unit),
+  status: toText(raw?.status ?? raw?.kelas?.status),
 })
 
 export const kelasService = {

@@ -117,7 +117,9 @@ export default function TahunAjaranPage() {
 
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState("")
+  const [draftSearchKeyword, setDraftSearchKeyword] = useState("")
   const [statusFilter, setStatusFilter] = useState<"all" | YearStatus>("all")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<"all" | YearStatus>("all")
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -180,7 +182,7 @@ export default function TahunAjaranPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchKeyword, statusFilter, rowsPerPage])
+  }, [rowsPerPage])
 
   useEffect(() => {
     setSelectedIds([])
@@ -221,8 +223,17 @@ export default function TahunAjaranPage() {
   }
 
   const resetFilter = () => {
+    setDraftSearchKeyword("")
+    setDraftStatusFilter("all")
     setSearchKeyword("")
     setStatusFilter("all")
+    setCurrentPage(1)
+  }
+
+  const applyFilter = () => {
+    setSearchKeyword(draftSearchKeyword)
+    setStatusFilter(draftStatusFilter)
+    setCurrentPage(1)
   }
 
   const openEditDialog = (rowId: number) => {
@@ -584,14 +595,14 @@ export default function TahunAjaranPage() {
                   <Input
                     id="search-year"
                     placeholder="Cari kode tahun, nama tahun, atau keterangan"
-                    value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
+                    value={draftSearchKeyword}
+                    onChange={(event) => setDraftSearchKeyword(event.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as "all" | YearStatus)}>
+                  <Select value={draftStatusFilter} onValueChange={(value) => setDraftStatusFilter(value as "all" | YearStatus)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Semua Status" />
                     </SelectTrigger>
@@ -604,9 +615,12 @@ export default function TahunAjaranPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={applyFilter}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>

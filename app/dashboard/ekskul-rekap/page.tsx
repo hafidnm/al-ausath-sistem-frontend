@@ -20,9 +20,11 @@ import { ekskulService, EkskulApiItem, PendaftaranApiItem } from "@/lib/services
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { dataSantriService, DataSantriApiItem } from "@/lib/services/santri.service"
 import { Download, Search, Users, PlusCircle, MoreVertical, PencilLine, Trash2, CheckCircle2 } from "lucide-react"
+import { useUnit } from "@/contexts/unit-context"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface UnitOption { value: string; label: string }
-interface KelasOption { kode_kelas: string; nama_kelas: string; kode_unit: string; status?: string }
+interface KelasOption { kode_kelas: string; nama_kelas: string; kode_unit: string; status?: string; tahun_ajaran?: string }
 
 // ─── Dialog Tambah ─────────────────────────────────────────────────────────────
 interface AddDialogProps {
@@ -32,9 +34,11 @@ interface AddDialogProps {
   unitOptions: UnitOption[]
   allKelas: KelasOption[]
   ekskulOptions: EkskulApiItem[]
+  selectedKodeUnit: string | null
+  selectedKodeTahun: string | null
 }
 
-function AddPendaftarDialog({ open, onClose, onSaved, unitOptions, allKelas, ekskulOptions }: AddDialogProps) {
+function AddPendaftarDialog({ open, onClose, onSaved, unitOptions, allKelas, ekskulOptions, selectedKodeUnit, selectedKodeTahun }: AddDialogProps) {
   const { toast } = useToast()
   const [filterUnit, setFilterUnit] = useState("")
   const [filterKelas, setFilterKelas] = useState("")
@@ -47,17 +51,17 @@ function AddPendaftarDialog({ open, onClose, onSaved, unitOptions, allKelas, eks
   // Reset tiap kali dialog dibuka
   useEffect(() => {
     if (open) {
-      setFilterUnit("")
+      setFilterUnit(selectedKodeUnit || "")
       setFilterKelas("")
       setSantriList([])
       setSelectedSantri(null)
       setSelectedEkskul("")
     }
-  }, [open])
+  }, [open, selectedKodeUnit])
 
-  // Filter kelas berdasarkan unit yang dipilih — hanya yang AKTIF
+  // Filter kelas berdasarkan unit dan tahun ajaran yang aktif
   const kelasByUnit = filterUnit
-    ? allKelas.filter(k => k.kode_unit === filterUnit && k.status === "AKTIF")
+    ? allKelas.filter(k => k.kode_unit === filterUnit && k.status === "AKTIF" && k.tahun_ajaran === selectedKodeTahun)
     : []
 
   // Reset kelas kalau unit berubah
@@ -312,6 +316,8 @@ function EditPendaftarDialog({ open, onClose, onSaved, row, allKelas, ekskulOpti
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function EkskulRekapPage() {
   const { toast } = useToast()
+  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeTahun } = useTahunAjaran()
   const initCalledRef = useRef(false)
 
   const [rows, setRows] = useState<PendaftaranApiItem[]>([])
@@ -322,8 +328,9 @@ export default function EkskulRekapPage() {
   const [isExporting, setIsExporting] = useState(false)
 
   const [filterEkskul, setFilterEkskul] = useState("all")
-  const [filterUnit, setFilterUnit] = useState("all")
+  const [draftEkskul, setDraftEkskul] = useState("all")
   const [keyword, setKeyword] = useState("")
+  const [draftKeyword, setDraftKeyword] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -335,10 +342,10 @@ export default function EkskulRekapPage() {
   const buildParams = useCallback(() => {
     const params: Record<string, unknown> = { page: currentPage, per_page: 25 }
     if (filterEkskul !== "all") params.id_ekskul = filterEkskul
-    if (filterUnit !== "all") params.kode_unit = filterUnit
+    if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
     if (keyword.trim()) params.q = keyword.trim()
     return params
-  }, [currentPage, filterEkskul, filterUnit, keyword])
+  }, [currentPage, filterEkskul, selectedKodeUnit, keyword])
 
   const fetchRows = useCallback(async () => {
     setIsLoading(true)
@@ -370,12 +377,21 @@ export default function EkskulRekapPage() {
     void load()
   }, [])
 
-  useEffect(() => { void fetchRows() }, [currentPage, filterEkskul, filterUnit])
+  useEffect(() => { void fetchRows() }, [currentPage, filterEkskul, selectedKodeUnit, keyword])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
+    setKeyword(draftKeyword)
+    setFilterEkskul(draftEkskul)
     setCurrentPage(1)
-    void fetchRows()
+  }
+
+  const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftEkskul("all")
+    setKeyword("")
+    setFilterEkskul("all")
+    setCurrentPage(1)
   }
 
   const handleExport = async () => {
@@ -383,7 +399,7 @@ export default function EkskulRekapPage() {
     try {
       const params: Record<string, unknown> = {}
       if (filterEkskul !== "all") params.id_ekskul = filterEkskul
-      if (filterUnit !== "all") params.kode_unit = filterUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (keyword.trim()) params.q = keyword.trim()
 
       const blob = await ekskulService.exportRekap(params)
@@ -432,31 +448,34 @@ export default function EkskulRekapPage() {
 
       {/* Filters */}
       <Card>
-        <CardContent className="p-4 flex flex-wrap gap-3 items-center">
-          <Select value={filterEkskul} onValueChange={v => { setFilterEkskul(v); setCurrentPage(1) }}>
-            <SelectTrigger className="w-52"><SelectValue placeholder="Semua Ekskul" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Ekskul</SelectItem>
-              {ekskulOptions.map(e => (
-                <SelectItem key={e.id_ekskul} value={String(e.id_ekskul)}>{e.nama_ekskul}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filterUnit} onValueChange={v => { setFilterUnit(v); setCurrentPage(1) }}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Semua Unit" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Unit</SelectItem>
-              {unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <form onSubmit={handleSearch} className="flex gap-2 ml-auto">
-            <Input
-              value={keyword}
-              onChange={e => setKeyword(e.target.value)}
-              placeholder="Cari nama santri..."
-              className="w-56"
-            />
-            <Button type="submit" size="icon" variant="secondary"><Search className="w-4 h-4" /></Button>
+        <CardContent className="p-4 flex flex-wrap gap-3 items-end">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Ekskul</Label>
+            <Select value={draftEkskul} onValueChange={setDraftEkskul}>
+              <SelectTrigger className="w-52 h-9"><SelectValue placeholder="Semua Ekskul" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Ekskul</SelectItem>
+                {ekskulOptions
+                  .filter(e => !selectedKodeUnit || !e.kode_unit || e.kode_unit === selectedKodeUnit)
+                  .map(e => (
+                    <SelectItem key={e.id_ekskul} value={String(e.id_ekskul)}>{e.nama_ekskul}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <form onSubmit={handleSearch} className="flex gap-2 items-end ml-auto">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Cari Nama</Label>
+              <Input
+                value={draftKeyword}
+                onChange={e => setDraftKeyword(e.target.value)}
+                placeholder="Cari nama santri..."
+                className="w-56 h-9"
+              />
+            </div>
+            <Button type="button" variant="outline" className="h-9" onClick={resetFilter}>Reset</Button>
+            <Button type="submit" className="h-9">Terapkan</Button>
           </form>
         </CardContent>
       </Card>
@@ -549,6 +568,8 @@ export default function EkskulRekapPage() {
         unitOptions={unitOptions}
         allKelas={allKelas}
         ekskulOptions={ekskulOptions}
+        selectedKodeUnit={selectedKodeUnit}
+        selectedKodeTahun={selectedKodeTahun}
       />
 
       {/* Dialog Edit */}

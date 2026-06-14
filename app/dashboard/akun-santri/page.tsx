@@ -66,7 +66,6 @@ interface AkunFormData {
 }
 
 interface FilterOptions {
-  units: string[]
   classes: {
     value: string
     label: string
@@ -149,7 +148,11 @@ export default function AkunSantriPage() {
   const [rows, setRows] = useState<AkunRow[]>([])
   const [selectedKeyword, setSelectedKeyword] = useState("")
   const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedStatus, setSelectedStatus] = useState<"all" | BackendAkunSantriStatus>("all")
+  const [selectedStatus, setSelectedStatus] = useState<BackendAkunSantriStatus | "all">("all")
+
+  const [draftSelectedKeyword, setDraftSelectedKeyword] = useState("")
+  const [draftSelectedKelas, setDraftSelectedKelas] = useState("all")
+  const [draftSelectedStatus, setDraftSelectedStatus] = useState<BackendAkunSantriStatus | "all">("all")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   const { selectedKodeTahun } = useTahunAjaran()
@@ -181,7 +184,7 @@ export default function AkunSantriPage() {
   const [addSantriOptions, setAddSantriOptions] = useState<DataAkunSantriTanpaAkunItem[]>([])
   const [addSelectedNis, setAddSelectedNis] = useState("")
 
-  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ units: [], classes: [] })
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({ classes: [] })
   const rowsLimit = Number(rowsPerPage)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [isBulkActionLoading, setIsBulkActionLoading] = useState(false)
@@ -236,19 +239,7 @@ export default function AkunSantriPage() {
 
   const loadFilterOptions = async () => {
     try {
-      const [unitResult, kelasResult, tahunResult] = await Promise.all([
-        dataUnitService.getAll({ page: 1, per_page: 300 }),
-        dataKelasService.getAll({ page: 1, per_page: 300 }),
-        dataSantriService.getAll({ page: 1, per_page: 300 }),
-      ])
-
-      const units = Array.from(
-        new Set(
-          unitResult.data
-            .map((item) => toText(item.kode_unit).trim())
-            .filter((item) => item.length > 0),
-        ),
-      )
+      const kelasResult = await dataKelasService.getAll({ page: 1, per_page: 300 })
 
       const kelasSeen = new Set<string>()
       const classes = kelasResult.data
@@ -266,9 +257,9 @@ export default function AkunSantriPage() {
           return true
         })
 
-      setFilterOptions({ units, classes })
+      setFilterOptions({ classes })
     } catch {
-      setFilterOptions({ units: [], classes: [] })
+      setFilterOptions({ classes: [] })
     }
   }
 
@@ -327,6 +318,7 @@ export default function AkunSantriPage() {
     const existsInSelectedUnit = filteredClassOptions.some((item) => item.value === selectedKelas)
     if (!existsInSelectedUnit) {
       setSelectedKelas("all")
+      setDraftSelectedKelas("all")
     }
   }, [filteredClassOptions, selectedKelas])
 
@@ -553,9 +545,13 @@ export default function AkunSantriPage() {
   }
 
   const resetFilter = () => {
+    setDraftSelectedKeyword("")
+    setDraftSelectedKelas("all")
+    setDraftSelectedStatus("all")
     setSelectedKeyword("")
     setSelectedKelas("all")
     setSelectedStatus("all")
+    setCurrentPage(1)
   }
 
   const formFields = (
@@ -570,7 +566,6 @@ export default function AkunSantriPage() {
             <Label>Pilih Kelas</Label>
             <Select
               value={addSelectedKelas}
-              disabled={!selectedKodeUnit}
               onValueChange={async (val) => {
                 setAddSelectedKelas(val)
                 setAddSelectedNis("")
@@ -588,14 +583,14 @@ export default function AkunSantriPage() {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder={selectedKodeUnit ? "Pilih Kelas" : "Pilih unit di Header terlebih dahulu"} />
+                <SelectValue placeholder="Pilih Kelas" />
               </SelectTrigger>
               <SelectContent>
                 {filterOptions.classes
-                  .filter((cls) => cls.kodeUnit === selectedKodeUnit && cls.tahunAjaran === selectedKodeTahun && cls.status === "AKTIF")
+                  .filter((cls) => (!selectedKodeUnit || cls.kodeUnit === selectedKodeUnit) && cls.tahunAjaran === selectedKodeTahun && cls.status === "AKTIF")
                   .map((cls) => (
                     <SelectItem key={cls.value} value={cls.value}>
-                      {cls.label}
+                      {cls.label} {cls.kodeUnit && `(${cls.kodeUnit})`}
                     </SelectItem>
                   ))}
               </SelectContent>
@@ -803,8 +798,8 @@ export default function AkunSantriPage() {
                   <Label>Kata Kunci</Label>
                   <Input
                     placeholder="Masukan kata kunci pencarian"
-                    value={selectedKeyword}
-                    onChange={(event) => setSelectedKeyword(event.target.value)}
+                    value={draftSelectedKeyword}
+                    onChange={(event) => setDraftSelectedKeyword(event.target.value)}
                   />
                 </div>
 
@@ -812,7 +807,7 @@ export default function AkunSantriPage() {
 
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>
-                  <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+                  <Select value={draftSelectedKelas} onValueChange={setDraftSelectedKelas}>
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Kelas" />
                     </SelectTrigger>
@@ -829,7 +824,7 @@ export default function AkunSantriPage() {
 
                 <div className="space-y-2">
                   <Label>Status</Label>
-                  <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as "all" | BackendAkunSantriStatus)}>
+                  <Select value={draftSelectedStatus} onValueChange={(value) => setDraftSelectedStatus(value as "all" | BackendAkunSantriStatus)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Status" />
                     </SelectTrigger>
@@ -843,11 +838,16 @@ export default function AkunSantriPage() {
               </div>
 
               <div className="mt-4 flex items-center gap-2">
-                <Button className="bg-primary text-primary-foreground" onClick={() => void fetchRows()}>
-                  Terapkan Filter
+                <Button className="bg-primary text-primary-foreground" onClick={() => {
+                  setSelectedKeyword(draftSelectedKeyword)
+                  setSelectedKelas(draftSelectedKelas)
+                  setSelectedStatus(draftSelectedStatus)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
                 </Button>
               </div>
             </CardContent>

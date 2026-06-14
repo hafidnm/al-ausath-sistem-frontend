@@ -36,6 +36,7 @@ import {
 } from "@/lib/services/mata-pelajaran.service"
 import { dataUnitService } from "@/lib/services/unit.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { useUnit } from "@/contexts/unit-context"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -133,6 +134,7 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 
 export default function MapelPage() {
   const { toast } = useToast()
+  const { selectedKodeUnit } = useUnit()
 
   const [rows, setRows] = useState<MapelRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -156,8 +158,11 @@ export default function MapelPage() {
 
   const [keyword, setKeyword] = useState("")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
-  const [kodeUnitFilter, setKodeUnitFilter] = useState<string | "all">("all")
   const [kelompokMapelFilter, setKelompokMapelFilter] = useState<string | "all">("all")
+
+  const [draftKeyword, setDraftKeyword] = useState("")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<UiStatus | "all">("all")
+  const [draftKelompokMapelFilter, setDraftKelompokMapelFilter] = useState<string | "all">("all")
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -184,7 +189,7 @@ export default function MapelPage() {
       const q = keyword.trim()
       if (q) params.q = q
       if (statusFilter !== "all") params.status = toBackendStatus(statusFilter)
-      if (kodeUnitFilter !== "all") params.kode_unit = kodeUnitFilter
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (kelompokMapelFilter !== "all") params.kelompok_mapel = kelompokMapelFilter
 
       const result = await dataMataPelajaranService.getAll(params)
@@ -240,27 +245,19 @@ export default function MapelPage() {
   const kelompokMapelOptions = useMemo(() => {
     const values = new Set<string>()
     for (const item of allMapelOptions) {
-      if (kodeUnitFilter !== "all" && item.kode_unit !== kodeUnitFilter) continue
+      if (selectedKodeUnit && item.kode_unit !== selectedKodeUnit) continue
       const name = toText(item.kelompok_mapel).trim()
       if (name) values.add(name)
     }
     return Array.from(values).sort((a, b) => a.localeCompare(b, "id"))
-  }, [allMapelOptions, kodeUnitFilter])
-
-  useEffect(() => {
-    if (kodeUnitFilter === "all") return
-    const exists = unitOptions.some((option) => option.value === kodeUnitFilter)
-    if (!exists) {
-      setKodeUnitFilter("all")
-      setCurrentPage(1)
-    }
-  }, [kodeUnitFilter, unitOptions])
+  }, [allMapelOptions, selectedKodeUnit])
 
   useEffect(() => {
     if (kelompokMapelFilter === "all") return
     const exists = kelompokMapelOptions.some((option) => option === kelompokMapelFilter)
     if (!exists) {
       setKelompokMapelFilter("all")
+      setDraftKelompokMapelFilter("all")
       setCurrentPage(1)
     }
   }, [kelompokMapelFilter, kelompokMapelOptions])
@@ -268,12 +265,14 @@ export default function MapelPage() {
   useEffect(() => {
     if (!initDoneRef.current) return
     void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, statusFilter, kodeUnitFilter, kelompokMapelFilter])
+  }, [currentPage, rowsPerPage, keyword, statusFilter, selectedKodeUnit, kelompokMapelFilter])
 
   const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftStatusFilter("all")
+    setDraftKelompokMapelFilter("all")
     setKeyword("")
     setStatusFilter("all")
-    setKodeUnitFilter("all")
     setKelompokMapelFilter("all")
     setCurrentPage(1)
   }
@@ -499,7 +498,7 @@ export default function MapelPage() {
         const blob = await dataMataPelajaranService.exportCsv({
           q: keyword.trim() || undefined,
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
-          kode_unit: kodeUnitFilter === "all" ? undefined : kodeUnitFilter,
+          kode_unit: selectedKodeUnit || undefined,
           kelompok_mapel: kelompokMapelFilter === "all" ? undefined : kelompokMapelFilter,
         })
 
@@ -576,10 +575,12 @@ export default function MapelPage() {
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeUnit: value || null }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih unit" />
+                        <SelectValue placeholder="Pilih unit (wajib)" />
                       </SelectTrigger>
                       <SelectContent>
-                        {unitOptions.map((option) => (
+                        {unitOptions
+                          .filter((option) => !selectedKodeUnit || option.value === selectedKodeUnit)
+                          .map((option) => (
                           <SelectItem key={option.value} value={option.value}>
                             {option.value} - {option.label}
                           </SelectItem>
@@ -674,27 +675,21 @@ export default function MapelPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label htmlFor="mapel-keyword">Kata Kunci</Label>
                   <Input
                     id="mapel-keyword"
                     placeholder="Cari kode mapel / nama mapel / kelompok"
-                    value={keyword}
-                    onChange={(event) => {
-                      setKeyword(event.target.value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftKeyword}
+                    onChange={(event) => setDraftKeyword(event.target.value)}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Status</Label>
                   <Select
-                    value={statusFilter}
-                    onValueChange={(value) => {
-                      setStatusFilter(value as UiStatus | "all")
-                      setCurrentPage(1)
-                    }}
+                    value={draftStatusFilter}
+                    onValueChange={(value) => setDraftStatusFilter(value as UiStatus | "all")}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih status" />
@@ -706,36 +701,12 @@ export default function MapelPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label>Kode Unit</Label>
-                  <Select
-                    value={kodeUnitFilter}
-                    onValueChange={(value) => {
-                      setKodeUnitFilter(value)
-                      setCurrentPage(1)
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.value} - {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+
                 <div className="space-y-2">
                   <Label>Kelompok Mapel</Label>
                   <Select
-                    value={kelompokMapelFilter}
-                    onValueChange={(value) => {
-                      setKelompokMapelFilter(value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftKelompokMapelFilter}
+                    onValueChange={(value) => setDraftKelompokMapelFilter(value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih kelompok mapel" />
@@ -752,9 +723,17 @@ export default function MapelPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
+              <div className="mt-6 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={() => {
+                  setKeyword(draftKeyword)
+                  setStatusFilter(draftStatusFilter)
+                  setKelompokMapelFilter(draftKelompokMapelFilter)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>

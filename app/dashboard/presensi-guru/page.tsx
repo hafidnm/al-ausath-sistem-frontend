@@ -21,6 +21,7 @@ import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 interface RekapPetugasRow {
   id_petugas: number
@@ -42,6 +43,7 @@ type JadwalOption = { id: number; label: string; mapel: string; kelas: string; h
 export default function PresensiGuruPage() {
   const [activeTab, setActiveTab] = useState("rekap")
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
   
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
@@ -55,24 +57,11 @@ export default function PresensiGuruPage() {
     tanggal_selesai: "",
     q: "",
   })
-  const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
-
-  // Sync from global header tahun ajaran
-  useEffect(() => {
-    if (selectedKodeTahun) {
-      setSelectedTahunAjaranRekap(selectedKodeTahun)
-      setSelectedTahunAjaran(selectedKodeTahun)
-    }
-  }, [selectedKodeTahun])
 
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
   const [sesiLoading, setSesiLoading] = useState(false)
-  const [selectedUnitSesi, setSelectedUnitSesi] = useState("ALL")
   const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
-  const [kelasSesiOptions, setKelasSesiOptions] = useState<KelasItem[]>([])
-  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
     status_sesi: "SELESAI",
@@ -83,9 +72,7 @@ export default function PresensiGuruPage() {
   // States for Belum Diabsen
   const [belumDiabsenRows, setBelumDiabsenRows] = useState<any[]>([])
   const [belumDiabsenLoading, setBelumDiabsenLoading] = useState(false)
-  const [selectedUnitBelum, setSelectedUnitBelum] = useState("ALL")
   const [selectedKelasBelum, setSelectedKelasBelum] = useState("ALL")
-  const [kelasBelumOptions, setKelasBelumOptions] = useState<KelasItem[]>([])
   const [filterBelumDiabsen, setFilterBelumDiabsen] = useState({
     tanggal: new Date().toISOString().slice(0, 10)
   })
@@ -93,7 +80,15 @@ export default function PresensiGuruPage() {
   // Options
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [jadwalOptions, setJadwalOptions] = useState<JadwalOption[]>([])
-  const [unitOptions, setUnitOptions] = useState<DataUnitApiItem[]>([])
+
+  const [allKelas, setAllKelas] = useState<KelasItem[]>([])
+  
+  const kelasOptions = useMemo(() => {
+    return allKelas.filter(k => 
+      (!selectedKodeUnit || k.kode_unit === selectedKodeUnit) &&
+      (!selectedKodeTahun || k.tahun_ajaran === selectedKodeTahun)
+    )
+  }, [allKelas, selectedKodeUnit, selectedKodeTahun])
 
   // States for Edit Absensi Guru (Admin)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -130,6 +125,9 @@ export default function PresensiGuruPage() {
       if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
         params.tahun_ajaran = selectedKodeTahun
       }
+      if (selectedKodeUnit && selectedKodeUnit !== "ALL") {
+        params.kode_unit = selectedKodeUnit
+      }
       const res = await sesiAbsensiService.adminGetLogAktivitas(params)
       setLogs(res.log_aktivitas || [])
       setAuditLogs(res.log_audit || [])
@@ -156,26 +154,36 @@ export default function PresensiGuruPage() {
     if (activeTab === "log_aktivitas" && isInitDone) {
       void loadLogs()
     }
-  }, [activeTab, isInitDone, selectedKodeTahun])
+  }, [activeTab, isInitDone, selectedKodeTahun, selectedKodeUnit])
 
   // Tab: Rekap (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!isInitDone || activeTab !== "rekap") return
+    if (!isInitDone || activeTab !== "rekap" || !selectedKodeTahun) return
     void loadRekap()
-  }, [isInitDone, activeTab, selectedTahunAjaranRekap, filterRekap.tanggal_mulai, filterRekap.tanggal_selesai, filterRekap.q])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitDone, activeTab, selectedKodeTahun, selectedKodeUnit])
 
   // Tab: Riwayat Sesi (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!isInitDone || activeTab !== "riwayat") return
+    if (!isInitDone || activeTab !== "riwayat" || !selectedKodeTahun) return
+    
+    // Auto-clear kelas filter
+    setSelectedKelasSesi("ALL")
+    
     void loadRiwayatSesi()
-  }, [isInitDone, activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.q, filterSesi.id_petugas_hadir])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitDone, activeTab, selectedKodeUnit, selectedKodeTahun])
 
   // Re-fetch saat tab "belum_diabsen" aktif atau saat filter dropdown/tahun berubah
   useEffect(() => {
-    if (activeTab === "belum_diabsen") {
-      void loadBelumDiabsen()
-    }
-  }, [activeTab, filterBelumDiabsen.tanggal, selectedUnitBelum, selectedKelasBelum, selectedKodeTahun])
+    if (!isInitDone || activeTab !== "belum_diabsen" || !selectedKodeTahun) return
+
+    // Auto-clear kelas filter
+    setSelectedKelasBelum("ALL")
+
+    void loadBelumDiabsen()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitDone, activeTab, selectedKodeUnit, selectedKodeTahun])
 
   const loadOptions = async () => {
     try {
@@ -203,18 +211,7 @@ export default function PresensiGuruPage() {
       }).filter((i: any) => i.id)
       setJadwalOptions(mappedJadwal)
       
-      setUnitOptions(initData.unit || [])
-      setKelasSesiOptions(initData.kelas || [])
-      setKelasBelumOptions(initData.kelas || [])
-
-      const tahunList = initData.tahun_ajaran || []
-      setTahunAjaranOptions(tahunList)
-
-      const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
-      if (activeTahun?.kode_tahun && !selectedKodeTahun) {
-        setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
-        setSelectedTahunAjaran(activeTahun.kode_tahun)
-      }
+      setAllKelas(initData.kelas || [])
 
       setIsInitDone(true)
     } catch (error) {
@@ -223,32 +220,15 @@ export default function PresensiGuruPage() {
     }
   }
 
-  const loadKelasSesiByUnit = async (kode_unit?: string) => {
-    try {
-      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
-      setKelasSesiOptions(kelasRes || [])
-    } catch (e) {
-      console.error("Gagal memuat kelas untuk riwayat sesi", e)
-    }
-  }
-
-  const loadKelasBelumByUnit = async (kode_unit?: string) => {
-    try {
-      const params: any = { per_page: "500", status: "AKTIF" }
-      if (kode_unit) params.kode_unit = kode_unit
-      const kelasRes = await kelasService.getAll(params)
-      setKelasBelumOptions(kelasRes || [])
-    } catch (e) {
-      console.error("Gagal memuat kelas untuk belum diabsen", e)
-    }
-  }
-
   const loadRekap = async () => {
     setRekapLoading(true)
     try {
       const params: any = { ...filterRekap, per_page: 100 }
-      if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
-        params.tahun_ajaran = selectedTahunAjaranRekap
+      if (selectedKodeTahun) {
+        params.tahun_ajaran = selectedKodeTahun
+      }
+      if (selectedKodeUnit) {
+        params.kode_unit = selectedKodeUnit
       }
       const response = await sesiAbsensiService.rekapPetugas(params)
       setRekapRows(response?.data || [])
@@ -263,18 +243,14 @@ export default function PresensiGuruPage() {
     }
   }
 
-  const loadRiwayatSesi = async (tahunOverride?: string) => {
+  const loadRiwayatSesi = async () => {
     setSesiLoading(true)
     try {
       const params: any = { ...filterSesi, per_page: 100 }
       if (params.id_petugas_hadir === "ALL") delete params.id_petugas_hadir
       if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
-      if (selectedUnitSesi !== "ALL") params.kode_unit = selectedUnitSesi
-      
-      const yearToUse = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaran
-      if (yearToUse !== "ALL") {
-        params.tahun_ajaran = yearToUse
-      }
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       
       const response = await sesiAbsensiService.getAll(params)
       setSesiRows(response as SesiAbsensiApiItem[])
@@ -289,21 +265,15 @@ export default function PresensiGuruPage() {
     }
   }
 
-  const loadBelumDiabsen = async (unitOverride?: string, kelasOverride?: string, dateOverride?: string) => {
+  const loadBelumDiabsen = async () => {
     setBelumDiabsenLoading(true)
     try {
-      const activeUnit = unitOverride !== undefined ? unitOverride : selectedUnitBelum
-      const activeKelas = kelasOverride !== undefined ? kelasOverride : selectedKelasBelum
-      const activeDate = dateOverride !== undefined ? dateOverride : filterBelumDiabsen.tanggal
-      
       const params: any = {
-        tanggal: activeDate
+        tanggal: filterBelumDiabsen.tanggal
       }
-      if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
-        params.tahun_ajaran = selectedKodeTahun
-      }
-      if (activeUnit !== "ALL") params.kode_unit = activeUnit
-      if (activeKelas !== "ALL") params.kode_kelas = activeKelas
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
+      if (selectedKelasBelum !== "ALL") params.kode_kelas = selectedKelasBelum
 
       const response = await sesiAbsensiService.adminGetBelumDiabsen(params)
       setBelumDiabsenRows(response || [])
@@ -320,8 +290,11 @@ export default function PresensiGuruPage() {
 
   const handleExport = (format: 'pdf' | 'excel') => {
     const params: any = { ...filterRekap }
-    if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
-      params.tahun_ajaran = selectedTahunAjaranRekap
+    if (selectedKodeTahun) {
+      params.tahun_ajaran = selectedKodeTahun
+    }
+    if (selectedKodeUnit) {
+      params.kode_unit = selectedKodeUnit
     }
     const url = sesiAbsensiService.getExportPetugasUrl(format, params)
     window.open(url, '_blank')
@@ -481,19 +454,6 @@ export default function PresensiGuruPage() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <CardTitle className="text-lg">Rekap Kehadiran Guru</CardTitle>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select value={selectedTahunAjaranRekap} onValueChange={setSelectedTahunAjaranRekap}>
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
-                      {tahunAjaranOptions.map((t) => (
-                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <Input
                     type="date"
                     value={filterRekap.tanggal_mulai}
@@ -517,7 +477,7 @@ export default function PresensiGuruPage() {
                       onChange={(e) => setFilterRekap({ ...filterRekap, q: e.target.value })}
                     />
                   </div>
-                  <Button variant="secondary" onClick={loadRekap}>Filter</Button>
+                  <Button variant="secondary" onClick={loadRekap}>Terapkan</Button>
                   
                   <div className="flex items-center gap-2 border-l pl-2 ml-2">
                     <Button variant="outline" className="gap-2" onClick={() => handleExport('excel')}>
@@ -591,44 +551,6 @@ export default function PresensiGuruPage() {
                   <CardTitle className="text-lg">Riwayat Sesi Absensi</CardTitle>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={selectedTahunAjaran}
-                    onValueChange={(val) => {
-                      setSelectedTahunAjaran(val)
-                    }}
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
-                      {tahunAjaranOptions.map((t) => (
-                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select 
-                    value={selectedUnitSesi} 
-                    onValueChange={(val) => {
-                      setSelectedUnitSesi(val)
-                      setSelectedKelasSesi("ALL")
-                      loadKelasSesiByUnit(val === "ALL" ? undefined : val)
-                    }}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Unit</SelectItem>
-                      {unitOptions.map((u) => (
-                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
                   <Select 
                     value={selectedKelasSesi} 
                     onValueChange={(val) => setSelectedKelasSesi(val)}
@@ -638,8 +560,8 @@ export default function PresensiGuruPage() {
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="ALL">Semua Kelas</SelectItem>
-                      {kelasSesiOptions.map((k) => (
-                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      {kelasOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} {k.status !== 'AKTIF' && '(Non-aktif)'}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -676,7 +598,7 @@ export default function PresensiGuruPage() {
                     </SelectContent>
                   </Select>
                   
-                  <Button variant="secondary" onClick={() => loadRiwayatSesi()}>Filter</Button>
+                  <Button variant="secondary" onClick={() => loadRiwayatSesi()}>Terapkan</Button>
                   
                   <div className="border-l pl-2 ml-2">
                     <Button onClick={openBukaSesiModal} className="bg-primary text-primary-foreground gap-2">
@@ -767,37 +689,16 @@ export default function PresensiGuruPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Select 
-                    value={selectedUnitBelum} 
-                    onValueChange={(val) => {
-                      setSelectedUnitBelum(val)
-                      setSelectedKelasBelum("ALL")
-                      loadKelasBelumByUnit(val === "ALL" ? undefined : val)
-                    }}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Unit</SelectItem>
-                      {unitOptions.map((u) => (
-                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select 
                     value={selectedKelasBelum} 
-                    onValueChange={(val) => {
-                      setSelectedKelasBelum(val)
-                    }}
+                    onValueChange={(val) => setSelectedKelasBelum(val)}
                   >
                     <SelectTrigger className="w-40">
                       <SelectValue placeholder="Kelas" />
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="ALL">Semua Kelas</SelectItem>
-                      {kelasBelumOptions.map((k) => (
-                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      {kelasOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} {k.status !== 'AKTIF' && '(Non-aktif)'}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -811,7 +712,7 @@ export default function PresensiGuruPage() {
                     className="w-40"
                   />
                   <Button variant="secondary" onClick={() => loadBelumDiabsen()} disabled={belumDiabsenLoading}>
-                    Filter
+                    Terapkan
                   </Button>
                 </div>
               </div>

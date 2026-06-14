@@ -164,6 +164,9 @@ export default function UnitPage() {
   const [searchKeyword, setSearchKeyword] = useState("")
   const [unitStatusFilter, setUnitStatusFilter] = useState<"all" | UnitStatus>("all")
 
+  const [draftSearchKeyword, setDraftSearchKeyword] = useState("")
+  const [draftUnitStatusFilter, setDraftUnitStatusFilter] = useState<"all" | UnitStatus>("all")
+
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
   const [sortField, setSortField] = useState<SortField>("urut")
@@ -451,8 +454,11 @@ export default function UnitPage() {
   }
 
   const resetFilter = () => {
+    setDraftSearchKeyword("")
+    setDraftUnitStatusFilter("all")
     setSearchKeyword("")
     setUnitStatusFilter("all")
+    setCurrentPage(1)
   }
 
   const selectedCount = selectedIds.length
@@ -594,16 +600,16 @@ export default function UnitPage() {
                   <Input
                     id="unit-search"
                     placeholder="Cari kode unit, nama unit, atau keterangan"
-                    value={searchKeyword}
-                    onChange={(event) => setSearchKeyword(event.target.value)}
+                    value={draftSearchKeyword}
+                    onChange={(event) => setDraftSearchKeyword(event.target.value)}
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label>Status Unit</Label>
                   <Select
-                    value={unitStatusFilter}
-                    onValueChange={(value) => setUnitStatusFilter(value as "all" | UnitStatus)}
+                    value={draftUnitStatusFilter}
+                    onValueChange={(value) => setDraftUnitStatusFilter(value as "all" | UnitStatus)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Semua status" />
@@ -617,9 +623,16 @@ export default function UnitPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end gap-2">
                 <Button variant="outline" onClick={resetFilter}>
-                  Reset Filter
+                  Reset
+                </Button>
+                <Button onClick={() => {
+                  setSearchKeyword(draftSearchKeyword)
+                  setUnitStatusFilter(draftUnitStatusFilter)
+                  setCurrentPage(1)
+                }}>
+                  Terapkan
                 </Button>
               </div>
             </CardContent>

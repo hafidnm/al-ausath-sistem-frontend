@@ -41,6 +41,7 @@ import { dataPetugasService } from "@/lib/services/petugas.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
 
 type UiStatus = "Aktif" | "Nonaktif"
@@ -298,6 +299,7 @@ const buildCsvFromRows = (rows: JadwalRow[]): string => {
 export default function JadwalPembelajaranPage() {
   const { toast } = useToast()
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
 
   const [rows, setRows] = useState<JadwalRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -325,7 +327,6 @@ export default function JadwalPembelajaranPage() {
   const [tahunOptions, setTahunOptions] = useState<OptionItem[]>([])
 
   const [keyword, setKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [mapelFilter, setMapelFilter] = useState("all")
   const [petugasFilter, setPetugasFilter] = useState("all")
@@ -333,12 +334,20 @@ export default function JadwalPembelajaranPage() {
   const [semesterFilter, setSemesterFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState<UiStatus | "all">("all")
 
-  // Sync from global header tahun ajaran
+  const [draftKeyword, setDraftKeyword] = useState("")
+  const [draftKelasFilter, setDraftKelasFilter] = useState("all")
+  const [draftMapelFilter, setDraftMapelFilter] = useState("all")
+  const [draftPetugasFilter, setDraftPetugasFilter] = useState("all")
+  const [draftHariFilter, setDraftHariFilter] = useState("all")
+  const [draftSemesterFilter, setDraftSemesterFilter] = useState("all")
+  const [draftStatusFilter, setDraftStatusFilter] = useState<UiStatus | "all">("all")
+
+  // Sync from global header tahun ajaran & unit
   useEffect(() => {
-    if (selectedKodeTahun) {
-      setCurrentPage(1)
+    if (isInitDone) {
+      resetFilter()
     }
-  }, [selectedKodeTahun])
+  }, [selectedKodeTahun, selectedKodeUnit, isInitDone])
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
@@ -382,23 +391,13 @@ export default function JadwalPembelajaranPage() {
 
   const resolvedRows = useMemo(() => rows.map((row) => resolveRowWithKelasMapel(row)), [rows, kelasMapelById])
 
-  const unitFilterOptions = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const option of kelasMapelOptions) {
-      if (!option.kodeUnit) continue
-      map.set(option.kodeUnit, option.namaUnit || option.kodeUnit)
-    }
 
-    return Array.from(map.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([value, label]) => ({ value, label }))
-  }, [kelasMapelOptions])
 
-  const kelasFilterOptions = useMemo(() => {
+  const draftKelasFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const option of kelasMapelOptions) {
       if (option.tahunAjaran !== selectedKodeTahun) continue
-      if (unitFilter !== "all" && option.kodeUnit !== unitFilter) continue
+      if (selectedKodeUnit && option.kodeUnit !== selectedKodeUnit) continue
       if (!option.kodeKelas) continue
       map.set(option.kodeKelas, option.namaKelas || option.kodeKelas)
     }
@@ -406,14 +405,14 @@ export default function JadwalPembelajaranPage() {
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([value, label]) => ({ value, label }))
-  }, [kelasMapelOptions, unitFilter, selectedKodeTahun])
+  }, [kelasMapelOptions, selectedKodeUnit, selectedKodeTahun])
 
-  const mapelFilterOptions = useMemo(() => {
+  const draftMapelFilterOptions = useMemo(() => {
     const map = new Map<string, string>()
     for (const option of kelasMapelOptions) {
       if (option.tahunAjaran !== selectedKodeTahun) continue
-      if (unitFilter !== "all" && option.kodeUnit !== unitFilter) continue
-      if (kelasFilter !== "all" && option.kodeKelas !== kelasFilter) continue
+      if (selectedKodeUnit && option.kodeUnit !== selectedKodeUnit) continue
+      if (draftKelasFilter !== "all" && option.kodeKelas !== draftKelasFilter) continue
       if (!option.kodeMapel) continue
       map.set(option.kodeMapel, option.namaMapel || option.kodeMapel)
     }
@@ -421,26 +420,14 @@ export default function JadwalPembelajaranPage() {
     return Array.from(map.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([value, label]) => ({ value, label }))
-  }, [kelasMapelOptions, unitFilter, kelasFilter, selectedKodeTahun])
+  }, [kelasMapelOptions, selectedKodeUnit, draftKelasFilter, selectedKodeTahun])
 
   const formKelasMapelOptions = useMemo(() => {
     return kelasMapelOptions.filter((option) => option.tahunAjaran === selectedKodeTahun && option.status === "AKTIF")
   }, [kelasMapelOptions, selectedKodeTahun])
 
-  const visibleRows = useMemo(() => {
+  const rowsToRender = useMemo(() => {
     let nextRows = resolvedRows
-
-    if (unitFilter !== "all") {
-      nextRows = nextRows.filter((row) => {
-        const related = row.idKelasMapel ? kelasMapelById.get(String(row.idKelasMapel)) : null
-        return related?.kodeUnit === unitFilter
-      })
-    }
-    if (kelasFilter !== "all") nextRows = nextRows.filter((row) => row.kodeKelas === kelasFilter)
-    if (mapelFilter !== "all") nextRows = nextRows.filter((row) => row.kodeMapel === mapelFilter)
-    if (petugasFilter !== "all") nextRows = nextRows.filter((row) => String(row.idPetugas ?? "") === petugasFilter)
-    if (hariFilter !== "all") nextRows = nextRows.filter((row) => row.hari === hariFilter)
-    if (semesterFilter !== "all") nextRows = nextRows.filter((row) => row.semester === Number(semesterFilter))
 
     return [...nextRows].sort((a, b) => {
       const dayA = dayOrder[toHariValue(a.hari)] || 99
@@ -453,7 +440,7 @@ export default function JadwalPembelajaranPage() {
 
       return a.id - b.id
     })
-  }, [resolvedRows, unitFilter, kelasFilter, mapelFilter, petugasFilter, hariFilter, semesterFilter, kelasMapelById])
+  }, [resolvedRows])
 
   const selectedCreateKelasMapel = useMemo(
     () => (formData.idKelasMapel ? kelasMapelById.get(formData.idKelasMapel) || null : null),
@@ -472,6 +459,9 @@ export default function JadwalPembelajaranPage() {
         page: number
         per_page: number
         q?: string
+        kode_unit?: string
+        kode_kelas?: string
+        kode_mapel?: string
         id_petugas?: number
         tahun_ajaran?: string
         hari?: string
@@ -484,6 +474,9 @@ export default function JadwalPembelajaranPage() {
 
       const q = keyword.trim()
       if (q) params.q = q
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
+      if (kelasFilter !== "all") params.kode_kelas = kelasFilter
+      if (mapelFilter !== "all") params.kode_mapel = mapelFilter
       if (petugasFilter !== "all") params.id_petugas = toNumber(petugasFilter, 0)
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
       if (hariFilter !== "all") params.hari = hariFilter
@@ -632,7 +625,7 @@ export default function JadwalPembelajaranPage() {
     currentPage,
     rowsPerPage,
     keyword,
-    unitFilter,
+    selectedKodeUnit,
     kelasFilter,
     mapelFilter,
     petugasFilter,
@@ -643,16 +636,16 @@ export default function JadwalPembelajaranPage() {
   ])
 
   useEffect(() => {
-    if (kelasFilter !== "all" && !kelasFilterOptions.some((option) => option.value === kelasFilter)) {
-      setKelasFilter("all")
+    if (draftKelasFilter !== "all" && !draftKelasFilterOptions.some((option) => option.value === draftKelasFilter)) {
+      setDraftKelasFilter("all")
     }
-  }, [kelasFilter, kelasFilterOptions])
+  }, [draftKelasFilter, draftKelasFilterOptions])
 
   useEffect(() => {
-    if (mapelFilter !== "all" && !mapelFilterOptions.some((option) => option.value === mapelFilter)) {
-      setMapelFilter("all")
+    if (draftMapelFilter !== "all" && !draftMapelFilterOptions.some((option) => option.value === draftMapelFilter)) {
+      setDraftMapelFilter("all")
     }
-  }, [mapelFilter, mapelFilterOptions])
+  }, [draftMapelFilter, draftMapelFilterOptions])
 
   useEffect(() => {
     if (!isAddDialogOpen || !formData.idKelasMapel) return
@@ -721,8 +714,14 @@ export default function JadwalPembelajaranPage() {
   }, [isEditDialogOpen, editingFormData.idKelasMapel, kelasMapelById])
 
   const resetFilter = () => {
+    setDraftKeyword("")
+    setDraftKelasFilter("all")
+    setDraftMapelFilter("all")
+    setDraftPetugasFilter("all")
+    setDraftHariFilter("all")
+    setDraftSemesterFilter("all")
+    setDraftStatusFilter("all")
     setKeyword("")
-    setUnitFilter("all")
     setKelasFilter("all")
     setMapelFilter("all")
     setPetugasFilter("all")
@@ -892,7 +891,7 @@ export default function JadwalPembelajaranPage() {
   }
 
   const toggleSelectAll = (checked: boolean) => {
-    setSelectedIds(checked ? visibleRows.map((row) => row.id) : [])
+    setSelectedIds(checked ? rowsToRender.map((row) => row.id) : [])
   }
 
   const toggleSelectRow = (id: number, checked: boolean) => {
@@ -943,9 +942,9 @@ export default function JadwalPembelajaranPage() {
   const handleExport = () => {
     const run = async () => {
       try {
-        const hasClientOnlyFilter = unitFilter !== "all" || kelasFilter !== "all" || mapelFilter !== "all"
+        const hasClientOnlyFilter = false // Now handled by backend
         if (hasClientOnlyFilter) {
-          if (visibleRows.length === 0) {
+          if (rowsToRender.length === 0) {
             toast({
               title: "Tidak Ada Data",
               description: "Tidak ada data sesuai filter untuk diekspor.",
@@ -954,7 +953,7 @@ export default function JadwalPembelajaranPage() {
             return
           }
 
-          const csvContent = buildCsvFromRows(visibleRows)
+          const csvContent = buildCsvFromRows(rowsToRender)
           const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
           downloadBlob(csvBlob, `data-jadwal-pembelajaran-${new Date().toISOString().slice(0, 10)}.csv`)
           return
@@ -969,8 +968,8 @@ export default function JadwalPembelajaranPage() {
           status: statusFilter === "all" ? undefined : toBackendStatus(statusFilter),
         })
 
-        if (blob.size <= 1 && visibleRows.length > 0) {
-          const csvContent = buildCsvFromRows(visibleRows)
+        if (blob.size <= 1 && rowsToRender.length > 0) {
+          const csvContent = buildCsvFromRows(rowsToRender)
           const csvBlob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
           downloadBlob(csvBlob, `data-jadwal-pembelajaran-${new Date().toISOString().slice(0, 10)}.csv`)
           return
@@ -989,9 +988,9 @@ export default function JadwalPembelajaranPage() {
     void run()
   }
 
-  const visibleStart = visibleRows.length === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
-  const visibleEnd = visibleRows.length === 0 ? 0 : Math.min((currentPage - 1) * rowsLimit + visibleRows.length, totalItems)
-  const allSelected = visibleRows.length > 0 && visibleRows.every((row) => selectedIds.includes(row.id))
+  const visibleStart = rowsToRender.length === 0 ? 0 : (currentPage - 1) * rowsLimit + 1
+  const visibleEnd = rowsToRender.length === 0 ? 0 : Math.min((currentPage - 1) * rowsLimit + rowsToRender.length, totalItems)
+  const allSelected = rowsToRender.length > 0 && rowsToRender.every((row) => selectedIds.includes(row.id))
 
   return (
     <div className="space-y-6">
@@ -1176,42 +1175,25 @@ export default function JadwalPembelajaranPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t pt-5">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-8">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7">
                 <div className="space-y-2 min-w-0">
                   <Label htmlFor="jadwal-keyword">Kata Kunci</Label>
                   <Input
                     id="jadwal-keyword"
                     placeholder="Cari kelas/mapel"
-                    value={keyword}
-                    onChange={(event) => {
-                      setKeyword(event.target.value)
-                      setCurrentPage(1)
-                    }}
+                    value={draftKeyword}
+                    onChange={(event) => setDraftKeyword(event.target.value)}
                   />
                 </div>
                 <div className="space-y-2 min-w-0">
-                  <Label>Kode Unit</Label>
-                  <Select value={unitFilter} onValueChange={(value) => { setUnitFilter(value); setCurrentPage(1) }}>
-                    <SelectTrigger className="w-full min-w-0">
-                      <SelectValue className="truncate" placeholder="Pilih kode unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitFilterOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>{option.value} - {option.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2 min-w-0">
                   <Label>Kode Kelas</Label>
-                  <Select value={kelasFilter} onValueChange={(value) => { setKelasFilter(value); setCurrentPage(1) }}>
+                  <Select value={draftKelasFilter} onValueChange={setDraftKelasFilter}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih kode kelas" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Semua Kelas</SelectItem>
-                      {kelasFilterOptions.map((option) => (
+                      {draftKelasFilterOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>{option.value} - {option.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1219,13 +1201,13 @@ export default function JadwalPembelajaranPage() {
                 </div>
                 <div className="space-y-2 min-w-0">
                   <Label>Mapel</Label>
-                  <Select value={mapelFilter} onValueChange={(value) => { setMapelFilter(value); setCurrentPage(1) }}>
+                  <Select value={draftMapelFilter} onValueChange={setDraftMapelFilter}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih mapel" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">Semua Mapel</SelectItem>
-                      {mapelFilterOptions.map((option) => (
+                      {draftMapelFilterOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>{option.value} - {option.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1233,7 +1215,7 @@ export default function JadwalPembelajaranPage() {
                 </div>
                 <div className="space-y-2 min-w-0">
                   <Label>Petugas</Label>
-                  <Select value={petugasFilter} onValueChange={(value) => { setPetugasFilter(value); setCurrentPage(1) }}>
+                  <Select value={draftPetugasFilter} onValueChange={setDraftPetugasFilter}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih petugas" />
                     </SelectTrigger>
@@ -1248,7 +1230,7 @@ export default function JadwalPembelajaranPage() {
 
                 <div className="space-y-2 min-w-0">
                   <Label>Hari</Label>
-                  <Select value={hariFilter} onValueChange={(value) => { setHariFilter(value); setCurrentPage(1) }}>
+                  <Select value={draftHariFilter} onValueChange={setDraftHariFilter}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih hari" />
                     </SelectTrigger>
@@ -1262,7 +1244,7 @@ export default function JadwalPembelajaranPage() {
                 </div>
                 <div className="space-y-2 min-w-0">
                   <Label>Semester</Label>
-                  <Select value={semesterFilter} onValueChange={(value) => { setSemesterFilter(value); setCurrentPage(1) }}>
+                  <Select value={draftSemesterFilter} onValueChange={setDraftSemesterFilter}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih semester" />
                     </SelectTrigger>
@@ -1275,7 +1257,7 @@ export default function JadwalPembelajaranPage() {
                 </div>
                 <div className="space-y-2 min-w-0">
                   <Label>Status</Label>
-                  <Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value as UiStatus | "all"); setCurrentPage(1) }}>
+                  <Select value={draftStatusFilter} onValueChange={(value) => setDraftStatusFilter(value as UiStatus | "all")}>
                     <SelectTrigger className="w-full min-w-0">
                       <SelectValue className="truncate" placeholder="Pilih status" />
                     </SelectTrigger>
@@ -1288,8 +1270,18 @@ export default function JadwalPembelajaranPage() {
                 </div>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                <Button variant="outline" onClick={resetFilter}>Reset Filter</Button>
+              <div className="mt-6 flex justify-end gap-2">
+                <Button variant="outline" onClick={resetFilter}>Reset</Button>
+                <Button onClick={() => {
+                  setKeyword(draftKeyword)
+                  setKelasFilter(draftKelasFilter)
+                  setMapelFilter(draftMapelFilter)
+                  setPetugasFilter(draftPetugasFilter)
+                  setHariFilter(draftHariFilter)
+                  setSemesterFilter(draftSemesterFilter)
+                  setStatusFilter(draftStatusFilter)
+                  setCurrentPage(1)
+                }}>Terapkan</Button>
               </div>
             </CardContent>
           </CollapsibleContent>
@@ -1356,14 +1348,14 @@ export default function JadwalPembelajaranPage() {
               </TableHeader>
 
               <TableBody>
-                {visibleRows.length === 0 ? (
+                {rowsToRender.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={13} className="py-10 text-center text-muted-foreground">
                       {isLoading ? "Memuat data jadwal pembelajaran..." : "Data jadwal pembelajaran tidak ditemukan."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  visibleRows.map((row, index) => (
+                  rowsToRender.map((row, index) => (
                     <TableRow key={row.id}>
                       <TableCell className="text-center">
                         <input

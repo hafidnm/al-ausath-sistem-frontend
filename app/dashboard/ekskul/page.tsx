@@ -15,6 +15,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { ekskulService, EkskulApiItem } from "@/lib/services/ekskul.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
+import { useUnit } from "@/contexts/unit-context"
 import {
   MoreVertical, PlusCircle, PencilLine, Trash2, LockOpen, Lock, Users,
 } from "lucide-react"
@@ -96,6 +97,7 @@ function EkskulForm({ data, onChange, unitOptions }: EkskulFormProps) {
 
 export default function EkskulPage() {
   const { toast } = useToast()
+  const { selectedKodeUnit } = useUnit()
   const initCalledRef = useRef(false)
 
   const [rows, setRows] = useState<EkskulApiItem[]>([])
@@ -108,14 +110,14 @@ export default function EkskulPage() {
   const [formData, setFormData] = useState(defaultForm)
   const [editFormData, setEditFormData] = useState(defaultForm)
 
-  const [filterUnit, setFilterUnit] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
+  const [draftStatus, setDraftStatus] = useState("all")
 
   const fetchRows = async () => {
     setIsLoading(true)
     try {
       const params: Record<string, unknown> = { all: true }
-      if (filterUnit !== "all") params.kode_unit = filterUnit
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (filterStatus !== "all") params.status = filterStatus
       const result = await ekskulService.getAll(params)
       setRows(result.data ?? result)
@@ -142,7 +144,7 @@ export default function EkskulPage() {
     void load()
   }, [])
 
-  useEffect(() => { void fetchRows() }, [filterUnit, filterStatus])
+  useEffect(() => { void fetchRows() }, [selectedKodeUnit, filterStatus])
 
   const handleCreate = async () => {
     if (!formData.nama_ekskul.trim()) {
@@ -232,22 +234,24 @@ export default function EkskulPage() {
 
       {/* Filter */}
       <Card>
-        <CardContent className="p-4 flex flex-wrap gap-3">
-          <Select value={filterUnit} onValueChange={setFilterUnit}>
-            <SelectTrigger className="w-44"><SelectValue placeholder="Semua Unit" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Unit</SelectItem>
-              {unitOptions.map(u => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={filterStatus} onValueChange={setFilterStatus}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Semua Status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Status</SelectItem>
-              <SelectItem value="AKTIF">Aktif</SelectItem>
-              <SelectItem value="NONAKTIF">Nonaktif</SelectItem>
-            </SelectContent>
-          </Select>
+        <CardContent className="p-4 flex flex-wrap items-end gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Status Ekskul</Label>
+            <Select value={draftStatus} onValueChange={setDraftStatus}>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Semua Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Status</SelectItem>
+                <SelectItem value="AKTIF">Aktif</SelectItem>
+                <SelectItem value="NONAKTIF">Nonaktif</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <Button 
+            className="h-9" 
+            onClick={() => setFilterStatus(draftStatus)}
+          >
+            Terapkan
+          </Button>
         </CardContent>
       </Card>
 

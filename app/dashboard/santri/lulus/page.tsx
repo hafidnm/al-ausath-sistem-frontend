@@ -98,6 +98,9 @@ export default function SantriLulusPage() {
 
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKelas, setSelectedKelas] = useState("all")
+
+  const [draftSearchQuery, setDraftSearchQuery] = useState("")
+  const [draftSelectedKelas, setDraftSelectedKelas] = useState("all")
   const [rowsPerPage, setRowsPerPage] = useState("10")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalItems, setTotalItems] = useState(0)
@@ -166,7 +169,12 @@ export default function SantriLulusPage() {
 
   useEffect(() => { void loadOptions() }, [])
   useEffect(() => { setCurrentPage(1) }, [searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun, rowsPerPage])
-  useEffect(() => { if (selectedKelas !== "all" && !filteredKelas.some(k => k.value === selectedKelas)) setSelectedKelas("all") }, [selectedKodeUnit, selectedKodeTahun])
+  useEffect(() => { 
+    if (selectedKelas !== "all" && !filteredKelas.some(k => k.value === selectedKelas)) {
+      setSelectedKelas("all")
+      setDraftSelectedKelas("all")
+    }
+  }, [selectedKodeUnit, selectedKodeTahun, filteredKelas, selectedKelas])
   useEffect(() => { void fetchRows() }, [currentPage, rowsPerPage, searchQuery, selectedKodeUnit, selectedKelas, selectedKodeTahun])
 
   /* ─── actions ────────────────────────────────────────────────── */
@@ -293,13 +301,13 @@ export default function SantriLulusPage() {
               <Label>Cari Nama / NIS</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input className="pl-9" placeholder="Cari santri..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
+                <Input className="pl-9" placeholder="Cari santri..." value={draftSearchQuery} onChange={e => setDraftSearchQuery(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-1 lg:col-span-2">
               <Label>Kelas</Label>
-              <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+              <Select value={draftSelectedKelas} onValueChange={setDraftSelectedKelas}>
                 <SelectTrigger><SelectValue placeholder="Semua Kelas" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
@@ -307,6 +315,29 @@ export default function SantriLulusPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="mt-4 flex items-center justify-end gap-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDraftSearchQuery("")
+                setDraftSelectedKelas("all")
+                setSearchQuery("")
+                setSelectedKelas("all")
+                setCurrentPage(1)
+              }}
+            >
+              Reset
+            </Button>
+            <Button
+              onClick={() => {
+                setSearchQuery(draftSearchQuery)
+                setSelectedKelas(draftSelectedKelas)
+                setCurrentPage(1)
+              }}
+            >
+              Terapkan
+            </Button>
           </div>
         </CardContent>
       </Card>

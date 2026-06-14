@@ -223,6 +223,10 @@ export default function SantriPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedKelas, setSelectedKelas] = useState("all")
   const [selectedStatus, setSelectedStatus] = useState("AKTIF")
+
+  const [draftSearchQuery, setDraftSearchQuery] = useState("")
+  const [draftSelectedKelas, setDraftSelectedKelas] = useState("all")
+  const [draftSelectedStatus, setDraftSelectedStatus] = useState("AKTIF")
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -311,34 +315,20 @@ export default function SantriPage() {
       setTotalPages(Math.max(1, toNumber(result.meta?.last_page, 1)))
       setCurrentPage(toNumber(result.meta?.current_page, currentPage))
 
-      const summaryBaseParams: DataSantriListParams = {}
+      const summaryBaseParams: Omit<DataSantriListParams, "per_page" | "page" | "status"> = {}
       if (query) summaryBaseParams.q = query
       if (selectedKodeUnit) summaryBaseParams.kode_unit = selectedKodeUnit
       if (selectedKelas !== "all") summaryBaseParams.kode_kelas = selectedKelas
       if (selectedKodeTahun) summaryBaseParams.tahun_ajaran = selectedKodeTahun
 
-      if (selectedStatus === "all" || selectedStatus === "AKTIF" || selectedStatus === "CUTI" || selectedStatus === "KELUAR") {
-        const [aktifResult, lulusResult, keluarResult] = await Promise.all([
-          dataSantriService.getAll({ ...summaryBaseParams, status: "AKTIF", page: 1, per_page: 1 }),
-          dataSantriService.getAll({ ...summaryBaseParams, status: "LULUS", page: 1, per_page: 1 }),
-          dataSantriService.getAll({ ...summaryBaseParams, status: "KELUAR", page: 1, per_page: 1 }),
-        ])
+      const statsResult = await dataSantriService.getStats(summaryBaseParams)
 
-        setSummaryTotals({
-          totalSantri: toNumber(result.meta?.total),
-          aktif: toNumber(aktifResult.meta?.total),
-          lulus: toNumber(lulusResult.meta?.total),
-          keluar: toNumber(keluarResult.meta?.total),
-        })
-      } else {
-        const totalByStatus = toNumber(result.meta?.total)
-        setSummaryTotals({
-          totalSantri: totalByStatus,
-          aktif: selectedStatus === "AKTIF" ? totalByStatus : 0,
-          lulus: 0,
-          keluar: selectedStatus === "KELUAR" ? totalByStatus : 0,
-        })
-      }
+      setSummaryTotals({
+        totalSantri: statsResult.total,
+        aktif: statsResult.aktif,
+        lulus: statsResult.lulus,
+        keluar: statsResult.keluar,
+      })
     } catch (error) {
       toast({
         title: "Gagal Memuat Data",
@@ -388,6 +378,7 @@ export default function SantriPage() {
     const existsInCurrentUnit = filteredKelasOptions.some((option) => option.value === selectedKelas)
     if (!existsInCurrentUnit) {
       setSelectedKelas("all")
+      setDraftSelectedKelas("all")
     }
   }, [selectedKodeUnit, filteredKelasOptions, selectedKelas])
 
@@ -861,8 +852,8 @@ export default function SantriPage() {
                       id="santri-kata-kunci"
                       placeholder="Masukan kata kunci pencarian"
                       className="pl-9"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      value={draftSearchQuery}
+                      onChange={(e) => setDraftSearchQuery(e.target.value)}
                     />
                   </div>
                 </div>
@@ -871,7 +862,7 @@ export default function SantriPage() {
 
                 <div className="space-y-2">
                   <Label>Pilih Kelas</Label>
-                  <Select value={selectedKelas} onValueChange={setSelectedKelas}>
+                  <Select value={draftSelectedKelas} onValueChange={setDraftSelectedKelas}>
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Kelas" />
                     </SelectTrigger>
@@ -890,7 +881,7 @@ export default function SantriPage() {
 
                 <div className="space-y-2">
                   <Label>Status Santri</Label>
-                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                  <Select value={draftSelectedStatus} onValueChange={setDraftSelectedStatus}>
                     <SelectTrigger>
                       <SelectValue placeholder="Status Santri" />
                     </SelectTrigger>
@@ -906,6 +897,32 @@ export default function SantriPage() {
                     <Link href="/dashboard/santri/lulus" className="text-primary underline underline-offset-2">halaman Santri Lulus</Link>.
                   </p>
                 </div>
+              </div>
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setDraftSearchQuery("")
+                    setDraftSelectedKelas("all")
+                    setDraftSelectedStatus("AKTIF")
+                    setSearchQuery("")
+                    setSelectedKelas("all")
+                    setSelectedStatus("AKTIF")
+                    setCurrentPage(1)
+                  }}
+                >
+                  Reset
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSearchQuery(draftSearchQuery)
+                    setSelectedKelas(draftSelectedKelas)
+                    setSelectedStatus(draftSelectedStatus)
+                    setCurrentPage(1)
+                  }}
+                >
+                  Terapkan
+                </Button>
               </div>
             </CardContent>
           </CollapsibleContent>

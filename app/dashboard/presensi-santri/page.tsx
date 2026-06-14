@@ -18,6 +18,7 @@ import { dataUnitService, DataUnitApiItem } from "@/lib/services/unit.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 interface RekapSantriRow {
   nomor_induk: string
@@ -37,6 +38,7 @@ type SantriStatus = "hadir" | "izin" | "sakit" | "alfa"
 export default function PresensiSantriPage() {
   const [activeTab, setActiveTab] = useState("rekap")
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
   
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
@@ -53,27 +55,23 @@ export default function PresensiSantriPage() {
   })
 
   // Options
-  const [unitOptions, setUnitOptions] = useState<DataUnitApiItem[]>([])
-  const [kelasOptions, setKelasOptions] = useState<KelasItem[]>([])
-  const [selectedUnit, setSelectedUnit] = useState("ALL")
-  const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
+  const [allKelas, setAllKelas] = useState<KelasItem[]>([])
+  
+  const kelasOptions = useMemo(() => {
+    return allKelas.filter(k => 
+      (!selectedKodeUnit || k.kode_unit === selectedKodeUnit) &&
+      (!selectedKodeTahun || k.tahun_ajaran === selectedKodeTahun)
+    )
+  }, [allKelas, selectedKodeUnit, selectedKodeTahun])
 
   // Sync from global header tahun ajaran
-  useEffect(() => {
-    if (selectedKodeTahun) {
-      setSelectedTahunAjaranRekap(selectedKodeTahun)
-      setSelectedTahunAjaran(selectedKodeTahun)
-    }
-  }, [selectedKodeTahun])
+  // The page now fully relies on selectedKodeTahun
 
   // States for Riwayat Sesi
   const [sesiRows, setSesiRows] = useState<SesiAbsensiApiItem[]>([])
   const [sesiLoading, setSesiLoading] = useState(false)
-  const [selectedUnitSesi, setSelectedUnitSesi] = useState("ALL")
   const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
-  const [kelasSesiOptions, setKelasSesiOptions] = useState<KelasItem[]>([])
   const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
     status_sesi: "SELESAI",
@@ -101,6 +99,9 @@ export default function PresensiSantriPage() {
       if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
         params.tahun_ajaran = selectedKodeTahun
       }
+      if (selectedKodeUnit && selectedKodeUnit !== "ALL") {
+        params.kode_unit = selectedKodeUnit
+      }
       const res = await sesiAbsensiService.adminGetLogAktivitas(params)
       setLogs(res.log_aktivitas || [])
       setAuditLogs(res.log_audit || [])
@@ -120,7 +121,7 @@ export default function PresensiSantriPage() {
     if (activeTab === "log_aktivitas" && isInitDone) {
       void loadLogs()
     }
-  }, [activeTab, isInitDone, selectedKodeTahun])
+  }, [activeTab, isInitDone, selectedKodeTahun, selectedKodeUnit])
 
   useEffect(() => {
     if (initCalledRef.current) return
@@ -130,32 +131,34 @@ export default function PresensiSantriPage() {
 
   // Tab: Rekap (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!isInitDone || activeTab !== "rekap") return
+    if (!isInitDone || activeTab !== "rekap" || !selectedKodeTahun) return
+    
+    // Auto-clear kelas filter if unit/year changes to prevent mismatches
+    setFilterRekap(prev => ({ ...prev, kode_kelas: "" }))
+    
     void loadRekap()
-  }, [isInitDone, activeTab, selectedTahunAjaranRekap, selectedUnit, filterRekap.tanggal_mulai, filterRekap.tanggal_selesai, filterRekap.kode_kelas, filterRekap.q])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitDone, activeTab, selectedKodeUnit, selectedKodeTahun])
 
   // Tab: Riwayat Sesi (Hanya dipanggil jika init selesai DAN tab aktif)
   useEffect(() => {
-    if (!isInitDone || activeTab !== "riwayat") return
+    if (!isInitDone || activeTab !== "riwayat" || !selectedKodeTahun) return
+    
+    // Auto-clear kelas filter
+    setSelectedKelasSesi("ALL")
+    
     void loadRiwayatSesi()
-  }, [isInitDone, activeTab, selectedTahunAjaran, selectedUnitSesi, selectedKelasSesi, filterSesi.tanggal, filterSesi.status_sesi, filterSesi.q])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isInitDone, activeTab, selectedKodeUnit, selectedKodeTahun])
 
   const loadOptions = async () => {
     try {
       const initData = await sesiAbsensiService.adminPresensiSantriInit()
       
-      setUnitOptions(initData.unit || [])
-      setKelasOptions(initData.kelas || [])
-      setKelasSesiOptions(initData.kelas || [])
+      setAllKelas(initData.kelas || [])
 
       const tahunList = initData.tahun_ajaran || []
       setTahunAjaranOptions(tahunList)
-
-      const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
-      if (activeTahun?.kode_tahun && !selectedKodeTahun) {
-        setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
-        setSelectedTahunAjaran(activeTahun.kode_tahun)
-      }
       
       setIsInitDone(true)
     } catch (e) {
@@ -164,34 +167,13 @@ export default function PresensiSantriPage() {
     }
   }
 
-  const loadKelasByUnit = async (kode_unit?: string) => {
-    try {
-      const params: any = { per_page: "500", status: "AKTIF" }
-      if (kode_unit) params.kode_unit = kode_unit
-      const kelasRes = await kelasService.getAll(params)
-      setKelasOptions(kelasRes || [])
-    } catch (e) {
-      console.error("Gagal memuat kelas", e)
-    }
-  }
-
-  const loadKelasSesiByUnit = async (kode_unit?: string) => {
-    try {
-      const kelasRes = await kelasService.getAll({ per_page: "500", status: "AKTIF", kode_unit })
-      setKelasSesiOptions(kelasRes || [])
-    } catch (e) {
-      console.error("Gagal memuat kelas untuk riwayat sesi", e)
-    }
-  }
-
-  const loadRekap = async (unitOverride?: string) => {
+  const loadRekap = async () => {
     setRekapLoading(true)
     try {
-      const activeUnit = unitOverride !== undefined ? unitOverride : selectedUnit
       const params: any = { ...filterRekap, per_page: 100 }
-      if (activeUnit !== "ALL") params.kode_unit = activeUnit
-      if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
-        params.tahun_ajaran = selectedTahunAjaranRekap
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
+      if (selectedKodeTahun) {
+        params.tahun_ajaran = selectedKodeTahun
       }
       // remove empty kode_kelas so backend won't filter by empty string
       if (!params.kode_kelas) delete params.kode_kelas
@@ -209,16 +191,15 @@ export default function PresensiSantriPage() {
     }
   }
 
-  const loadRiwayatSesi = async (tahunOverride?: string) => {
+  const loadRiwayatSesi = async () => {
     setSesiLoading(true)
     try {
       const params: any = { ...filterSesi, per_page: 100 }
       if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
-      if (selectedUnitSesi !== "ALL") params.kode_unit = selectedUnitSesi
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       
-      const yearToUse = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaran
-      if (yearToUse !== "ALL") {
-        params.tahun_ajaran = yearToUse
+      if (selectedKodeTahun) {
+        params.tahun_ajaran = selectedKodeTahun
       }
       
       const response = await sesiAbsensiService.getAll(params)
@@ -235,7 +216,7 @@ export default function PresensiSantriPage() {
   }
 
   const handleApplyFilterRekap = () => {
-    loadRekap(selectedUnit)
+    loadRekap()
   }
 
   const handleApplyFilterSesi = () => {
@@ -244,9 +225,9 @@ export default function PresensiSantriPage() {
 
   const handleExport = (format: 'pdf' | 'excel') => {
     const params: any = { ...filterRekap }
-    if (selectedUnit !== "ALL") params.kode_unit = selectedUnit
-    if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
-      params.tahun_ajaran = selectedTahunAjaranRekap
+    if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
+    if (selectedKodeTahun) {
+      params.tahun_ajaran = selectedKodeTahun
     }
     if (!params.kode_kelas) delete params.kode_kelas
     const url = sesiAbsensiService.getExportSantriUrl(format, params)
@@ -375,19 +356,6 @@ export default function PresensiSantriPage() {
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <CardTitle className="text-lg">Rekap Kehadiran Santri</CardTitle>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select value={selectedTahunAjaranRekap} onValueChange={setSelectedTahunAjaranRekap}>
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
-                      {tahunAjaranOptions.map((t) => (
-                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                   <Input
                     type="date"
                     value={filterRekap.tanggal_mulai}
@@ -411,25 +379,7 @@ export default function PresensiSantriPage() {
                       onChange={(e) => setFilterRekap({ ...filterRekap, q: e.target.value })}
                     />
                   </div>
-                  <Select 
-                    value={selectedUnit} 
-                    onValueChange={(val) => {
-                      setSelectedUnit(val)
-                      setFilterRekap(prev => ({ ...prev, kode_kelas: "" }))
-                      loadKelasByUnit(val === "ALL" ? undefined : val)
-                    }}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Unit</SelectItem>
-                      {unitOptions.map((u) => (
-                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
+                  
                   <Select 
                     value={filterRekap.kode_kelas || "ALL"} 
                     onValueChange={(val) => setFilterRekap({ ...filterRekap, kode_kelas: val === "ALL" ? "" : val })}
@@ -440,11 +390,13 @@ export default function PresensiSantriPage() {
                     <SelectContent className="max-h-60">
                       <SelectItem value="ALL">Semua Kelas</SelectItem>
                       {kelasOptions.map((k) => (
-                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>
+                          {k.nama_kelas} ({k.kode_kelas}) {k.status && k.status !== 'AKTIF' ? '(Non-aktif)' : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="secondary" onClick={handleApplyFilterRekap}>Filter</Button>
+                  <Button variant="default" onClick={handleApplyFilterRekap}>Terapkan</Button>
                   
                   <div className="flex items-center gap-2 border-l pl-2 ml-2">
                     <Button variant="outline" className="gap-2" onClick={() => handleExport('excel')}>
@@ -517,44 +469,6 @@ export default function PresensiSantriPage() {
                   <CardDescription>Klik Edit untuk mengubah kehadiran santri pada sesi yang sudah selesai.</CardDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Select
-                    value={selectedTahunAjaran}
-                    onValueChange={(val) => {
-                      setSelectedTahunAjaran(val)
-                    }}
-                  >
-                    <SelectTrigger className="w-44">
-                      <SelectValue placeholder="Tahun Ajaran" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
-                      {tahunAjaranOptions.map((t) => (
-                        <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                          {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select 
-                    value={selectedUnitSesi} 
-                    onValueChange={(val) => {
-                      setSelectedUnitSesi(val)
-                      setSelectedKelasSesi("ALL")
-                      loadKelasSesiByUnit(val === "ALL" ? undefined : val)
-                    }}
-                  >
-                    <SelectTrigger className="w-32">
-                      <SelectValue placeholder="Unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Semua Unit</SelectItem>
-                      {unitOptions.map((u) => (
-                        <SelectItem key={u.kode_unit} value={u.kode_unit!}>{u.nama_unit}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
                   <Select 
                     value={selectedKelasSesi} 
                     onValueChange={(val) => setSelectedKelasSesi(val)}
@@ -564,8 +478,10 @@ export default function PresensiSantriPage() {
                     </SelectTrigger>
                     <SelectContent className="max-h-60">
                       <SelectItem value="ALL">Semua Kelas</SelectItem>
-                      {kelasSesiOptions.map((k) => (
-                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>{k.nama_kelas} ({k.kode_kelas})</SelectItem>
+                      {kelasOptions.map((k) => (
+                        <SelectItem key={k.kode_kelas} value={k.kode_kelas}>
+                          {k.nama_kelas} ({k.kode_kelas}) {k.status && k.status !== 'AKTIF' ? '(Non-aktif)' : ''}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -590,7 +506,7 @@ export default function PresensiSantriPage() {
                     />
                   </div>
                   
-                  <Button variant="secondary" onClick={handleApplyFilterSesi}>Filter</Button>
+                  <Button variant="default" onClick={handleApplyFilterSesi}>Terapkan</Button>
                 </div>
               </div>
             </CardHeader>
