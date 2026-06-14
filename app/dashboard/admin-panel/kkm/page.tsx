@@ -8,13 +8,16 @@ import { KkmTable } from "./components/kkm-table"
 import { KkmItem, kkmService } from "@/lib/services/kkm.service"
 import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
 import { kelasService, KelasItem } from "@/lib/services/kelas.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 export default function KkmPage() {
   const router = useRouter()
+  const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedUnit } = useUnit()
+
   const [query, setQuery] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("all")
-  const [kodeUnit, setKodeUnit] = useState("all")
   const [kodeKelas, setKodeKelas] = useState("all")
   const [perPage, setPerPage] = useState("10")
   const [items, setItems] = useState<KkmItem[]>([])
@@ -35,10 +38,13 @@ export default function KkmPage() {
       setError("")
 
       const queryTrimmed = query.trim()
+      const tahunAjaran = selectedTahunAjaran?.nama_tahun || undefined
+      const kodeUnit = selectedUnit?.kode_unit || undefined
+
       const sharedParams = {
-        tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
+        tahun_ajaran: tahunAjaran,
         semester: semester === "all" ? undefined : semester,
-        kode_unit: kodeUnit === "all" ? undefined : kodeUnit,
+        kode_unit: kodeUnit,
         per_page: perPage,
       }
 
@@ -72,7 +78,7 @@ export default function KkmPage() {
       if (kodeKelas !== "all") {
         const kelasMapelRes = await dataKelasMapelService.getAll({
           kode_kelas: kodeKelas,
-          tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
+          tahun_ajaran: tahunAjaran,
           semester: semester === "all" ? undefined : Number(semester),
           per_page: 500,
         })
@@ -92,19 +98,24 @@ export default function KkmPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeUnit, kodeKelas, perPage, query, semester, tahunAjaran])
+  }, [selectedTahunAjaran, selectedUnit, kodeKelas, perPage, query, semester])
 
   useEffect(() => {
     fetchKkm()
   }, [fetchKkm])
 
   const handleDelete = async (id: number) => {
+    if (!confirm("Apakah Anda yakin ingin menghapus data KKM ini?")) return
     try {
       await kkmService.remove(id)
-      await fetchKkm()
+      fetchKkm()
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Gagal menghapus data KKM")
+      alert(err?.response?.data?.message || "Gagal menghapus data KKM")
     }
+  }
+
+  const handleEdit = (item: KkmItem) => {
+    router.push(`/dashboard/admin-panel/kkm/${item.id_kkm}`)
   }
 
   return (
@@ -118,12 +129,8 @@ export default function KkmPage() {
       <KkmFilters
         query={query}
         onQueryChange={setQuery}
-        tahunAjaran={tahunAjaran}
-        onTahunAjaranChange={setTahunAjaran}
         semester={semester}
         onSemesterChange={setSemester}
-        kodeUnit={kodeUnit}
-        onKodeUnitChange={setKodeUnit}
         kodeKelas={kodeKelas}
         onKodeKelasChange={setKodeKelas}
         kelasList={kelasList}
@@ -135,7 +142,7 @@ export default function KkmPage() {
         items={items}
         isLoading={isLoading}
         error={error}
-        onEdit={(id) => router.push(`/dashboard/admin-panel/kkm/${id}/edit`)}
+        onEdit={handleEdit}
         onDelete={handleDelete}
       />
     </div>

@@ -10,18 +10,14 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Search } from "lucide-react"
-import { semesterOptions, tahunAjaranOptions, unitOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
 import { KelasItem } from "@/lib/services/kelas.service"
 
 interface KkmFiltersProps {
   query: string
   onQueryChange: (value: string) => void
-  tahunAjaran: string
-  onTahunAjaranChange: (value: string) => void
   semester: string
   onSemesterChange: (value: string) => void
-  kodeUnit: string
-  onKodeUnitChange: (value: string) => void
   kodeKelas: string
   onKodeKelasChange: (value: string) => void
   kelasList: KelasItem[]
@@ -32,12 +28,8 @@ interface KkmFiltersProps {
 export function KkmFilters({
   query,
   onQueryChange,
-  tahunAjaran,
-  onTahunAjaranChange,
   semester,
   onSemesterChange,
-  kodeUnit,
-  onKodeUnitChange,
   kodeKelas,
   onKodeKelasChange,
   kelasList,
@@ -58,37 +50,13 @@ export function KkmFilters({
             />
           </div>
 
-          <Select value={tahunAjaran} onValueChange={onTahunAjaranChange}>
-            <SelectTrigger className="w-full lg:w-40">
-              <SelectValue placeholder="Tahun Ajaran" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tahun</SelectItem>
-              {tahunAjaranOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
           <Select value={semester} onValueChange={onSemesterChange}>
             <SelectTrigger className="w-full lg:w-36">
               <SelectValue placeholder="Semester" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua</SelectItem>
+              <SelectItem value="all">Semua Semester</SelectItem>
               {semesterOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={kodeUnit} onValueChange={onKodeUnitChange}>
-            <SelectTrigger className="w-full lg:w-32">
-              <SelectValue placeholder="Unit" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua</SelectItem>
-              {unitOptions.map((item) => (
                 <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
               ))}
             </SelectContent>
@@ -113,9 +81,9 @@ export function KkmFilters({
               <SelectValue placeholder="Per page" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="10">10</SelectItem>
-              <SelectItem value="20">20</SelectItem>
-              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="10">10 Baris</SelectItem>
+              <SelectItem value="20">20 Baris</SelectItem>
+              <SelectItem value="50">50 Baris</SelectItem>
             </SelectContent>
           </Select>
         </div>
