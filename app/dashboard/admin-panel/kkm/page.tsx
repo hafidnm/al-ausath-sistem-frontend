@@ -119,8 +119,8 @@ export default function KkmPage() {
     }
   }
 
-  const handleEdit = (item: KkmItem) => {
-    router.push(`/dashboard/admin-panel/kkm/${item.id_kkm}`)
+  const handleEdit = (id: number) => {
+    router.push(`/dashboard/admin-panel/kkm/${id}`)
   }
 
   const contextLoading = isTahunLoading || isUnitLoading
