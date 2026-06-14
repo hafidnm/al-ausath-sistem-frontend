@@ -1,6 +1,7 @@
 import api from "../axios"
 
 export interface KkmItem {
+  id_kkm: any
   id: number
   kode_mapel: string
   mapel?: string

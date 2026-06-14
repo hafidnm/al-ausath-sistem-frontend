@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { KkmFilters } from "./components/kkm-filters"
 import { KkmHeader } from "./components/kkm-header"
@@ -13,8 +13,8 @@ import { useUnit } from "@/contexts/unit-context"
 
 export default function KkmPage() {
   const router = useRouter()
-  const { selectedTahunAjaran } = useTahunAjaran()
-  const { selectedUnit } = useUnit()
+  const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+  const { selectedUnit, isLoading: isUnitLoading } = useUnit()
 
   const [query, setQuery] = useState("")
   const [semester, setSemester] = useState("all")
@@ -25,14 +25,26 @@ export default function KkmPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  // Ambil daftar kelas untuk opsi dropdown filter
+  // Track apakah ini fetch pertama setelah context ready
+  const contextReadyRef = useRef(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Ambil daftar kelas untuk dropdown filter — hanya sekali, per_page kecil
   useEffect(() => {
-    kelasService.getAll({ status: "AKTIF" })
+    kelasService.getAll({ status: "AKTIF", per_page: "50" })
       .then(setKelasList)
       .catch(() => setKelasList([]))
   }, [])
 
   const fetchKkm = useCallback(async () => {
+    // Jangan fetch jika context masih loading
+    if (isTahunLoading || isUnitLoading) return
+
+    // Batalkan request sebelumnya jika ada
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     try {
       setIsLoading(true)
       setError("")
@@ -48,30 +60,15 @@ export default function KkmPage() {
         per_page: perPage,
       }
 
-      let data: KkmItem[]
+      // Satu API call — filter query dilakukan client-side
+      let data = await kkmService.getAll(sharedParams)
 
-      if (!queryTrimmed) {
-        data = await kkmService.getAll(sharedParams)
-      } else {
+      if (queryTrimmed) {
         const normalizedQuery = queryTrimmed.toLowerCase()
-
-        // 1) Coba backend yang mendukung q (search umum)
-        data = await kkmService.getAll({ ...sharedParams, q: queryTrimmed })
-
-        // 2) Fallback backend yang hanya mendukung kode_mapel
-        if (data.length === 0) {
-          data = await kkmService.getAll({ ...sharedParams, kode_mapel: queryTrimmed })
-        }
-
-        // 3) Fallback terakhir: ambil dataset filter lain lalu cari di frontend
-        if (data.length === 0) {
-          data = await kkmService.getAll(sharedParams)
-        }
-
-        data = data.filter((item) => (
+        data = data.filter((item) =>
           item.kode_mapel.toLowerCase().includes(normalizedQuery)
           || (item.mapel ?? "").toLowerCase().includes(normalizedQuery)
-        ))
+        )
       }
 
       // Filter berdasarkan kelas jika dipilih (client-side via kelas-mapel)
@@ -92,17 +89,25 @@ export default function KkmPage() {
         )
       }
 
-      setItems(data)
+      if (!controller.signal.aborted) {
+        setItems(data)
+      }
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Gagal memuat data KKM")
+      if (!abortRef.current?.signal.aborted) {
+        setError(err?.response?.data?.message || "Gagal memuat data KKM")
+      }
     } finally {
-      setIsLoading(false)
+      if (!abortRef.current?.signal.aborted) {
+        setIsLoading(false)
+      }
     }
-  }, [selectedTahunAjaran, selectedUnit, kodeKelas, perPage, query, semester])
+  }, [isTahunLoading, isUnitLoading, selectedTahunAjaran, selectedUnit, kodeKelas, perPage, query, semester])
 
+  // Hanya trigger fetch ketika context sudah selesai loading
   useEffect(() => {
+    if (isTahunLoading || isUnitLoading) return
     fetchKkm()
-  }, [fetchKkm])
+  }, [fetchKkm, isTahunLoading, isUnitLoading])
 
   const handleDelete = async (id: number) => {
     if (!confirm("Apakah Anda yakin ingin menghapus data KKM ini?")) return
@@ -117,6 +122,8 @@ export default function KkmPage() {
   const handleEdit = (item: KkmItem) => {
     router.push(`/dashboard/admin-panel/kkm/${item.id_kkm}`)
   }
+
+  const contextLoading = isTahunLoading || isUnitLoading
 
   return (
     <div className="space-y-6">
@@ -140,7 +147,7 @@ export default function KkmPage() {
 
       <KkmTable
         items={items}
-        isLoading={isLoading}
+        isLoading={isLoading || contextLoading}
         error={error}
         onEdit={handleEdit}
         onDelete={handleDelete}
