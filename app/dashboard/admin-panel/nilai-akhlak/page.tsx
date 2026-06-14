@@ -1,16 +1,18 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { NilaiAkhlakFilters } from "./components/nilai-akhlak-filters"
 import { NilaiAkhlakHeader } from "./components/nilai-akhlak-header"
 import { NilaiAkhlakTable } from "./components/nilai-akhlak-table"
 import { NilaiAkhlakItem, nilaiAkhlakService } from "@/lib/services/nilai-akhlak.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 export default function NilaiAkhlakPage() {
   const router = useRouter()
+  const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+
   const [nomorInduk, setNomorInduk] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("all")
   const [aspek, setAspek] = useState("all")
   const [perPage, setPerPage] = useState("10")
@@ -19,12 +21,15 @@ export default function NilaiAkhlakPage() {
   const [error, setError] = useState("")
 
   const fetchNilaiAkhlak = useCallback(async () => {
+    if (isTahunLoading) return
     try {
       setIsLoading(true)
       setError("")
 
+      const tahunAjaran = selectedTahunAjaran?.nama_tahun || undefined
+
       const sharedParams = {
-        tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
+        tahun_ajaran: tahunAjaran,
         semester: semester === "all" ? undefined : semester,
         aspek: aspek === "all" ? undefined : aspek,
         per_page: perPage,
@@ -44,7 +49,7 @@ export default function NilaiAkhlakPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [aspek, nomorInduk, perPage, semester, tahunAjaran])
+  }, [aspek, nomorInduk, perPage, semester, selectedTahunAjaran, isTahunLoading])
 
   useEffect(() => {
     fetchNilaiAkhlak()
@@ -69,8 +74,6 @@ export default function NilaiAkhlakPage() {
       <NilaiAkhlakFilters
         nomorInduk={nomorInduk}
         onNomorIndukChange={setNomorInduk}
-        tahunAjaran={tahunAjaran}
-        onTahunAjaranChange={setTahunAjaran}
         semester={semester}
         onSemesterChange={setSemester}
         aspek={aspek}
@@ -82,7 +85,7 @@ export default function NilaiAkhlakPage() {
 
       <NilaiAkhlakTable
         items={items}
-        isLoading={isLoading}
+        isLoading={isLoading || isTahunLoading}
         error={error}
         onDelete={handleDelete}
       />

@@ -18,8 +18,6 @@ import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
 interface NilaiAkhlakFiltersProps {
   nomorInduk: string
   onNomorIndukChange: (value: string) => void
-  tahunAjaran: string
-  onTahunAjaranChange: (value: string) => void
   semester: string
   onSemesterChange: (value: string) => void
   aspek: string
@@ -32,8 +30,6 @@ interface NilaiAkhlakFiltersProps {
 export function NilaiAkhlakFilters({
   nomorInduk,
   onNomorIndukChange,
-  tahunAjaran,
-  onTahunAjaranChange,
   semester,
   onSemesterChange,
   aspek,
@@ -183,18 +179,6 @@ export function NilaiAkhlakFilters({
               </div>
             )}
           </div>
-
-          <Select value={tahunAjaran} onValueChange={onTahunAjaranChange}>
-            <SelectTrigger className="w-full lg:w-40">
-              <SelectValue placeholder="Tahun Ajaran" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tahun</SelectItem>
-              {tahunAjaranOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select value={semester} onValueChange={onSemesterChange}>
             <SelectTrigger className="w-full lg:w-36">
