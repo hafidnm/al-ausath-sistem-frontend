@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
 import {
   Select,
@@ -12,8 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { BookMarked } from "lucide-react"
 import { AnalyticsQuery } from "@/lib/services/analytics-pengajar.service"
-import { useMasterData } from "@/hooks/use-master-data"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { Input } from "@/components/ui/input"
 
 interface FiltersProps {
   onFilterChange: (query: AnalyticsQuery) => void
@@ -21,24 +23,22 @@ interface FiltersProps {
 }
 
 export function AnalitikPengajarFilters({ onFilterChange, loading }: FiltersProps) {
-  const { tahunAjaran: tahunAjaranList } = useMasterData()
-  const [tahunAjaran, setTahunAjaran] = useState<string>("")
+  const { selectedTahunAjaran } = useTahunAjaran()
   const [semester, setSemester] = useState<string>("")
   const [kodeKelas, setKodeKelas] = useState<string>("")
 
   const handleFilter = () => {
     const query: AnalyticsQuery = {}
-    if (tahunAjaran) query.tahun_ajaran = tahunAjaran
+    if (selectedTahunAjaran?.nama_tahun) query.tahun_ajaran = selectedTahunAjaran.nama_tahun
     if (semester) query.semester = parseInt(semester)
     if (kodeKelas) query.kode_kelas = kodeKelas
     onFilterChange(query)
   }
 
   const handleReset = () => {
-    setTahunAjaran("")
     setSemester("")
     setKodeKelas("")
-    onFilterChange({})
+    onFilterChange(selectedTahunAjaran?.nama_tahun ? { tahun_ajaran: selectedTahunAjaran.nama_tahun } : {})
   }
 
   return (
@@ -52,18 +52,11 @@ export function AnalitikPengajarFilters({ onFilterChange, loading }: FiltersProp
           {/* Tahun Ajaran */}
           <div className="space-y-2">
             <Label htmlFor="tahun-ajaran">Tahun Ajaran</Label>
-            <Select value={tahunAjaran} onValueChange={setTahunAjaran}>
-              <SelectTrigger id="tahun-ajaran">
-                <SelectValue placeholder="Pilih tahun ajaran" />
-              </SelectTrigger>
-              <SelectContent>
-                {tahunAjaranList?.map((ta) => (
-                  <SelectItem key={ta.value} value={String(ta.value)}>
-                    {ta.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+              <BookMarked className="w-4 h-4 text-primary shrink-0" />
+              <span className="flex-1 truncate text-foreground">{selectedTahunAjaran?.nama_tahun || "Belum dipilih"}</span>
+              <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+            </div>
           </div>
 
           {/* Semester */}

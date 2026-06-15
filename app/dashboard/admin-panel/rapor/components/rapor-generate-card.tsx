@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BookMarked } from "lucide-react"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface CatatanFormState {
   nomor_induk: string
@@ -58,6 +61,9 @@ export function RaporGenerateCard({
   onPreviewPdf,
   onDownloadPdf,
 }: RaporGenerateCardProps) {
+  const { selectedTahunAjaran } = useTahunAjaran()
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun || catatanForm.tahun_ajaran
+
   return (
     <Card className="border-border/50">
       <CardHeader>
@@ -109,7 +115,11 @@ export function RaporGenerateCard({
           </div>
           <div>
             <Label>Tahun ajaran</Label>
-            <Input className="mt-2" value={catatanForm.tahun_ajaran} onChange={(event) => onCatatanFormChange((current) => ({ ...current, tahun_ajaran: event.target.value }))} />
+            <div className="flex h-10 mt-2 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+              <BookMarked className="w-4 h-4 text-primary shrink-0" />
+              <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+              <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+            </div>
           </div>
           <div>
             <Label>Semester</Label>

@@ -14,7 +14,6 @@ export default function RangkingPage() {
     selectedClassCode,
     setSelectedClassCode,
     tahunAjaran,
-    setTahunAjaran,
     semester,
     setSemester,
     isLoadingKelas,
@@ -43,8 +42,6 @@ export default function RangkingPage() {
         <RangkingFilters
           selectedClassCode={selectedClassCode}
           onSelectedClassCodeChange={setSelectedClassCode}
-          tahunAjaran={tahunAjaran}
-          onTahunAjaranChange={setTahunAjaran}
           semester={semester}
           onSemesterChange={setSemester}
           isLoadingKelas={isLoadingKelas}
