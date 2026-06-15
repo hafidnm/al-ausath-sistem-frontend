@@ -144,17 +144,41 @@ export function NilaiMapelForm() {
       .then(data => {
         const rows: SantriRow[] = data.map(item => {
           const n = item.nilai
-          const tugas = n?.tugas || []
-          const ulangan = n?.ulangan || []
           
-          let t1 = tugas[0]?.nilai?.toString() || ""
-          let t2 = tugas[1]?.nilai?.toString() || ""
-          let t3 = tugas[2]?.nilai?.toString() || ""
-          let uh1 = ulangan[0]?.nilai?.toString() || ""
-          let uh2 = ulangan[1]?.nilai?.toString() || ""
-          let uh3 = ulangan[2]?.nilai?.toString() || ""
-          let uas = (n?.ujian_akhir ?? n?.nilai_uas)?.toString() || ""
+          let t1 = ""
+          let t2 = ""
+          let t3 = ""
+          let uh1 = ""
+          let uh2 = ""
+          let uh3 = ""
+          let uas = ""
 
+          // Parse from nilai_detail if available
+          // format: "Tugas:[90.00,85.00,95.00];Ulangan:[70.00,65.00,75.00];UjianAkhir:55.00;NilaiAkhirMapel:66.50"
+          if (n?.nilai_detail) {
+            const tugasMatch = n.nilai_detail.match(/Tugas:\[(.*?)\]/)
+            if (tugasMatch && tugasMatch[1]) {
+              const tugasVals = tugasMatch[1].split(',')
+              t1 = tugasVals[0] || ""
+              t2 = tugasVals[1] || ""
+              t3 = tugasVals[2] || ""
+            }
+
+            const ulanganMatch = n.nilai_detail.match(/Ulangan:\[(.*?)\]/)
+            if (ulanganMatch && ulanganMatch[1]) {
+              const ulanganVals = ulanganMatch[1].split(',')
+              uh1 = ulanganVals[0] || ""
+              uh2 = ulanganVals[1] || ""
+              uh3 = ulanganVals[2] || ""
+            }
+
+            const uasMatch = n.nilai_detail.match(/UjianAkhir:([0-9.]+)/)
+            if (uasMatch && uasMatch[1]) {
+              uas = uasMatch[1]
+            }
+          }
+
+          // Fallback if detail is not available (e.g. old data)
           if (!t1 && !t2 && !t3 && n?.nilai_harian != null) {
             t1 = n.nilai_harian.toString()
             t2 = n.nilai_harian.toString()
@@ -164,6 +188,9 @@ export function NilaiMapelForm() {
             uh1 = n.nilai_uts.toString()
             uh2 = n.nilai_uts.toString()
             uh3 = n.nilai_uts.toString()
+          }
+          if (!uas && n?.nilai_uas != null) {
+            uas = n.nilai_uas.toString()
           }
 
           return {
