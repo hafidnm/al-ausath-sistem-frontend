@@ -120,7 +120,7 @@ export default function KkmPage() {
   }
 
   const handleEdit = (id: number) => {
-    router.push(`/dashboard/admin-panel/kkm/${id}`)
+    router.push(`/dashboard/admin-panel/kkm/${id}/edit`)
   }
 
   const contextLoading = isTahunLoading || isUnitLoading
