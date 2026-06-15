@@ -27,19 +27,28 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { MoreHorizontal, Trash2 } from "lucide-react"
-import { NilaiAkhlakItem } from "@/lib/services/nilai-akhlak.service"
+import { MoreHorizontal, Trash2, Edit, Save, Loader2 } from "lucide-react"
+import { NilaiAkhlakItem, nilaiAkhlakService } from "@/lib/services/nilai-akhlak.service"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface NilaiAkhlakTableProps {
   items: NilaiAkhlakItem[]
   isLoading?: boolean
   error?: string
   onDelete?: (id: number) => void
+  onUpdate?: () => void
 }
 
-export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: NilaiAkhlakTableProps) {
+export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete, onUpdate }: NilaiAkhlakTableProps) {
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editing, setEditing] = useState<NilaiAkhlakItem | null>(null)
+  const [nilaiInput, setNilaiInput] = useState<string>("")
+  const [deskripsiInput, setDeskripsiInput] = useState<string>("")
+  const [isSaving, setIsSaving] = useState(false)
 
   const handleDelete = () => {
     if (deleteId != null) {
@@ -125,6 +134,18 @@ export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: 
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
+                              onClick={() => {
+                                if (!hasValidId) return
+                                setEditing(item)
+                                setNilaiInput(String(item.nilai_angka ?? ""))
+                                setDeskripsiInput(String(item.deskripsi ?? ""))
+                                setIsEditOpen(true)
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               className="text-destructive"
                               disabled={!hasValidId}
                               onClick={() => {
@@ -162,6 +183,65 @@ export function NilaiAkhlakTable({ items, isLoading = false, error, onDelete }: 
           </AlertDialogAction>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isEditOpen} onOpenChange={(open) => setIsEditOpen(open)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Nilai Akhlak</DialogTitle>
+            <DialogDescription>Perbarui nilai dan deskripsi untuk santri ini.</DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <div className="space-y-4 py-2">
+              <div>
+                <Label>Santri</Label>
+                <div className="text-sm font-medium">{editing.nama_santri} — {editing.nomor_induk}</div>
+              </div>
+              <div>
+                <Label>Nilai (0-100)</Label>
+                <Input type="number" min={0} max={100} value={nilaiInput} onChange={(e) => setNilaiInput(e.target.value)} />
+              </div>
+              <div>
+                <Label>Deskripsi</Label>
+                <Input value={deskripsiInput} onChange={(e) => setDeskripsiInput(e.target.value)} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditOpen(false)}>Batal</Button>
+            <Button onClick={async () => {
+              if (!editing) return
+              setIsSaving(true)
+              try {
+                await nilaiAkhlakService.upsert({
+                  nomor_induk: editing.nomor_induk,
+                  tahun_ajaran: editing.tahun_ajaran,
+                  semester: editing.semester,
+                  nilai_angka: Number(nilaiInput || 0),
+                  deskripsi: deskripsiInput || undefined,
+                  aspek: editing.aspek,
+                })
+                setIsEditOpen(false)
+                setEditing(null)
+                setNilaiInput("")
+                setDeskripsiInput("")
+                // refresh parent list if provided
+                if (typeof onUpdate === 'function') {
+                  onUpdate()
+                } else {
+                  window.location.reload()
+                }
+              } catch (err) {
+                // silent
+              } finally {
+                setIsSaving(false)
+              }
+            }} className="gap-2">
+              {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </>
   )
 }

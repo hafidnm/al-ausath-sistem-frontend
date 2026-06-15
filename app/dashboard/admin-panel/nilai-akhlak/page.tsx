@@ -88,6 +88,7 @@ export default function NilaiAkhlakPage() {
         isLoading={isLoading || isTahunLoading}
         error={error}
         onDelete={handleDelete}
+        onUpdate={fetchNilaiAkhlak}
       />
     </div>
   )
