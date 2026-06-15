@@ -70,6 +70,29 @@ export interface UpsertNilaiMapelPayload {
   ujian_akhir: number
 }
 
+export interface BulkUpsertNilaiMapelItem {
+  nomor_induk: string
+  keterangan?: string
+  tugas: NilaiMapelTugasItem[]
+  ulangan: NilaiMapelUlanganItem[]
+  ujian_akhir: number
+}
+
+export interface BulkUpsertNilaiMapelPayload {
+  kode_mapel: string
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+  id_petugas_input?: number
+  items: BulkUpsertNilaiMapelItem[]
+}
+
+export interface BulkUpsertNilaiMapelResult {
+  message: string
+  saved_count: number
+  errors: { nomor_induk: string; error: string }[]
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const num = Number(value)
   return Number.isFinite(num) ? num : fallback
@@ -276,6 +299,11 @@ export const nilaiMapelService = {
       perhitungan: response.data?.perhitungan ?? rawData?.perhitungan,
     }
     return enrichNilaiMapelItem(normalizeNilaiMapelItem(raw))
+  },
+
+  async bulkUpsert(payload: BulkUpsertNilaiMapelPayload): Promise<BulkUpsertNilaiMapelResult> {
+    const response = await api.post("/akademik/nilai-mapel/bulk", payload)
+    return response.data as BulkUpsertNilaiMapelResult
   },
 
   async remove(id: number): Promise<void> {

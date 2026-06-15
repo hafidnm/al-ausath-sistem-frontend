@@ -23,9 +23,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, PlusCircle, MinusCircle } from "lucide-react"
 
-import { nilaiMapelService, UpsertNilaiMapelPayload } from "@/lib/services/nilai-mapel.service"
+import { nilaiMapelService, BulkUpsertNilaiMapelPayload, NilaiMapelTugasItem } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
 import { bobotNilaiService } from "@/lib/services/bobot-nilai.service"
 import { kelasService } from "@/lib/services/kelas.service"
@@ -39,12 +39,8 @@ interface SantriRow {
   id: number
   nomor_induk: string
   nama_santri: string
-  tugas1: string
-  tugas2: string
-  tugas3: string
-  uh1: string
-  uh2: string
-  uh3: string
+  tugas: string[]
+  ulangan: string[]
   uas: string
   keterangan: string
   isDirty: boolean
@@ -88,6 +84,9 @@ export function NilaiMapelForm() {
   const [semester, setSemester] = useState("1")
 
   const [santris, setSantris] = useState<SantriRow[]>([])
+  const [tugasCount, setTugasCount] = useState(3)
+  const [ulanganCount, setUlanganCount] = useState(3)
+
   const [searchQuery, setSearchQuery] = useState("")
   const [showIncompleteOnly, setShowIncompleteOnly] = useState(false)
   
@@ -133,6 +132,8 @@ export function NilaiMapelForm() {
   useEffect(() => {
     if (!kodeKelas || !kodeMapel || !tahunAjaran || !semester) {
       setSantris([])
+      setTugasCount(3)
+      setUlanganCount(3)
       return
     }
 
@@ -142,15 +143,14 @@ export function NilaiMapelForm() {
 
     nilaiMapelService.getKelasIndex({ kode_kelas: kodeKelas, kode_mapel: kodeMapel, tahun_ajaran: tahunAjaran, semester: Number(semester) })
       .then(data => {
+        let maxT = 3
+        let maxU = 3
+
         const rows: SantriRow[] = data.map(item => {
           const n = item.nilai
           
-          let t1 = ""
-          let t2 = ""
-          let t3 = ""
-          let uh1 = ""
-          let uh2 = ""
-          let uh3 = ""
+          let tugasArr: string[] = []
+          let ulanganArr: string[] = []
           let uas = ""
 
           // Parse from nilai_detail if available
@@ -158,18 +158,12 @@ export function NilaiMapelForm() {
           if (n?.nilai_detail) {
             const tugasMatch = n.nilai_detail.match(/Tugas:\[(.*?)\]/)
             if (tugasMatch && tugasMatch[1]) {
-              const tugasVals = tugasMatch[1].split(',')
-              t1 = tugasVals[0] || ""
-              t2 = tugasVals[1] || ""
-              t3 = tugasVals[2] || ""
+              tugasArr = tugasMatch[1].split(',')
             }
 
             const ulanganMatch = n.nilai_detail.match(/Ulangan:\[(.*?)\]/)
             if (ulanganMatch && ulanganMatch[1]) {
-              const ulanganVals = ulanganMatch[1].split(',')
-              uh1 = ulanganVals[0] || ""
-              uh2 = ulanganVals[1] || ""
-              uh3 = ulanganVals[2] || ""
+              ulanganArr = ulanganMatch[1].split(',')
             }
 
             const uasMatch = n.nilai_detail.match(/UjianAkhir:([0-9.]+)/)
@@ -179,36 +173,40 @@ export function NilaiMapelForm() {
           }
 
           // Fallback if detail is not available (e.g. old data)
-          if (!t1 && !t2 && !t3 && n?.nilai_harian != null) {
-            t1 = n.nilai_harian.toString()
-            t2 = n.nilai_harian.toString()
-            t3 = n.nilai_harian.toString()
+          if (tugasArr.length === 0 && n?.nilai_harian != null) {
+            tugasArr = [n.nilai_harian.toString(), n.nilai_harian.toString(), n.nilai_harian.toString()]
           }
-          if (!uh1 && !uh2 && !uh3 && n?.nilai_uts != null) {
-            uh1 = n.nilai_uts.toString()
-            uh2 = n.nilai_uts.toString()
-            uh3 = n.nilai_uts.toString()
+          if (ulanganArr.length === 0 && n?.nilai_uts != null) {
+            ulanganArr = [n.nilai_uts.toString(), n.nilai_uts.toString(), n.nilai_uts.toString()]
           }
           if (!uas && n?.nilai_uas != null) {
             uas = n.nilai_uas.toString()
           }
 
+          if (tugasArr.length > maxT) maxT = tugasArr.length
+          if (ulanganArr.length > maxU) maxU = ulanganArr.length
+
           return {
             id: item.id,
             nomor_induk: item.nomor_induk,
             nama_santri: item.nama_santri,
-            tugas1: t1,
-            tugas2: t2,
-            tugas3: t3,
-            uh1: uh1,
-            uh2: uh2,
-            uh3: uh3,
+            tugas: tugasArr,
+            ulangan: ulanganArr,
             uas: uas,
             keterangan: n?.keterangan || "",
             isDirty: false,
             originalNilai: n,
           }
         })
+
+        // Pad arrays so all rows have the same max length
+        rows.forEach(row => {
+          while (row.tugas.length < maxT) row.tugas.push("")
+          while (row.ulangan.length < maxU) row.ulangan.push("")
+        })
+
+        setTugasCount(maxT)
+        setUlanganCount(maxU)
         setSantris(rows)
       })
       .catch(err => {
@@ -219,13 +217,48 @@ export function NilaiMapelForm() {
 
   }, [kodeKelas, kodeMapel, tahunAjaran, semester])
 
-  const handleInputChange = (nomor_induk: string, field: keyof SantriRow, value: string) => {
+  const handleArrayInputChange = (nomor_induk: string, field: 'tugas' | 'ulangan', index: number, value: string) => {
     setSantris(prev => prev.map(s => {
       if (s.nomor_induk === nomor_induk) {
-        return { ...s, [field]: value, isDirty: true }
+        const newArr = [...s[field]]
+        newArr[index] = value
+        return { ...s, [field]: newArr, isDirty: true }
       }
       return s
     }))
+  }
+
+  const handleUasChange = (nomor_induk: string, value: string) => {
+    setSantris(prev => prev.map(s => {
+      if (s.nomor_induk === nomor_induk) {
+        return { ...s, uas: value, isDirty: true }
+      }
+      return s
+    }))
+  }
+
+  const addTugasColumn = () => {
+    setTugasCount(prev => prev + 1)
+    setSantris(prev => prev.map(s => ({ ...s, tugas: [...s.tugas, ""] })))
+  }
+
+  const removeTugasColumn = () => {
+    if (tugasCount > 3) {
+      setTugasCount(prev => prev - 1)
+      setSantris(prev => prev.map(s => ({ ...s, tugas: s.tugas.slice(0, -1), isDirty: true })))
+    }
+  }
+
+  const addUlanganColumn = () => {
+    setUlanganCount(prev => prev + 1)
+    setSantris(prev => prev.map(s => ({ ...s, ulangan: [...s.ulangan, ""] })))
+  }
+
+  const removeUlanganColumn = () => {
+    if (ulanganCount > 3) {
+      setUlanganCount(prev => prev - 1)
+      setSantris(prev => prev.map(s => ({ ...s, ulangan: s.ulangan.slice(0, -1), isDirty: true })))
+    }
   }
 
   const handleSave = async () => {
@@ -245,35 +278,42 @@ export function NilaiMapelForm() {
     setSuccessMsg("")
 
     try {
-      for (const row of dirtyRows) {
-        const payload: UpsertNilaiMapelPayload = {
+      // Kirim SEMUA santri dalam 1 request sekaligus
+      const payload: BulkUpsertNilaiMapelPayload = {
+        kode_mapel: kodeMapel,
+        kode_kelas: kodeKelas,
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+        id_petugas_input: petugasInputId,
+        items: dirtyRows.map(row => ({
           nomor_induk: row.nomor_induk,
-          kode_mapel: kodeMapel,
-          kode_kelas: kodeKelas,
-          tahun_ajaran: tahunAjaran,
-          semester: Number(semester),
-          id_petugas_input: petugasInputId,
           keterangan: row.keterangan || undefined,
-          tugas: [
-            { nilai: parseNilai(row.tugas1), jenis: "PR" },
-            { nilai: parseNilai(row.tugas2), jenis: "TUGAS_PENGGANTI" },
-            { nilai: parseNilai(row.tugas3), jenis: "MODUL_KOMPETENSI" },
-          ],
-          ulangan: [
-            { nilai: parseNilai(row.uh1), soal_disusun_pengajar: true, diawasi_pengajar: true },
-            { nilai: parseNilai(row.uh2), soal_disusun_pengajar: true, diawasi_pengajar: true },
-            { nilai: parseNilai(row.uh3), soal_disusun_pengajar: true, diawasi_pengajar: true },
-          ],
+          tugas: row.tugas.map((val, idx) => ({
+            nilai: parseNilai(val),
+            jenis: (idx === 0 ? "PR" : idx === 1 ? "TUGAS_PENGGANTI" : idx === 2 ? "MODUL_KOMPETENSI" : "PR") as NilaiMapelTugasItem["jenis"]
+          })),
+          ulangan: row.ulangan.map((val) => ({
+            nilai: parseNilai(val),
+            soal_disusun_pengajar: true,
+            diawasi_pengajar: true
+          })),
           ujian_akhir: parseNilai(row.uas)
-        }
-        await nilaiMapelService.upsert(payload)
+        }))
       }
-      
-      setSuccessMsg(`Berhasil menyimpan nilai untuk ${dirtyRows.length} santri.`)
+
+      const result = await nilaiMapelService.bulkUpsert(payload)
+
+      if (result.errors && result.errors.length > 0) {
+        const errDetail = result.errors.map(e => `${e.nomor_induk}: ${e.error}`).join('; ')
+        setError(`Tersimpan ${result.saved_count} santri, namun ${result.errors.length} gagal: ${errDetail}`)
+      } else {
+        setSuccessMsg(`Berhasil menyimpan nilai ${result.saved_count} santri.`)
+      }
+
       // Reset dirty flag
       setSantris(prev => prev.map(s => ({ ...s, isDirty: false })))
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Gagal menyimpan beberapa nilai.")
+      setError(err?.response?.data?.message || "Gagal menyimpan nilai.")
     } finally {
       setIsSaving(false)
     }
@@ -283,7 +323,7 @@ export function NilaiMapelForm() {
     return santris.filter(s => {
       const matchSearch = s.nama_santri.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           s.nomor_induk.includes(searchQuery)
-      const isIncomplete = !s.tugas1 || !s.tugas2 || !s.tugas3 || !s.uh1 || !s.uh2 || !s.uh3 || !s.uas
+      const isIncomplete = s.tugas.some(v => !v) || s.ulangan.some(v => !v) || !s.uas
       return matchSearch && (showIncompleteOnly ? isIncomplete : true)
     })
   }, [santris, searchQuery, showIncompleteOnly])
@@ -360,8 +400,21 @@ export function NilaiMapelForm() {
                   KKM: {nilaiKkm ?? "-"} | Bobot: T({bobot.tugas}%) U({bobot.ulangan}%) UAS({bobot.ujian}%)
                 </CardDescription>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2 border rounded-md p-1 bg-muted/20">
+                  <span className="text-xs font-semibold px-2">Tugas</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={removeTugasColumn} disabled={tugasCount <= 3}><MinusCircle className="h-4 w-4" /></Button>
+                  <span className="text-xs font-medium w-4 text-center">{tugasCount}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={addTugasColumn}><PlusCircle className="h-4 w-4" /></Button>
+                </div>
+                <div className="flex items-center gap-2 border rounded-md p-1 bg-muted/20">
+                  <span className="text-xs font-semibold px-2">Ulangan</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={removeUlanganColumn} disabled={ulanganCount <= 3}><MinusCircle className="h-4 w-4" /></Button>
+                  <span className="text-xs font-medium w-4 text-center">{ulanganCount}</span>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={addUlanganColumn}><PlusCircle className="h-4 w-4" /></Button>
+                </div>
+
+                <div className="flex items-center space-x-2 border-l pl-4">
                   <Switch id="incomplete-mode" checked={showIncompleteOnly} onCheckedChange={setShowIncompleteOnly} />
                   <Label htmlFor="incomplete-mode">Belum Lengkap</Label>
                 </div>
@@ -383,36 +436,36 @@ export function NilaiMapelForm() {
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto pb-4">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[200px]">Nama Santri</TableHead>
-                      <TableHead className="w-[80px]">T1</TableHead>
-                      <TableHead className="w-[80px]">T2</TableHead>
-                      <TableHead className="w-[80px]">T3</TableHead>
-                      <TableHead className="w-[80px]">UH1</TableHead>
-                      <TableHead className="w-[80px]">UH2</TableHead>
-                      <TableHead className="w-[80px]">UH3</TableHead>
-                      <TableHead className="w-[80px]">UAS</TableHead>
-                      <TableHead className="w-[80px]">Akhir</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead className="min-w-[200px] sticky left-0 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">Nama Santri</TableHead>
+                      {Array.from({length: tugasCount}).map((_, i) => (
+                        <TableHead key={`th-t-${i}`} className="w-[80px] text-center px-1">T{i+1}</TableHead>
+                      ))}
+                      {Array.from({length: ulanganCount}).map((_, i) => (
+                        <TableHead key={`th-u-${i}`} className="w-[80px] text-center px-1">UH{i+1}</TableHead>
+                      ))}
+                      <TableHead className="w-[80px] text-center px-1">UAS</TableHead>
+                      <TableHead className="w-[80px] text-center">Akhir</TableHead>
+                      <TableHead className="text-center">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredSantris.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={tugasCount + ulanganCount + 4} className="text-center py-8 text-muted-foreground">
                           Tidak ada data santri.
                         </TableCell>
                       </TableRow>
                     ) : (
                       filteredSantris.map(s => {
-                        const isKosong = !s.tugas1 && !s.tugas2 && !s.tugas3 && !s.uh1 && !s.uh2 && !s.uh3 && !s.uas
+                        const isKosong = s.tugas.every(v => !v) && s.ulangan.every(v => !v) && !s.uas
                         
                         // Calculate Preview
-                        const t = [{ nilai: parseNilai(s.tugas1), jenis: "PR" as const }, { nilai: parseNilai(s.tugas2), jenis: "PR" as const }, { nilai: parseNilai(s.tugas3), jenis: "PR" as const }]
-                        const u = [{ nilai: parseNilai(s.uh1), soal_disusun_pengajar: true, diawasi_pengajar: true }, { nilai: parseNilai(s.uh2), soal_disusun_pengajar: true, diawasi_pengajar: true }, { nilai: parseNilai(s.uh3), soal_disusun_pengajar: true, diawasi_pengajar: true }]
+                        const t = s.tugas.map(val => ({ nilai: parseNilai(val), jenis: "PR" as const }))
+                        const u = s.ulangan.map(val => ({ nilai: parseNilai(val), soal_disusun_pengajar: true, diawasi_pengajar: true }))
                         const uasVal = parseNilai(s.uas)
                         
                         const raw = calculateRaporRaw(t, u, uasVal, bobot)
@@ -421,27 +474,27 @@ export function NilaiMapelForm() {
 
                         return (
                           <TableRow key={s.nomor_induk} className={isKosong ? "bg-destructive/5" : ""}>
-                            <TableCell>
-                              <div className="font-medium text-sm">{s.nama_santri}</div>
+                            <TableCell className="sticky left-0 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                              <div className="font-medium text-sm whitespace-nowrap">{s.nama_santri}</div>
                               <div className="text-xs text-muted-foreground">{s.nomor_induk}</div>
                             </TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas1} onChange={e => handleInputChange(s.nomor_induk, "tugas1", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas2} onChange={e => handleInputChange(s.nomor_induk, "tugas2", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.tugas3} onChange={e => handleInputChange(s.nomor_induk, "tugas3", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh1} onChange={e => handleInputChange(s.nomor_induk, "uh1", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh2} onChange={e => handleInputChange(s.nomor_induk, "uh2", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uh3} onChange={e => handleInputChange(s.nomor_induk, "uh3", e.target.value)} /></TableCell>
-                            <TableCell><Input className="h-8 w-16 px-2 text-center" value={s.uas} onChange={e => handleInputChange(s.nomor_induk, "uas", e.target.value)} /></TableCell>
+                            {s.tugas.map((val, i) => (
+                              <TableCell key={`t-${i}`} className="px-1"><Input className="h-8 w-16 px-2 text-center mx-auto" value={val} onChange={e => handleArrayInputChange(s.nomor_induk, "tugas", i, e.target.value)} /></TableCell>
+                            ))}
+                            {s.ulangan.map((val, i) => (
+                              <TableCell key={`u-${i}`} className="px-1"><Input className="h-8 w-16 px-2 text-center mx-auto" value={val} onChange={e => handleArrayInputChange(s.nomor_induk, "ulangan", i, e.target.value)} /></TableCell>
+                            ))}
+                            <TableCell className="px-1"><Input className="h-8 w-16 px-2 text-center mx-auto" value={s.uas} onChange={e => handleUasChange(s.nomor_induk, e.target.value)} /></TableCell>
                             <TableCell className="text-center font-semibold">
                               {!isKosong ? norm.nilai : "-"}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               {!isKosong ? (
-                                <span className={`text-xs px-2 py-1 rounded-full ${status.isPassed ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
-                                  {status.label}
+                                <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${status === "TUNTAS" ? "bg-emerald-100 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
+                                  {status.replace('_', ' ')}
                                 </span>
                               ) : (
-                                <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive">KOSONG</span>
+                                <span className="text-xs px-2 py-1 rounded-full bg-destructive/10 text-destructive whitespace-nowrap">KOSONG</span>
                               )}
                             </TableCell>
                           </TableRow>
