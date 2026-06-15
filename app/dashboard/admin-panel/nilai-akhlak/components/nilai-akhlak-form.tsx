@@ -25,7 +25,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked } from "lucide-react"
 
-import { nilaiAkhlakService, UpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
+import { nilaiAkhlakService, BulkUpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
 import { kelasService } from "@/lib/services/kelas.service"
 import { authService } from "@/lib/services/auth.service"
 import { semesterOptions } from "../utils/constants"
@@ -144,7 +144,7 @@ export function NilaiAkhlakForm() {
       return
     }
 
-    const dirtyRows = santris.filter(s => s.isDirty)
+    const dirtyRows = santris.filter(s => s.isDirty && s.nilai_angka)
     if (dirtyRows.length === 0) {
       setError("Tidak ada perubahan untuk disimpan.")
       return
@@ -155,25 +155,32 @@ export function NilaiAkhlakForm() {
     setSuccessMsg("")
 
     try {
-      for (const row of dirtyRows) {
-        if (!row.nilai_angka) continue // Skip if empty (unless we want to allow deleting?)
-        const payload: UpsertNilaiAkhlakPayload = {
+      // Kirim SEMUA santri dalam 1 request sekaligus
+      const payload: BulkUpsertNilaiAkhlakPayload = {
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+        aspek: aspek || "AKHLAK",
+        id_petugas_input: petugasInputId,
+        items: dirtyRows.map(row => ({
           nomor_induk: row.nomor_induk,
-          tahun_ajaran: tahunAjaran,
-          semester: Number(semester),
-          aspek: aspek || "AKHLAK",
           nilai_angka: parseNilai(row.nilai_angka),
           deskripsi: row.deskripsi.trim() || undefined,
-          id_petugas_input: petugasInputId,
-        }
-        await nilaiAkhlakService.upsert(payload)
+        }))
       }
-      
-      setSuccessMsg(`Berhasil menyimpan nilai untuk ${dirtyRows.length} santri.`)
+
+      const result = await nilaiAkhlakService.bulkUpsert(payload)
+
+      if (result.errors && result.errors.length > 0) {
+        const errDetail = result.errors.map(e => `${e.nomor_induk}: ${e.error}`).join('; ')
+        setError(`Tersimpan ${result.saved_count} santri, namun ${result.errors.length} gagal: ${errDetail}`)
+      } else {
+        setSuccessMsg(`Berhasil menyimpan nilai akhlak ${result.saved_count} santri.`)
+      }
+
       // Reset dirty flag
       setSantris(prev => prev.map(s => ({ ...s, isDirty: false })))
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Gagal menyimpan beberapa nilai.")
+      setError(err?.response?.data?.message || "Gagal menyimpan nilai.")
     } finally {
       setIsSaving(false)
     }
