@@ -21,6 +21,7 @@ import { authService } from "@/lib/services/auth.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import type { TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import {
   Dialog,
   DialogContent,
@@ -309,6 +310,7 @@ const mapGuruStatusToApi = (status: GuruStatus): "HADIR" | "IZIN" | "SAKIT" => {
 export default function GuruPanelPage() {
   const { toast } = useToast()
   const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit } = useUnit()
   // Guard: cegah double-invocation dari React StrictMode (development)
   const initCalledRef = useRef(false)
 
@@ -346,7 +348,6 @@ export default function GuruPanelPage() {
   const [isGuruTidakHadirFlow, setIsGuruTidakHadirFlow] = useState(false)
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [isLoadingPetugas, setIsLoadingPetugas] = useState(false)
-  const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [mapelFilter, setMapelFilter] = useState("all")
   const [petugasFilter, setPetugasFilter] = useState("all")
@@ -399,21 +400,21 @@ export default function GuruPanelPage() {
   }, [jadwalMengajar])
 
   const kelasOptions = useMemo(() => {
-    const source = jadwalMengajar.filter((jadwal) => unitFilter === "all" || jadwal.kode_unit === unitFilter)
+    const source = jadwalMengajar.filter((jadwal) => !selectedKodeUnit || jadwal.kode_unit === selectedKodeUnit)
     return uniqueOptions(source.map((jadwal) => ({ value: jadwal.kelas, label: jadwal.kelas })))
-  }, [jadwalMengajar, unitFilter])
+  }, [jadwalMengajar, selectedKodeUnit])
 
   const mapelOptions = useMemo(() => {
     const source = jadwalMengajar.filter(
-      (jadwal) => (unitFilter === "all" || jadwal.kode_unit === unitFilter) && (kelasFilter === "all" || jadwal.kelas === kelasFilter),
+      (jadwal) => (!selectedKodeUnit || jadwal.kode_unit === selectedKodeUnit) && (kelasFilter === "all" || jadwal.kelas === kelasFilter),
     )
     return uniqueOptions(source.map((jadwal) => ({ value: jadwal.mapel, label: jadwal.mapel })))
-  }, [jadwalMengajar, unitFilter, kelasFilter])
+  }, [jadwalMengajar, selectedKodeUnit, kelasFilter])
 
   const petugasFilterOptions = useMemo(() => {
     const source = jadwalMengajar.filter(
       (jadwal) =>
-        (unitFilter === "all" || jadwal.kode_unit === unitFilter) &&
+        (!selectedKodeUnit || jadwal.kode_unit === selectedKodeUnit) &&
         (kelasFilter === "all" || jadwal.kelas === kelasFilter) &&
         (mapelFilter === "all" || jadwal.mapel === mapelFilter),
     )
@@ -426,11 +427,11 @@ export default function GuruPanelPage() {
         }))
         .filter((item) => item.value && item.value !== "0"),
     )
-  }, [jadwalMengajar, unitFilter, kelasFilter, mapelFilter])
+  }, [jadwalMengajar, selectedKodeUnit, kelasFilter, mapelFilter])
 
   const filteredSortedJadwalMengajar = useMemo(() => {
     const source = jadwalMengajar.filter((jadwal) => {
-      const unitMatch = unitFilter === "all" || jadwal.kode_unit === unitFilter
+      const unitMatch = !selectedKodeUnit || jadwal.kode_unit === selectedKodeUnit
       const kelasMatch = kelasFilter === "all" || jadwal.kelas === kelasFilter
       const mapelMatch = mapelFilter === "all" || jadwal.mapel === mapelFilter
       const petugasMatch = petugasFilter === "all" || String(jadwal.id_petugas_hadir ?? "") === petugasFilter
@@ -444,17 +445,19 @@ export default function GuruPanelPage() {
       if (dayDiff !== 0) return dayDiff
       return String(a.jam || "").localeCompare(String(b.jam || ""))
     })
-  }, [jadwalMengajar, unitFilter, kelasFilter, mapelFilter, petugasFilter, hariFilter])
+  }, [jadwalMengajar, selectedKodeUnit, kelasFilter, mapelFilter, petugasFilter, hariFilter])
 
   const todaySchedule = useMemo(() => {
-    const today = jadwalMengajar.filter((j) => String(j.hari || "").toUpperCase() === dayName)
+    const today = jadwalMengajar.filter(
+      (j) => String(j.hari || "").toUpperCase() === dayName && (!selectedKodeUnit || j.kode_unit === selectedKodeUnit)
+    )
 
     if (!currentPetugasId) return today
 
     if (isAdminUser) return today
 
     return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentPetugasId))
-  }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser])
+  }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser, selectedKodeUnit])
 
   const todayDateStr = useMemo(() => {
     const d = new Date()
@@ -492,8 +495,12 @@ export default function GuruPanelPage() {
       filtered = filtered.filter((item) => item.tahun_ajaran === selectedTahunAjaranRekap)
     }
 
+    if (selectedKodeUnit) {
+      filtered = filtered.filter((item) => normalizeUnitCode(item.kode_unit) === selectedKodeUnit)
+    }
+
     return [...filtered].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
-  }, [aktivitasSesi, currentPetugasId, selectedTahunAjaranRekap])
+  }, [aktivitasSesi, currentPetugasId, selectedTahunAjaranRekap, selectedKodeUnit])
 
   // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
 
@@ -625,10 +632,12 @@ export default function GuruPanelPage() {
     }
   }
 
-  /** Dipanggil hanya saat tab Jadwal perlu refresh (setelah submit/cancel). */
-  const loadAktivitasSesi = async () => {
+  /** Dipanggil hanya saat tab Riwayat perlu refresh. Bisa dikirim filter tahun_ajaran. */
+  const loadAktivitasSesi = async (tahunAjaran?: string) => {
     try {
-      const rows = await sesiAbsensiService.getAll({ per_page: 100 })
+      const params: Record<string, string | number> = { per_page: 200 }
+      if (tahunAjaran && tahunAjaran !== "ALL") params.tahun_ajaran = tahunAjaran
+      const rows = await sesiAbsensiService.getAll(params)
       const mapped = toArray(rows).map(mapSesiToJadwal).filter((r) => r.id_sesi > 0)
       setAktivitasSesi(mapped)
     } catch (error: any) {
@@ -650,6 +659,11 @@ export default function GuruPanelPage() {
       const activeTahun = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaranRekap
       if (activeTahun && activeTahun !== "ALL") {
         params.tahun_ajaran = activeTahun
+      }
+
+      // Filter by unit header
+      if (selectedKodeUnit) {
+        params.kode_unit = selectedKodeUnit
       }
 
       const result = await sesiAbsensiService.rekapPetugas(params)
@@ -679,18 +693,28 @@ export default function GuruPanelPage() {
     if (activeTab === "riwayat" && !riwayatLoaded && currentPetugasId !== undefined) {
       setRiwayatLoaded(true)
       void Promise.all([
-        loadAktivitasSesi(),
+        loadAktivitasSesi(selectedTahunAjaranRekap),
         loadRekap(currentPetugasId, selectedTahunAjaranRekap),
       ])
     }
   }, [activeTab, riwayatLoaded, currentPetugasId])
 
-  // Re-fetch rekap saat filter tahun ajaran berubah (hanya jika tab Riwayat sudah pernah dibuka)
+  // Re-fetch rekap & riwayat sesi saat filter tahun ajaran berubah (hanya jika tab Riwayat sudah pernah dibuka)
+  useEffect(() => {
+    if (riwayatLoaded && currentPetugasId) {
+      void Promise.all([
+        loadAktivitasSesi(selectedTahunAjaranRekap),
+        loadRekap(currentPetugasId, selectedTahunAjaranRekap),
+      ])
+    }
+  }, [selectedTahunAjaranRekap])
+
+  // Re-fetch rekap saat filter unit header berubah (hanya jika tab Riwayat sudah pernah dibuka)
   useEffect(() => {
     if (riwayatLoaded && currentPetugasId) {
       void loadRekap(currentPetugasId, selectedTahunAjaranRekap)
     }
-  }, [selectedTahunAjaranRekap])
+  }, [selectedKodeUnit])
 
   // Re-fetch jadwal saat tahun ajaran global berubah (setelah mount pertama)
   const isMountedRef = useRef(false)
@@ -951,7 +975,6 @@ export default function GuruPanelPage() {
   }
 
   const resetJadwalFilters = () => {
-    setUnitFilter("all")
     setKelasFilter("all")
     setMapelFilter("all")
     setPetugasFilter("all")
@@ -1154,23 +1177,6 @@ export default function GuruPanelPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <div className="space-y-2">
-                  <Label>Unit</Label>
-                  <Select value={unitFilter} onValueChange={setUnitFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Semua unit" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Unit</SelectItem>
-                      {unitOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="space-y-2">
                   <Label>Kelas</Label>
                   <Select value={kelasFilter} onValueChange={setKelasFilter}>
