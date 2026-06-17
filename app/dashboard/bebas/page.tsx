@@ -245,9 +245,14 @@ export default function AdministrasiBebasPage() {
   }, [data])
 
   const filterKelasOptions = useMemo(() => {
-    const set = new Set(data.map((r) => r.santri?.kode_kelas ?? "").filter(Boolean))
+    let filtered = data
+    // Jika unit dipilih, filter kelas berdasarkan unit tersebut
+    if (filterUnit !== "all") {
+      filtered = data.filter((r) => r.santri?.kode_kelas?.startsWith(filterUnit))
+    }
+    const set = new Set(filtered.map((r) => r.santri?.kode_kelas ?? "").filter(Boolean))
     return Array.from(set).sort()
-  }, [data])
+  }, [data, filterUnit])
 
   const handleApplyFilter = () => {
     setAppliedSearch(search)
@@ -510,7 +515,10 @@ export default function AdministrasiBebasPage() {
 
                 <div className="space-y-2">
                   <Label>Pilih Unit/Jenjang</Label>
-                  <Select value={filterUnit} onValueChange={setFilterUnit}>
+                  <Select value={filterUnit} onValueChange={(v) => {
+                    setFilterUnit(v)
+                    setFilterKelas("all")
+                  }}>
                     <SelectTrigger>
                       <SelectValue placeholder="Pilih Jenjang" />
                     </SelectTrigger>

@@ -4,9 +4,7 @@ import { useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Badge } from "@/components/ui/badge"
 import {
   Select,
   SelectContent,
@@ -17,8 +15,8 @@ import {
 import { Input } from "@/components/ui/input"
 import { Loader2, Plus, Trash2, ImagePlus, X, Globe } from "lucide-react"
 import type { TesKonfigurasiJenjangKey, TesKonfigurasiJenjang, TestQuestion, TestQuestionType } from "@/types/ppdb/admin"
-import type { TesKonfigurasiJenjangKey, TesKonfigurasiJenjang, TestQuestion, TestQuestionType } from "@/types/ppdb/admin"
 import api from "@/lib/axios"
+import { transliterateText } from "@/lib/utils/arabic-transliterate"
 
 // Helper: Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
@@ -32,38 +30,6 @@ const getImageUrl = (path?: string): string | null => {
   // Handle both relative paths (ppdb/tes_soal/img.jpg) and /storage/ prefixes
   const cleanPath = path.replace(/^\/storage\/?/, '').replace(/^\//, '');
   return `${base}/storage/${cleanPath}`;
-};
-
-// Helper: Auto-transliterasi A/B/C ke Bahasa Arab jika pilihan dimulai dengan huruf Latin
-const autoTransliterateOptions = (text: string, bahasa: 'id' | 'ar' = 'id'): string[] => {
-  if (bahasa !== 'ar') return text.split('\n');
-  
-  const lines = text.split('\n');
-  const arabicChoices: Record<string, string> = {
-    'a': 'أ',
-    'b': 'ب',
-    'c': 'ج',
-    'd': 'د',
-    'e': 'ه',
-    'f': 'و',
-    'g': 'ز',
-    'h': 'ح',
-  };
-  
-  return lines.map(line => {
-    const trimmed = line.trim();
-    if (!trimmed) return line;
-    
-    // Jika baris dimulai dengan huruf tunggal (A, B, C, dll), transliterasi
-    const match = trimmed.match(/^([a-hA-H])\s*[\.\):\-]?\s*(.*)/);
-    if (match) {
-      const letter = match[1].toLowerCase();
-      const rest = match[2];
-      const arabicLetter = arabicChoices[letter];
-      return rest ? `${arabicLetter} - ${rest}` : arabicLetter;
-    }
-    return line;
-  });
 };
 
 const tesJenjangOptions: Array<{ value: TesKonfigurasiJenjangKey; label: string }> = [
@@ -261,9 +227,19 @@ export function PpdbTesKonfigurasiCard({
                               placeholder={q.bahasa === 'ar' ? 'اكتب السؤال هنا...' : 'Tuliskan pertanyaan...'}
                               dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
                               className={q.bahasa === 'ar' ? 'text-right font-arabic' : ''}
-                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleUpdateQuestion(idx, { question: e.target.value })}
+                              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                                let value = e.target.value;
+                                // Auto-transliterasi pertanyaan jika bahasa Arab
+                                if (q.bahasa === 'ar' && /[a-zA-Z]/.test(value)) {
+                                  value = transliterateText(value);
+                                }
+                                handleUpdateQuestion(idx, { question: value });
+                              }}
                               disabled={isLoading || isSaving}
                             />
+                            {q.bahasa === 'ar' && (
+                              <p className="text-xs text-amber-600 mt-1">💡 Ketik A/B/C akan otomatis menjadi أ/ب/ج</p>
+                            )}
                           </div>
                           <div className="w-full sm:w-[200px]">
                             <Label className="mb-2 block">Tipe Jawaban</Label>
@@ -344,25 +320,73 @@ export function PpdbTesKonfigurasiCard({
                           </div>
                         </div>
 
+                        {/* POIN 16: Setiap opsi pilihan ganda memiliki box/input tersendiri */}
                         {q.type === "multiple_choice" && (
-                          <div className="pl-4 border-l-2 border-primary/20 space-y-2">
-                            <Label className="text-xs text-muted-foreground uppercase tracking-wider">Opsi Pilihan Ganda (Satu baris per opsi)</Label>
-                            <Textarea
-                              className={`min-h-[80px] ${q.bahasa === 'ar' ? 'text-right' : ''}`}
-                              dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
-                              placeholder={q.bahasa === 'ar' ? 'الخيار الأول\nالخيار الثاني\nالخيار الثالث' : 'Ketik opsi satu, tekan ENTER\nKetik opsi dua, dst...'}
-                              value={q.options ? q.options.join("\n") : ""}
-                              onChange={(e) => {
-                                const rawText = e.target.value;
-                                // Auto-transliterasi jika bahasa Arab
-                                const transliterated = autoTransliterateOptions(rawText, q.bahasa as 'id' | 'ar');
-                                handleUpdateQuestion(idx, { options: transliterated });
-                              }}
-                              disabled={isLoading || isSaving}
-                            />
+                          <div className="pl-4 border-l-2 border-primary/20 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                                Opsi Pilihan Ganda
+                              </Label>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1.5"
+                                disabled={isLoading || isSaving}
+                                onClick={() => {
+                                  const currentOptions = q.options ?? []
+                                  handleUpdateQuestion(idx, { options: [...currentOptions, ""] })
+                                }}
+                              >
+                                <Plus className="w-3 h-3" /> Tambah Opsi
+                              </Button>
+                            </div>
                             {q.bahasa === 'ar' && (
-                              <p className="text-xs text-amber-600">💡 Ketik A/B/C akan otomatis menjadi ا/ب/ج</p>
+                              <p className="text-xs text-amber-600">💡 Ketik A/B/C akan otomatis menjadi أ/ب/ج</p>
                             )}
+                            <div className="space-y-2">
+                              {(q.options ?? [""]).map((opt, optIdx) => {
+                                const optLabel = String.fromCharCode(65 + optIdx) // A, B, C, ...
+                                return (
+                                  <div
+                                    key={optIdx}
+                                    className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-2 shadow-sm"
+                                  >
+                                    <span className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
+                                      {optLabel}
+                                    </span>
+                                    <Input
+                                      value={opt}
+                                      placeholder={q.bahasa === 'ar' ? `الخيار ${optLabel}` : `Opsi ${optLabel}`}
+                                      dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
+                                      className={`flex-1 h-8 text-sm border-0 shadow-none focus-visible:ring-0 px-1 ${q.bahasa === 'ar' ? 'text-right' : ''}`}
+                                      disabled={isLoading || isSaving}
+                                      onChange={(e) => {
+                                        let value = e.target.value
+                                        if (q.bahasa === 'ar' && /[a-zA-Z]/.test(value)) {
+                                          value = transliterateText(value)
+                                        }
+                                        const newOptions = [...(q.options ?? [])]
+                                        newOptions[optIdx] = value
+                                        handleUpdateQuestion(idx, { options: newOptions })
+                                      }}
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={isLoading || isSaving || (q.options ?? []).length <= 1}
+                                      onClick={() => {
+                                        const newOptions = (q.options ?? []).filter((_, i) => i !== optIdx)
+                                        handleUpdateQuestion(idx, { options: newOptions.length ? newOptions : [""] })
+                                      }}
+                                      className="flex-shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
+                                      title="Hapus opsi"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>

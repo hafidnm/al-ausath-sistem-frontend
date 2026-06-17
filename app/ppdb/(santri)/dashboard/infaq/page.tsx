@@ -1,14 +1,15 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, ArrowRight, GraduationCap, Percent,
-  Info, Loader2, CheckCircle2,
+  Info, Loader2, CheckCircle2, Paperclip, UploadCloud,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
@@ -47,6 +48,11 @@ export default function PpdbInfoInfaqPage() {
   const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
   const [confirmed, setConfirmed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // POIN 4: Upload bukti anak guru — state file
+  const [buktiAnakGuruFile, setBuktiAnakGuruFile] = useState<File | null>(null);
+  const [buktiAnakGuruPreview, setBuktiAnakGuruPreview] = useState<string | null>(null);
+  const buktiAnakGuruRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void fetchDashboard().catch(() => {
@@ -120,25 +126,34 @@ export default function PpdbInfoInfaqPage() {
   const infaqBulananDisplay = infaqOptions.find(o => o.value === pilihanInfaqBulanan)?.display ?? '-';
 
   const handleLanjut = async () => {
+    // POIN 4: Validasi — jika anak guru, bukti wajib diupload
+    if (isAnakGuru && !buktiAnakGuruFile && !data?.buktiOrtuGuruUrl) {
+      toast({
+        title: 'Bukti anak guru wajib',
+        description: 'Silakan upload bukti bahwa calon santri adalah anak guru.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       await ppdbPortalApi.updateForm({
         is_anak_guru: isAnakGuru,
         pilihan_uang_gedung: pilihanUangGedung,
         pilihan_infaq_bulanan: pilihanInfaqBulanan,
+        ...(buktiAnakGuruFile ? { bukti_ortu_guru: buktiAnakGuruFile } : {}),
       });
       if (typeof window !== 'undefined') {
         sessionStorage.setItem('ppdb_infaq_acknowledged', '1');
         if (isAnakGuru) sessionStorage.setItem('ppdb_is_anak_guru', '1');
       }
       
-      // Tambahkan toast success untuk feedback
       toast({
         title: 'Pilihan infaq berhasil disimpan',
         description: 'Mengarahkan ke halaman pembayaran...',
       });
       
-      // Gunakan setTimeout kecil untuk memastikan state tersimpan sebelum redirect
       setTimeout(() => {
         router.push('/ppdb/dashboard/pembayaran');
       }, 100);
@@ -395,22 +410,91 @@ export default function PpdbInfoInfaqPage() {
             </div>
 
             {isAnakGuru === true && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex gap-2">
-                <Percent className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-semibold text-amber-800">Diskon 50% untuk Anak Guru</p>
+              <div className="space-y-3">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex gap-2">
+                  <Percent className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-amber-800">Diskon 50% untuk Anak Guru</p>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Admin akan memverifikasi status dan menyesuaikan nominal tagihan administrasi PPDB Anda.
+                    </p>
+                  </div>
+                </div>
 
-              <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm">
-                <p className="font-medium text-amber-900">Pilihan tersimpan</p>
-                <p className="text-amber-800 mt-1">
-                  {billingInfo?.selectedInfaqBulanan
-                    ? `${billingInfo.selectedInfaqBulanan.label} - ${billingInfo.selectedInfaqBulanan.display}`
-                    : 'Belum ada pilihan infaq yang tersimpan'}
-                </p>
-              </div>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Admin akan memverifikasi status dan menyesuaikan nominal tagihan administrasi PPDB Anda.
+                {/* POIN 4: Upload bukti anak guru — muncul hanya jika isAnakGuru = true */}
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3">
+                  <Label className="text-sm font-semibold text-amber-900 flex items-center gap-2">
+                    <Paperclip className="w-4 h-4 text-amber-600" />
+                    Upload Bukti Anak Guru <span className="text-destructive">*</span>
+                  </Label>
+                  <p className="text-xs text-amber-700">
+                    Upload surat keterangan atau bukti bahwa calon santri adalah anak dari guru / pengajar pondok. Format: JPG, PNG, PDF (maks. 5MB).
                   </p>
+
+                  {/* Tampilkan bukti yang sudah tersimpan sebelumnya */}
+                  {data?.buktiOrtuGuruUrl && !buktiAnakGuruPreview && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-700">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <a
+                        href={data.buktiOrtuGuruUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline"
+                      >
+                        Bukti tersimpan — klik untuk melihat
+                      </a>
+                      <span className="text-muted-foreground">(bisa diperbarui di bawah)</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 border-amber-300 text-amber-800 hover:bg-amber-50"
+                      onClick={() => buktiAnakGuruRef.current?.click()}
+                      disabled={submitting}
+                    >
+                      <UploadCloud className="w-3.5 h-3.5" />
+                      Pilih File
+                    </Button>
+                    <input
+                      type="file"
+                      ref={buktiAnakGuruRef}
+                      className="hidden"
+                      accept=".jpg,.jpeg,.png,.pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast({ title: 'File terlalu besar', description: 'Maksimal 5MB', variant: 'destructive' });
+                          return;
+                        }
+                        if (buktiAnakGuruPreview) URL.revokeObjectURL(buktiAnakGuruPreview);
+                        setBuktiAnakGuruFile(file);
+                        setBuktiAnakGuruPreview(URL.createObjectURL(file));
+                      }}
+                    />
+                    <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                      {buktiAnakGuruFile ? buktiAnakGuruFile.name : 'Tidak ada file terpilih'}
+                    </span>
+                  </div>
+
+                  {buktiAnakGuruPreview && (
+                    <div className="max-w-xs border rounded overflow-hidden mt-2">
+                      {buktiAnakGuruFile?.type === 'application/pdf' ? (
+                        <div className="p-3 bg-muted text-xs text-center">PDF dipilih: {buktiAnakGuruFile.name}</div>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={buktiAnakGuruPreview}
+                          alt="Preview bukti anak guru"
+                          className="w-full h-auto object-contain max-h-40"
+                        />
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

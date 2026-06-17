@@ -72,6 +72,32 @@ const normalizeTesJenjang = (value?: string | null): TesKonfigurasiJenjangKey | 
   return null
 }
 
+// Filter untuk menampilkan hanya kelas penerimaan awal (Kelas 1, PAUD, TK)
+const isFirstYearClass = (kelas: KelasItem, jenjang?: string): boolean => {
+  const namaKelas = (kelas.nama_kelas || "").toLowerCase()
+  const kodeKelas = (kelas.kode_kelas || "").toLowerCase()
+  const normalizedJenjang = (jenjang || "").toUpperCase()
+
+  // Untuk PAUD dan TK, tampilkan semua
+  if (normalizedJenjang === "PAUD" || normalizedJenjang === "TK") {
+    return true
+  }
+
+  // Untuk MI, MTS, MA: hanya tampilkan kelas 1
+  if (normalizedJenjang === "MI" || normalizedJenjang === "MTS" || normalizedJenjang === "MA") {
+    // Cek apakah mengandung "kelas 1" atau "1 " atau diawali dengan "1-"
+    return (
+      namaKelas.includes("kelas 1") ||
+      namaKelas.includes("1 ") ||
+      kodeKelas.includes("1-") ||
+      /^1[^0-9]/.test(kodeKelas) ||
+      /^1$/.test(kodeKelas)
+    )
+  }
+
+  return false
+}
+
 import { toErrorMessage } from "@/hooks/shared/react-query-helpers"
 
 const getErrorMessage = (error: unknown, fallback: string) =>
@@ -93,6 +119,11 @@ export default function PpdbPage() {
   const [kodeKelasDiterima, setKodeKelasDiterima] = useState("")
   const [kelasList, setKelasList] = useState<KelasItem[]>([])
   const [kelasLoading, setKelasLoading] = useState(false)
+
+  // State untuk opsi filter kelas di tabel (semua kelas aktif, tidak difilter per jenjang)
+  const [kelasFilterOptions, setKelasFilterOptions] = useState<
+    Array<{ kode_kelas: string; nama_kelas: string; tahun_ajaran?: string }>
+  >([])
 
   // Selection & form state
   const [selectedPendaftar, setSelectedPendaftar] = useState<PpdbDetail | null>(null)
@@ -187,6 +218,23 @@ export default function PpdbPage() {
   useEffect(() => {
     void fetchList()
     void loadTesKonfigurasi()
+    // Load opsi kelas untuk filter tabel saat halaman pertama dimuat
+    void (async () => {
+      try {
+        const result = await dataKelasService.getAll({ per_page: 500, status: "AKTIF" })
+        const opts = result.data
+          .filter(item => item.kode_kelas)
+          .map(item => ({
+            kode_kelas: item.kode_kelas ?? "",
+            nama_kelas: item.nama_kelas ?? "",
+            tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? "",
+          }))
+          .sort((a, b) => a.kode_kelas.localeCompare(b.kode_kelas))
+        setKelasFilterOptions(opts)
+      } catch {
+        // gagal load kelas filter — tidak kritis, abaikan
+      }
+    })()
   }, [fetchList, loadTesKonfigurasi])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -342,12 +390,19 @@ export default function PpdbPage() {
       } as Parameters<typeof dataKelasService.getAll>[0] & { status_ppdb: "AKTIF" }
 
       const result = await dataKelasService.getAll(kelasParams)
-      const mappedList = result.data.map(item => ({
-        id: item.id_kelas ?? item.id ?? -1,
-        kode_kelas: item.kode_kelas ?? "",
-        nama_kelas: item.nama_kelas ?? "",
-        tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? (item.tahun_ajaran_relasi as any)?.tahun_ajaran ?? "",
-      })).filter(item => item.kode_kelas)
+      const jenjangPendaftar = terimaPendaftar?.jenjang || terimaPendaftar?.programPendaftaran
+      
+      const mappedList = result.data
+        .map(item => ({
+          id: item.id_kelas ?? item.id ?? -1,
+          kode_kelas: item.kode_kelas ?? "",
+          nama_kelas: item.nama_kelas ?? "",
+          tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? (item.tahun_ajaran_relasi as any)?.tahun_ajaran ?? "",
+        }))
+        .filter(item => item.kode_kelas)
+        // Filter untuk menampilkan hanya kelas penerimaan awal
+        .filter(item => isFirstYearClass(item, jenjangPendaftar))
+      
       setKelasList(mappedList)
     } catch (err) {
       console.error("Error loading kelas list:", err)
@@ -355,7 +410,7 @@ export default function PpdbPage() {
     } finally {
       setKelasLoading(false)
     }
-  }, [])
+  }, [terimaPendaftar?.jenjang, terimaPendaftar?.programPendaftaran])
 
   const handleTerimaPendaftarSubmit = async () => {
     if (!terimaPendaftar) {
@@ -388,6 +443,11 @@ export default function PpdbPage() {
       setIntegrasikanSantri(false)
       setKodeKelasDiterima("")
       void fetchList()
+      
+      // Auto-redirect ke halaman uang-pangkal setelah penerimaan berhasil
+      setTimeout(() => {
+        router.push("/ppdb/dashboard/uang-pangkal")
+      }, 800)
     } catch (err) { alert(getErrorMessage(err, "Gagal menerima pendaftar")) }
   }
 
@@ -551,9 +611,9 @@ export default function PpdbPage() {
             searchQuery={searchQuery}
             selectedStatus={selectedStatus}
             selectedProgram={selectedProgram}
-            // Issue 6: Add kelas filters
             selectedKelas={selectedKelas}
             selectedStatusKelas={selectedStatusKelas}
+            kelasOptions={kelasFilterOptions}
             programOptions={programOptions}
             verificationLoading={verificationLoading}
             deleteLoading={deleteLoading}

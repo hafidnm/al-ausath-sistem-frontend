@@ -13,6 +13,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppdb/santri';
+import { transliterateText } from '@/lib/utils/arabic-transliterate';
 
 // Issue 2: Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
@@ -210,6 +211,7 @@ export default function PpdbTesPage() {
                           )}
                           <div className="pl-6">
                             {q.type === 'multiple_choice' && q.options ? (
+                              /* POIN 16: Setiap opsi memiliki box container tersendiri */
                               <RadioGroup
                                 disabled={submitLoading || data.tesSubmitted}
                                 value={answersMap[q.id] || ''}
@@ -217,18 +219,62 @@ export default function PpdbTesPage() {
                                 className="space-y-2"
                                 dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
                               >
-                                {q.options.map((opt, i) => (
-                                  <div key={i} className={`flex items-center space-x-2 ${q.bahasa === 'ar' ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                                    <RadioGroupItem value={opt} id={`q-${q.id}-opt-${i}`} />
-                                    <Label htmlFor={`q-${q.id}-opt-${i}`} className="font-normal cursor-pointer">{opt}</Label>
-                                  </div>
-                                ))}
+                                {q.options.map((opt, i) => {
+                                  const optLabel = String.fromCharCode(65 + i) // A, B, C, ...
+                                  const isSelected = answersMap[q.id] === opt
+                                  return (
+                                    <div
+                                      key={i}
+                                      onClick={() => {
+                                        if (!submitLoading && !data.tesSubmitted) {
+                                          setAnswersMap(prev => ({ ...prev, [q.id]: opt }))
+                                        }
+                                      }}
+                                      className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 cursor-pointer transition-all select-none
+                                        ${q.bahasa === 'ar' ? 'flex-row-reverse' : ''}
+                                        ${isSelected
+                                          ? 'border-primary bg-primary/5 shadow-sm'
+                                          : 'border-border bg-background hover:border-primary/40 hover:bg-muted/30'
+                                        }
+                                        ${(submitLoading || data.tesSubmitted) ? 'opacity-60 cursor-not-allowed' : ''}
+                                      `}
+                                    >
+                                      <span className={`flex-shrink-0 w-7 h-7 rounded-full border-2 flex items-center justify-center text-xs font-bold transition-colors
+                                        ${isSelected ? 'border-primary bg-primary text-white' : 'border-muted-foreground/40 text-muted-foreground'}
+                                      `}>
+                                        {optLabel}
+                                      </span>
+                                      <RadioGroupItem
+                                        value={opt}
+                                        id={`q-${q.id}-opt-${i}`}
+                                        className="sr-only"
+                                      />
+                                      <Label
+                                        htmlFor={`q-${q.id}-opt-${i}`}
+                                        className={`flex-1 font-normal cursor-pointer text-sm leading-relaxed
+                                          ${q.bahasa === 'ar' ? 'text-right' : ''}
+                                          ${isSelected ? 'text-primary font-medium' : 'text-foreground'}
+                                        `}
+                                        dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
+                                      >
+                                        {opt}
+                                      </Label>
+                                    </div>
+                                  )
+                                })}
                               </RadioGroup>
                             ) : (
                               <Textarea
                                 disabled={submitLoading || data.tesSubmitted}
                                 value={answersMap[q.id] || ''}
-                                onChange={(e) => setAnswersMap(prev => ({ ...prev, [q.id]: e.target.value }))}
+                                onChange={(e) => {
+                                  let value = e.target.value;
+                                  // Auto-transliterasi jawaban jika bahasa Arab
+                                  if (q.bahasa === 'ar' && /[a-zA-Z]/.test(value)) {
+                                    value = transliterateText(value);
+                                  }
+                                  setAnswersMap(prev => ({ ...prev, [q.id]: value }));
+                                }}
                                 placeholder={q.bahasa === 'ar' ? 'اكتب إجابتك هنا...' : 'Ketik jawaban Anda...'}
                                 className={`min-h-[100px] ${q.bahasa === 'ar' ? 'text-right' : ''}`}
                                 dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
