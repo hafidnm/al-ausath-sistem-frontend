@@ -63,7 +63,13 @@ import NotificationsBell from "@/components/notifications/notifications-bell"
 function TahunAjaranSelector() {
   const { allTahunAjaran, selectedTahunAjaran, setSelectedTahunAjaran, isLoading } = useTahunAjaran()
 
-  if (isLoading || allTahunAjaran.length === 0) return null
+  if (isLoading) {
+    return (
+      <div className="h-8 w-32 rounded-md bg-muted animate-pulse hidden sm:block" />
+    )
+  }
+
+  if (allTahunAjaran.length === 0) return null
 
   return (
     <DropdownMenu>
@@ -106,8 +112,14 @@ function TahunAjaranSelector() {
 function UnitSelector() {
   const { allUnit, selectedUnit, setSelectedUnit, isLoading } = useUnit()
 
+  if (isLoading) {
+    return (
+      <div className="h-8 w-28 rounded-md bg-muted animate-pulse hidden sm:block" />
+    )
+  }
+
   // Only show if there's more than one unit
-  if (isLoading || allUnit.length <= 1) return null
+  if (allUnit.length <= 1) return null
 
   return (
     <DropdownMenu>
@@ -323,7 +335,21 @@ export default function DashboardLayout({
   }
 
   if (!mounted) {
-    return <div className="min-h-screen bg-background" suppressHydrationWarning />
+    return (
+      <UnitProvider>
+      <TahunAjaranProvider>
+      <div className="min-h-screen bg-background">
+        <header className="sticky top-0 z-30 bg-card border-b border-border">
+          <div className="flex items-center justify-between px-4 py-3 lg:px-6">
+            <div className="flex items-center gap-3">
+              <div className="h-6 w-32 rounded-md bg-muted animate-pulse" />
+            </div>
+          </div>
+        </header>
+      </div>
+      </TahunAjaranProvider>
+      </UnitProvider>
+    )
   }
 
   return (

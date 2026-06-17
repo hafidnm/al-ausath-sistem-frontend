@@ -1,20 +1,20 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Loader2, Search } from "lucide-react"
+import { Loader2, Search, BookMarked } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Check } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface RaporFiltersCardProps {
   query: string
   onQueryChange: (value: string) => void
-  tahunAjaran: string
-  onTahunAjaranChange: (value: string) => void
   kodeKelas: string
   onKodeKelasChange: (value: string) => void
   semester: string
@@ -31,8 +31,6 @@ interface RaporFiltersCardProps {
 export function RaporFiltersCard({
   query,
   onQueryChange,
-  tahunAjaran,
-  onTahunAjaranChange,
   kodeKelas,
   onKodeKelasChange,
   semester,
@@ -45,6 +43,7 @@ export function RaporFiltersCard({
   onSearch,
   onReset,
 }: RaporFiltersCardProps) {
+  const { selectedTahunAjaran } = useTahunAjaran()
   const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
   const [searchInput, setSearchInput] = useState("")
   const [santriResults, setSantriResults] = useState<SantriItem[]>([])
@@ -195,9 +194,12 @@ export function RaporFiltersCard({
             </div>
           </div>
           <div>
-            <Label htmlFor="tahun-ajaran">Tahun ajaran</Label>
-            <Input id="tahun-ajaran" className="mt-2" value={tahunAjaran} onChange={(event) => onTahunAjaranChange(event.target.value.trim() || "all")} placeholder="Format: 2025/2026 atau 'all'" />
-            <p className="text-xs text-muted-foreground mt-1">Ketik 'all' untuk menampilkan semua tahun ajaran</p>
+            <Label htmlFor="tahun-ajaran">Tahun Ajaran</Label>
+            <div className="flex h-10 mt-2 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+              <BookMarked className="w-4 h-4 text-primary shrink-0" />
+              <span className="flex-1 truncate text-foreground">{selectedTahunAjaran?.nama_tahun || "Belum dipilih"}</span>
+              <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+            </div>
           </div>
         </div>
 

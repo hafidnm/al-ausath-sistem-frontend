@@ -14,6 +14,7 @@ import { RaporPublishCard } from "./components/rapor-publish-card"
 import RaporPreviewDialog from "./components/rapor-preview-dialog"
 import { RaporSummaryCards } from "./components/rapor-summary-cards"
 import { RaporTable } from "./components/rapor-table"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 type CatatanFormState = {
   nomor_induk: string
@@ -75,9 +76,10 @@ const isTerbitStatus = (status?: string) => {
 
 export default function AdminPanelRaporPage() {
   const router = useRouter()
+  const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+
   const [query, setQuery] = useState("")
   const [kodeKelas, setKodeKelas] = useState("all")
-  const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("1")
   const [status, setStatus] = useState("all")
   const [perPage, setPerPage] = useState("10")
@@ -104,14 +106,15 @@ export default function AdminPanelRaporPage() {
 
   const selectedParams = useMemo(() => {
     const nomorInduk = selected?.nomor_induk || catatanForm.nomor_induk.trim()
+    const currentTahunAjaran = selectedTahunAjaran?.nama_tahun || catatanForm.tahun_ajaran
 
     return {
       nomor_induk: nomorInduk,
       kode_kelas: selected?.kode_kelas || catatanForm.kode_kelas,
-      tahun_ajaran: selected?.tahun_ajaran || catatanForm.tahun_ajaran,
+      tahun_ajaran: selected?.tahun_ajaran || currentTahunAjaran,
       semester: Number(selected?.semester || catatanForm.semester || 1),
     }
-  }, [catatanForm.kode_kelas, catatanForm.nomor_induk, catatanForm.semester, catatanForm.tahun_ajaran, selected])
+  }, [catatanForm.kode_kelas, catatanForm.nomor_induk, catatanForm.semester, catatanForm.tahun_ajaran, selected, selectedTahunAjaran])
 
   const isReportReady = Boolean(detail || selected)
   const isPublishedReport = isTerbitStatus(selected?.status) || isTerbitStatus(detail?.status)
@@ -187,13 +190,10 @@ export default function AdminPanelRaporPage() {
       const searchIsNomorInduk = /^\d+$/.test(searchText)
       const includeNilaiMapel = status === "TERBIT"
       
-      // Normalize kodeKelas: if "all" or empty, send undefined to fetch all classes
       const normalizedKodeKelas = (kodeKelas || "").trim().toLowerCase()
       const kodeKelasParam = (normalizedKodeKelas === "all" || !normalizedKodeKelas) ? undefined : kodeKelas.trim()
       
-      // Normalize tahunAjaran: if "all" or empty, send undefined to fetch all years
-      const normalizedTahunAjaran = (tahunAjaran || "").trim().toLowerCase()
-      const tahunAjaranParam = (normalizedTahunAjaran === "all" || !normalizedTahunAjaran) ? undefined : tahunAjaran.trim()
+      const tahunAjaranParam = selectedTahunAjaran?.nama_tahun || undefined
 
       const data = await raporService.getAll({
         q: searchText || undefined,
@@ -269,11 +269,12 @@ export default function AdminPanelRaporPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeKelas, perPage, query, santriNameByNomorInduk, selectedIdentity, semester, status, tahunAjaran])
+  }, [kodeKelas, perPage, query, santriNameByNomorInduk, selectedIdentity, semester, status, selectedTahunAjaran])
 
   useEffect(() => {
+    if (isTahunLoading) return
     fetchReports()
-  }, [fetchReports])
+  }, [fetchReports, isTahunLoading])
 
   useEffect(() => {
     return () => {
@@ -312,7 +313,6 @@ export default function AdminPanelRaporPage() {
   const handleReset = () => {
     setQuery("")
     setKodeKelas("all")
-    setTahunAjaran("all")
     setSemester("1")
     setStatus("all")
     setPerPage("10")
@@ -595,8 +595,6 @@ export default function AdminPanelRaporPage() {
       <RaporFiltersCard
         query={query}
         onQueryChange={setQuery}
-        tahunAjaran={tahunAjaran}
-        onTahunAjaranChange={setTahunAjaran}
         kodeKelas={kodeKelas}
         onKodeKelasChange={setKodeKelas}
         semester={semester}
@@ -615,7 +613,7 @@ export default function AdminPanelRaporPage() {
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.5fr)_minmax(360px,1fr)]">
         <RaporTable
           items={items}
-          isLoading={isLoading}
+          isLoading={isLoading || isTahunLoading}
           error={error}
           isSelecting={isSelecting}
           selectedIdentity={selectedIdentity}

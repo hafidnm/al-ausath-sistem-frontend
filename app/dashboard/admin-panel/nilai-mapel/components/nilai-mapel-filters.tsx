@@ -22,8 +22,6 @@ interface NilaiMapelFiltersProps {
   onKodeMapelChange: (value: string) => void
   kodeKelas: string
   onKodeKelasChange: (value: string) => void
-  tahunAjaran: string
-  onTahunAjaranChange: (value: string) => void
   semester: string
   onSemesterChange: (value: string) => void
   perPage: string
@@ -38,8 +36,6 @@ export function NilaiMapelFilters({
   onKodeMapelChange,
   kodeKelas,
   onKodeKelasChange,
-  tahunAjaran,
-  onTahunAjaranChange,
   semester,
   onSemesterChange,
   perPage,
@@ -199,18 +195,6 @@ export function NilaiMapelFilters({
             onChange={(e) => onKodeKelasChange(e.target.value)}
             placeholder="Filter kode kelas"
           />
-
-          <Select value={tahunAjaran} onValueChange={onTahunAjaranChange}>
-            <SelectTrigger>
-              <SelectValue placeholder="Tahun Ajaran" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Tahun</SelectItem>
-              {tahunAjaranOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
 
           <Select value={semester} onValueChange={onSemesterChange}>
             <SelectTrigger>

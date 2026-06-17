@@ -7,20 +7,25 @@ import { BobotNilaiItem, bobotNilaiService } from "@/lib/services/bobot-nilai.se
 import { BobotHeader } from "./components/bobot-header"
 import { BobotInfo } from "./components/bobot-info"
 import { BobotTable } from "./components/bobot-table"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 export default function BobotPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+
   const [items, setItems] = useState<BobotNilaiItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const fetchBobot = useCallback(async () => {
+    if (isTahunLoading) return
     try {
       setIsLoading(true)
       setError(null)
 
-      const response = await bobotNilaiService.getAll({ per_page: 100 })
+      const tahunAjaran = selectedTahunAjaran?.nama_tahun || undefined
+      const response = await bobotNilaiService.getAll({ per_page: 100, tahun_ajaran: tahunAjaran })
       setItems(response.data)
     } catch (err) {
       const message = err instanceof Error ? err.message : "Gagal memuat data bobot"
@@ -33,7 +38,7 @@ export default function BobotPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [toast])
+  }, [toast, isTahunLoading, selectedTahunAjaran])
 
   useEffect(() => {
     void fetchBobot()

@@ -7,13 +7,15 @@ import { NilaiMapelHeader } from "./components/nilai-mapel-header"
 import { NilaiMapelTable } from "./components/nilai-mapel-table"
 import { NilaiMapelEditDialog } from "./components/nilai-mapel-edit-dialog"
 import { NilaiMapelItem, nilaiMapelService, UpsertNilaiMapelPayload } from "@/lib/services/nilai-mapel.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 export default function NilaiMapelPage() {
   const router = useRouter()
+  const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+
   const [nomorInduk, setNomorInduk] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
   const [kodeKelas, setKodeKelas] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState("all")
   const [semester, setSemester] = useState("all")
   const [perPage, setPerPage] = useState("10")
   const [items, setItems] = useState<NilaiMapelItem[]>([])
@@ -24,6 +26,7 @@ export default function NilaiMapelPage() {
   const [isEditLoading, setIsEditLoading] = useState(false)
 
   const fetchNilaiMapel = useCallback(async () => {
+    if (isTahunLoading) return
     if (!nomorInduk.trim()) {
       setItems([])
       setError("Nomor induk wajib diisi untuk menampilkan nilai mapel")
@@ -34,11 +37,13 @@ export default function NilaiMapelPage() {
       setIsLoading(true)
       setError("")
 
+      const tahunAjaran = selectedTahunAjaran?.nama_tahun || undefined
+
       const data = await nilaiMapelService.getAll({
         nomor_induk: nomorInduk.trim(),
         kode_mapel: kodeMapel.trim() || undefined,
         kode_kelas: kodeKelas.trim() || undefined,
-        tahun_ajaran: tahunAjaran === "all" ? undefined : tahunAjaran,
+        tahun_ajaran: tahunAjaran,
         semester: semester === "all" ? undefined : semester,
         per_page: perPage,
       })
@@ -50,7 +55,7 @@ export default function NilaiMapelPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeKelas, kodeMapel, nomorInduk, perPage, semester, tahunAjaran])
+  }, [kodeKelas, kodeMapel, nomorInduk, perPage, semester, selectedTahunAjaran, isTahunLoading])
 
   const handleDetail = (item: NilaiMapelItem) => {
     const query = new URLSearchParams({
@@ -119,8 +124,6 @@ export default function NilaiMapelPage() {
         onKodeMapelChange={setKodeMapel}
         kodeKelas={kodeKelas}
         onKodeKelasChange={setKodeKelas}
-        tahunAjaran={tahunAjaran}
-        onTahunAjaranChange={setTahunAjaran}
         semester={semester}
         onSemesterChange={setSemester}
         perPage={perPage}
@@ -130,7 +133,7 @@ export default function NilaiMapelPage() {
 
       <NilaiMapelTable
         items={items}
-        isLoading={isLoading}
+        isLoading={isLoading || isTahunLoading}
         error={error}
         onDetail={handleDetail}
         onEdit={handleEdit}

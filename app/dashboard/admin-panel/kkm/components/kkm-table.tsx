@@ -70,7 +70,6 @@ export function KkmTable({ items, isLoading = false, error, onEdit, onDelete }: 
                   <TableHead className="text-center">Nilai KKM</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Keterangan</TableHead>
-                  <TableHead>Diperbarui</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -105,15 +104,14 @@ export function KkmTable({ items, isLoading = false, error, onEdit, onDelete }: 
                   return (
                   <TableRow key={rowKey} className="hover:bg-muted/30">
                     <TableCell className="font-medium">{item.kode_mapel}</TableCell>
-                    <TableCell>{item.mapel || "-"}</TableCell>
+                    <TableCell>{item.mapel}</TableCell>
                     <TableCell>{item.tahun_ajaran}</TableCell>
                     <TableCell className="text-center">{item.semester}</TableCell>
                     <TableCell className="text-center">
                       <Badge className="bg-primary/10 text-primary border-0">{item.nilai_kkm}</Badge>
                     </TableCell>
                     <TableCell>{normalizeUnitLabel(item.kode_unit || "global")}</TableCell>
-                    <TableCell className="max-w-44 truncate">{item.keterangan || "-"}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{item.updatedAt || "-"}</TableCell>
+                    <TableCell className="max-w-44 truncate">{item.keterangan}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

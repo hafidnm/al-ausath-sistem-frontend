@@ -3,14 +3,18 @@ import { useToast } from "@/hooks/use-toast"
 import { kelasService } from "@/lib/services/kelas.service"
 import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
 import type { KelasOption, RankingItem } from "../types"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 const defaultTahunAjaran = "2025/2026"
 
 export function useRangkingKelas() {
   const { toast } = useToast()
+  const { selectedTahunAjaran } = useTahunAjaran()
+
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun || defaultTahunAjaran
+
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
   const [selectedClassCode, setSelectedClassCode] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState(defaultTahunAjaran)
   const [semester, setSemester] = useState("1")
   const [rankedData, setRankedData] = useState<RankingItem[]>([])
   const [isLoadingKelas, setIsLoadingKelas] = useState(false)
@@ -52,14 +56,6 @@ export function useRangkingKelas() {
   const selectedClass = useMemo(() => {
     return kelasOptions.find((item) => item.kodeKelas === selectedClassCode)
   }, [kelasOptions, selectedClassCode])
-
-  useEffect(() => {
-    if (!selectedClass?.tahunAjaran) {
-      return
-    }
-
-    setTahunAjaran(selectedClass.tahunAjaran)
-  }, [selectedClass])
 
   const generateRanking = useCallback(async (showSuccessToast: boolean) => {
     if (!selectedClassCode) {
@@ -141,7 +137,6 @@ export function useRangkingKelas() {
     selectedClassCode,
     setSelectedClassCode,
     tahunAjaran,
-    setTahunAjaran,
     semester,
     setSemester,
     isLoadingKelas,

@@ -37,6 +37,26 @@ export interface UpsertNilaiAkhlakPayload {
   id_petugas_input?: number
 }
 
+export interface BulkUpsertNilaiAkhlakItem {
+  nomor_induk: string
+  nilai_angka: number
+  deskripsi?: string
+}
+
+export interface BulkUpsertNilaiAkhlakPayload {
+  tahun_ajaran: string
+  semester: number
+  aspek?: string
+  id_petugas_input?: number
+  items: BulkUpsertNilaiAkhlakItem[]
+}
+
+export interface BulkUpsertNilaiAkhlakResult {
+  message: string
+  saved_count: number
+  errors: { nomor_induk: string; error: string }[]
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const num = Number(value)
   return Number.isFinite(num) ? num : fallback
@@ -134,6 +154,11 @@ export const nilaiAkhlakService = {
     })
 
     return normalizeNilaiAkhlakItem(response.data?.data ?? response.data)
+  },
+
+  async bulkUpsert(payload: BulkUpsertNilaiAkhlakPayload): Promise<BulkUpsertNilaiAkhlakResult> {
+    const response = await api.post("/akademik/nilai-akhlak/bulk", payload)
+    return response.data as BulkUpsertNilaiAkhlakResult
   },
 
   async remove(id: number): Promise<void> {

@@ -67,8 +67,6 @@ export function KonversiTable({ items, isLoading = false, error, onEdit, onDelet
                   <TableHead>Predikat</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Keterangan</TableHead>
-                  <TableHead>Diperbarui</TableHead>
                   <TableHead className="text-right">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
@@ -114,8 +112,6 @@ export function KonversiTable({ items, isLoading = false, error, onEdit, onDelet
                           {item.is_active === false ? "Nonaktif" : "Aktif"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="max-w-44 truncate">{item.keterangan || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">{item.updatedAt || "-"}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

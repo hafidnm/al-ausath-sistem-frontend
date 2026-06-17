@@ -22,12 +22,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2 } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked } from "lucide-react"
 
-import { nilaiAkhlakService, UpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
+import { nilaiAkhlakService, BulkUpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
 import { kelasService } from "@/lib/services/kelas.service"
 import { authService } from "@/lib/services/auth.service"
-import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 interface SantriRow {
   id: number
@@ -65,10 +67,11 @@ const parseNilai = (val: string): number => {
 }
 
 export function NilaiAkhlakForm() {
+  const { selectedTahunAjaran } = useTahunAjaran()
   const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
   
   const [kodeKelas, setKodeKelas] = useState("")
-  const [tahunAjaran, setTahunAjaran] = useState("2024/2025")
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
   const [semester, setSemester] = useState("1")
   const [aspek, setAspek] = useState("AKHLAK")
 
@@ -141,7 +144,7 @@ export function NilaiAkhlakForm() {
       return
     }
 
-    const dirtyRows = santris.filter(s => s.isDirty)
+    const dirtyRows = santris.filter(s => s.isDirty && s.nilai_angka)
     if (dirtyRows.length === 0) {
       setError("Tidak ada perubahan untuk disimpan.")
       return
@@ -152,25 +155,32 @@ export function NilaiAkhlakForm() {
     setSuccessMsg("")
 
     try {
-      for (const row of dirtyRows) {
-        if (!row.nilai_angka) continue // Skip if empty (unless we want to allow deleting?)
-        const payload: UpsertNilaiAkhlakPayload = {
+      // Kirim SEMUA santri dalam 1 request sekaligus
+      const payload: BulkUpsertNilaiAkhlakPayload = {
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+        aspek: aspek || "AKHLAK",
+        id_petugas_input: petugasInputId,
+        items: dirtyRows.map(row => ({
           nomor_induk: row.nomor_induk,
-          tahun_ajaran: tahunAjaran,
-          semester: Number(semester),
-          aspek: aspek || "AKHLAK",
           nilai_angka: parseNilai(row.nilai_angka),
           deskripsi: row.deskripsi.trim() || undefined,
-          id_petugas_input: petugasInputId,
-        }
-        await nilaiAkhlakService.upsert(payload)
+        }))
       }
-      
-      setSuccessMsg(`Berhasil menyimpan nilai untuk ${dirtyRows.length} santri.`)
+
+      const result = await nilaiAkhlakService.bulkUpsert(payload)
+
+      if (result.errors && result.errors.length > 0) {
+        const errDetail = result.errors.map(e => `${e.nomor_induk}: ${e.error}`).join('; ')
+        setError(`Tersimpan ${result.saved_count} santri, namun ${result.errors.length} gagal: ${errDetail}`)
+      } else {
+        setSuccessMsg(`Berhasil menyimpan nilai akhlak ${result.saved_count} santri.`)
+      }
+
       // Reset dirty flag
       setSantris(prev => prev.map(s => ({ ...s, isDirty: false })))
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Gagal menyimpan beberapa nilai.")
+      setError(err?.response?.data?.message || "Gagal menyimpan nilai.")
     } finally {
       setIsSaving(false)
     }
@@ -205,12 +215,11 @@ export function NilaiAkhlakForm() {
             </div>
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
-              <Select value={tahunAjaran} onValueChange={setTahunAjaran}>
-                <SelectTrigger><SelectValue placeholder="Pilih TA" /></SelectTrigger>
-                <SelectContent>
-                  {tahunAjaranOptions.map(ta => <SelectItem key={ta.value} value={ta.value}>{ta.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+                <BookMarked className="w-4 h-4 text-primary shrink-0" />
+                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+                <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Semester</Label>

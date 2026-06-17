@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,10 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, BookMarked, Building2 } from "lucide-react"
 import api from "@/lib/axios"
-import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
 import { isValidKkm } from "../utils/helpers"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 const kodeUnitOptions = ["PAUD", "TK", "MI", "MTS", "MA"] as const
 
@@ -66,11 +69,17 @@ interface KkmFormProps {
 }
 
 export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, onCancel }: KkmFormProps) {
+  const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedUnit } = useUnit()
+
+  // Ambil tahun ajaran dan kode unit dari header context
+  const tahunAjaran = initialData?.tahun_ajaran ?? selectedTahunAjaran?.nama_tahun ?? ""
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+
   const [kodeMapel, setKodeMapel] = useState(initialData?.kode_mapel ?? "")
-  const [tahunAjaran, setTahunAjaran] = useState(initialData?.tahun_ajaran ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
   const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
-  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit?.toUpperCase() ?? "")
+  const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit?.toUpperCase() ?? kodeUnitFromContext)
   const [keterangan, setKeterangan] = useState(initialData?.keterangan ?? "")
   const [mapelOptions, setMapelOptions] = useState<MapelOption[]>([])
   const [isLoadingMapel, setIsLoadingMapel] = useState(true)
@@ -107,12 +116,18 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
     if (!initialData) return
 
     setKodeMapel(initialData.kode_mapel)
-    setTahunAjaran(initialData.tahun_ajaran)
     setSemester(String(initialData.semester))
     setNilaiKkm(initialData.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
-    setKodeUnit(initialData.kode_unit?.toUpperCase() ?? "")
+    setKodeUnit(initialData.kode_unit?.toUpperCase() ?? kodeUnitFromContext)
     setKeterangan(initialData.keterangan ?? "")
-  }, [initialData])
+  }, [initialData, kodeUnitFromContext])
+
+  // Sync kodeUnit jika context unit berubah dan tidak ada initialData
+  useEffect(() => {
+    if (!initialData && kodeUnitFromContext) {
+      setKodeUnit(kodeUnitFromContext)
+    }
+  }, [kodeUnitFromContext, initialData])
 
   useEffect(() => {
     if (!selectedMapel) return
@@ -234,16 +249,12 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
 
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
-              <Select value={tahunAjaran} onValueChange={(v) => { setTahunAjaran(v); setError("") }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih tahun ajaran" />
-                </SelectTrigger>
-                <SelectContent>
-                  {tahunAjaranOptions.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+                <BookMarked className="w-4 h-4 text-primary shrink-0" />
+                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+                <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">Diambil dari pilihan Tahun Ajaran di header.</p>
             </div>
 
             <div className="space-y-2">
@@ -274,21 +285,32 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
 
             <div className="space-y-2">
               <Label>Kode Unit</Label>
-              <Select
-                value={kodeUnit}
-                onValueChange={(v) => { setKodeUnit(v); setError("") }}
-                disabled={selectedMapel?.kode_unit ? true : false}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedMapel?.kode_unit ? `Unit khusus: ${selectedMapel.kode_unit}` : "Pilih kode unit"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableUnitOptions.map((item) => (
-                    <SelectItem key={item} value={item}>{item}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedMapel?.kode_unit && (
+              {selectedUnit ? (
+                <>
+                  <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
+                    <Building2 className="w-4 h-4 text-indigo-500 shrink-0" />
+                    <span className="flex-1 truncate text-foreground">{kodeUnit || selectedUnit.nama_unit}</span>
+                    <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Diambil dari pilihan Unit di header.</p>
+                </>
+              ) : (
+                <Select
+                  value={kodeUnit}
+                  onValueChange={(v) => { setKodeUnit(v); setError("") }}
+                  disabled={selectedMapel?.kode_unit ? true : false}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedMapel?.kode_unit ? `Unit khusus: ${selectedMapel.kode_unit}` : "Pilih kode unit"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableUnitOptions.map((item) => (
+                      <SelectItem key={item} value={item}>{item}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedMapel?.kode_unit && !selectedUnit && (
                 <p className="text-xs text-muted-foreground">Mapel ini khusus untuk unit {selectedMapel.kode_unit}</p>
               )}
             </div>
