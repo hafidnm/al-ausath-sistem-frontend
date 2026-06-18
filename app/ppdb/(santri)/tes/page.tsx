@@ -15,6 +15,18 @@ import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalSubmitTesJawab, usePpdbPortalTesStatus } from '@/hooks/ppdb/santri';
 import { transliterateText } from '@/lib/utils/arabic-transliterate';
 
+const getMultipleChoiceValue = (optionIndex: number) => `option-${optionIndex}`;
+
+const formatMultipleChoiceAnswer = (answerValue: string, options?: string[]) => {
+  const match = /^option-(\d+)$/.exec(answerValue);
+  if (!match) return answerValue;
+
+  const optionIndex = Number(match[1]);
+  const optionLabel = String.fromCharCode(65 + optionIndex);
+  const optionText = options?.[optionIndex] ?? '';
+  return `${optionLabel}. ${optionText}`.trim();
+};
+
 // Issue 2: Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
   if (!path) return null;
@@ -83,7 +95,12 @@ export default function PpdbTesPage() {
       }
       
       const formattedLines = data.formSchema.map((q, idx) => {
-        const ans = answersMap[q.id] || '(Kosong)';
+        const rawAnswer = answersMap[q.id] || '';
+        const ans = rawAnswer
+          ? q.type === 'multiple_choice'
+            ? formatMultipleChoiceAnswer(rawAnswer, q.options)
+            : rawAnswer
+          : '(Kosong)';
         return `${idx + 1}. ${q.question}\nJawaban: ${ans}`;
       });
       finalAnswer = formattedLines.join("\n\n");
@@ -221,13 +238,14 @@ export default function PpdbTesPage() {
                               >
                                 {q.options.map((opt, i) => {
                                   const optLabel = String.fromCharCode(65 + i) // A, B, C, ...
-                                  const isSelected = answersMap[q.id] === opt
+                                  const optionValue = getMultipleChoiceValue(i)
+                                  const isSelected = answersMap[q.id] === optionValue
                                   return (
                                     <div
                                       key={i}
                                       onClick={() => {
                                         if (!submitLoading && !data.tesSubmitted) {
-                                          setAnswersMap(prev => ({ ...prev, [q.id]: opt }))
+                                          setAnswersMap(prev => ({ ...prev, [q.id]: optionValue }))
                                         }
                                       }}
                                       className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 cursor-pointer transition-all select-none
@@ -245,7 +263,7 @@ export default function PpdbTesPage() {
                                         {optLabel}
                                       </span>
                                       <RadioGroupItem
-                                        value={opt}
+                                        value={optionValue}
                                         id={`q-${q.id}-opt-${i}`}
                                         className="sr-only"
                                       />

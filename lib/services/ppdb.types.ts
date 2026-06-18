@@ -142,6 +142,7 @@ export interface TestQuestion {
   type: TestQuestionType;
   question: string;
   options?: string[]; // Used for multiple_choice
+  correctAnswerIndex?: number;
 }
 
 export interface UpdateTesKonfigurasiRequest {

@@ -54,6 +54,14 @@ export const routeWhitelist: RouteRule[] = [
 
   // ── Admin Panel (Data Master & Manajemen Akademik)
   {
+    prefix: "/dashboard/admin-panel/spp-settings",
+    allowedRoles: ["Petugas Admin", "Petugas SPP"],
+  },
+  {
+    prefix: "/dashboard/admin-panel/rekening",
+    allowedRoles: ["Petugas Admin", "Petugas SPP"],
+  },
+  {
     prefix: "/dashboard/admin-panel",
     allowedRoles: ["Petugas Admin", "Staf Pengajar"],
   },

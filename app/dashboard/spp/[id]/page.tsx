@@ -375,7 +375,11 @@ export default function SppTagihanDetailPage() {
 
   // Issue 10: Calculate tunggakan breakdown by type
   const tunggakanByType = useMemo(() => {
-    const breakdown: Record<string, number> = {};
+    const breakdown: Record<string, number> = {
+      'SPP': 0,
+      'INFAQ': 0,
+      'Lainnya': 0
+    };
     (data?.invoice ?? []).forEach((inv: InvoiceRow) => {
       const type = inv.jenis_tagihan || 'Lainnya';
       breakdown[type] = (breakdown[type] || 0) + (inv.jumlah_tunggakan || 0);
@@ -588,40 +592,6 @@ export default function SppTagihanDetailPage() {
             <CardTitle className="text-base">Daftar Tagihan</CardTitle>
           </CardHeader>
           <CardContent>
-            {data.profil?.sumber === 'ppdb' && (
-              <div className="mb-4 space-y-3">
-                {/* Issue 11: Infaq Display Highlight */}
-                <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-sm text-purple-900">
-                  <div className="flex items-start gap-2">
-                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold">Tagihan Infaq (Sumbangan Sukarela)</p>
-                      <p className="mt-1 text-xs text-purple-800">
-                        Infaq akan ditampilkan sebagai tagihan terpisah sesuai pilihan Anda saat registrasi.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {/* Issue 9: Uang Gedung + SPP Bundling Info */}
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
-                  <div className="flex items-start gap-2">
-                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold">Uang Gedung + SPP Bulan Pertama (Tergabung)</p>
-                      <p className="mt-1 text-xs text-emerald-800">
-                        Saat pembayaran awal, Uang Gedung dan SPP bulan pertama dijadikan satu tagihan. Lihat rincian tagihan di bawah untuk detail.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm text-blue-900">
-                  <p className="font-semibold">Status Tagihan PPDB</p>
-                  <p className="mt-1 text-xs text-blue-800">
-                    Semua tagihan PPDB akan muncul di daftar ini setelah pendaftar dinyatakan diterima.
-                  </p>
-                </div>
-              </div>
-            )}
             <Tabs defaultValue="belum-lunas" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="belum-lunas" id="tab-belum-lunas">

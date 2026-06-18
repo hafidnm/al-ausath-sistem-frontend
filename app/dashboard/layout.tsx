@@ -207,12 +207,18 @@ const adminMenuItems: MenuItem[] = [
   { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
   { icon: TrendingUp, label: "Analitik", href: "/dashboard/analitik" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
-  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
-  { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
-  { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
-  { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
-  { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
-  { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
+  {
+    icon: Wallet,
+    label: "Administrasi",
+    subItems: [
+      { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
+      { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
+      { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
+      { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
+      { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
+      { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+    ],
+  },
 ]
 
 const guruMenuItems: MenuItem[] = [
@@ -232,10 +238,18 @@ const stafPengajarMenuItems: MenuItem[] = [
 
 const sppMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-  { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
-  { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
-  { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
-  { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+  {
+    icon: Wallet,
+    label: "Administrasi",
+    subItems: [
+      { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
+      { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
+      { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
+      { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
+      { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
+      { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+    ],
+  },
 ]
 
 const ppdbMenuItems: MenuItem[] = [
@@ -271,6 +285,12 @@ export default function DashboardLayout({
 
   const toggleMenu = (label: string) => {
     setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }))
+  }
+
+  const isMenuHrefActive = (href?: string) => {
+    if (!href) return false
+    if (href === "/dashboard") return pathname === href
+    return pathname === href || pathname.startsWith(`${href}/`)
   }
 
   useEffect(() => {
@@ -421,7 +441,7 @@ export default function DashboardLayout({
                : santriMenuItems
              ).map((item) => {
               if (item.subItems) {
-                const isAnyChildActive = item.subItems.some((sub: any) => pathname === sub.href)
+                const isAnyChildActive = item.subItems.some((sub: any) => isMenuHrefActive(sub.href))
                 const isOpen = openMenus[item.label] || isAnyChildActive
 
                 return (
@@ -444,7 +464,7 @@ export default function DashboardLayout({
                     {isOpen && (
                       <div className="flex flex-col pl-9 space-y-1 mt-1">
                         {item.subItems.map((sub: any) => {
-                          const isSubActive = pathname === sub.href
+                          const isSubActive = isMenuHrefActive(sub.href)
                           return (
                             <Link
                               key={sub.href}
@@ -468,7 +488,7 @@ export default function DashboardLayout({
                 )
               }
 
-              const isActive = pathname === item.href
+              const isActive = isMenuHrefActive(item.href)
               return (
                 <Link
                   key={item.href || item.label}
@@ -538,9 +558,9 @@ export default function DashboardLayout({
               <div>
                 <h2 className="font-semibold text-foreground">
                   {([...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems] as any[]).find((item) => {
-                    if (item.href === pathname) return true;
+                    if (isMenuHrefActive(item.href)) return true;
                     if (item.subItems) {
-                      return item.subItems.find((sub: any) => sub.href === pathname);
+                      return item.subItems.find((sub: any) => isMenuHrefActive(sub.href));
                     }
                     return false;
                   })?.label || "Dashboard"}

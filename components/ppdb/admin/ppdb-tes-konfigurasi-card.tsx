@@ -246,7 +246,11 @@ export function PpdbTesKonfigurasiCard({
                             <Select
                               value={q.type}
                               disabled={isLoading || isSaving}
-                              onValueChange={(val: TestQuestionType) => handleUpdateQuestion(idx, { type: val, options: val === "multiple_choice" ? q.options || [""] : undefined })}
+                              onValueChange={(val: TestQuestionType) => handleUpdateQuestion(idx, {
+                                type: val,
+                                options: val === "multiple_choice" ? q.options || [""] : undefined,
+                                correctAnswerIndex: val === "multiple_choice" ? q.correctAnswerIndex : undefined,
+                              })}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -376,7 +380,16 @@ export function PpdbTesKonfigurasiCard({
                                       disabled={isLoading || isSaving || (q.options ?? []).length <= 1}
                                       onClick={() => {
                                         const newOptions = (q.options ?? []).filter((_, i) => i !== optIdx)
-                                        handleUpdateQuestion(idx, { options: newOptions.length ? newOptions : [""] })
+                                        let nextCorrectAnswerIndex = q.correctAnswerIndex
+                                        if (nextCorrectAnswerIndex === optIdx) {
+                                          nextCorrectAnswerIndex = undefined
+                                        } else if (typeof nextCorrectAnswerIndex === "number" && nextCorrectAnswerIndex > optIdx) {
+                                          nextCorrectAnswerIndex -= 1
+                                        }
+                                        handleUpdateQuestion(idx, {
+                                          options: newOptions.length ? newOptions : [""],
+                                          correctAnswerIndex: nextCorrectAnswerIndex,
+                                        })
                                       }}
                                       className="flex-shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors"
                                       title="Hapus opsi"
@@ -386,6 +399,30 @@ export function PpdbTesKonfigurasiCard({
                                   </div>
                                 )
                               })}
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+                                Jawaban Benar
+                              </Label>
+                              <Select
+                                value={typeof q.correctAnswerIndex === "number" ? String(q.correctAnswerIndex) : undefined}
+                                disabled={isLoading || isSaving || !(q.options ?? []).length}
+                                onValueChange={(value) => handleUpdateQuestion(idx, { correctAnswerIndex: Number(value) })}
+                              >
+                                <SelectTrigger className="max-w-xs">
+                                  <SelectValue placeholder="Pilih jawaban benar" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(q.options ?? []).map((opt, optIdx) => {
+                                    const optLabel = String.fromCharCode(65 + optIdx)
+                                    return (
+                                      <SelectItem key={optIdx} value={String(optIdx)}>
+                                        {optLabel}. {opt || `Opsi ${optLabel}`}
+                                      </SelectItem>
+                                    )
+                                  })}
+                                </SelectContent>
+                              </Select>
                             </div>
                           </div>
                         )}
