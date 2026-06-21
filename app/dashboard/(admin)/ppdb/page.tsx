@@ -72,30 +72,72 @@ const normalizeTesJenjang = (value?: string | null): TesKonfigurasiJenjangKey | 
   return null
 }
 
-// Filter untuk menampilkan hanya kelas penerimaan awal (Kelas 1, PAUD, TK)
+const normalizeClassText = (value?: string | null): string =>
+  (value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+
+const hasGradeMarker = (value: string | null | undefined, grade: string): boolean => {
+  const normalized = normalizeClassText(value)
+  if (!normalized) return false
+
+  const tokens = normalized.split(/\s+/).filter(Boolean)
+  if (tokens.includes(grade)) return true
+
+  const regexEscaped = grade.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+  return (
+    new RegExp(`\\bkelas\\s*${regexEscaped}\\b`).test(normalized)
+    || new RegExp(`\\btingkat\\s*${regexEscaped}\\b`).test(normalized)
+    || new RegExp(`\\b${regexEscaped}\\s*(a|b|c|putra|putri)\\b`).test(normalized)
+    || new RegExp(`^(mi|mts|ma)\\s*${regexEscaped}\\b`).test(normalized)
+    || new RegExp(`^${regexEscaped}\\s*(mi|mts|ma)?\\b`).test(normalized)
+  )
+}
+
+const classMatchesJenjang = (kelas: KelasItem, jenjang?: string): boolean => {
+  const normalizedJenjang = (jenjang || "").replace(/[^a-z]/gi, "").toUpperCase()
+  if (!normalizedJenjang) return true
+
+  const kodeUnit = (kelas.kode_unit || "").replace(/[^a-z]/gi, "").toUpperCase()
+  const combined = normalizeClassText(`${kelas.kode_kelas} ${kelas.nama_kelas}`)
+
+  if (kodeUnit) return kodeUnit === normalizedJenjang
+  return combined.split(/\s+/).includes(normalizedJenjang.toLowerCase())
+}
+
+// Filter untuk menampilkan hanya kelas penerimaan awal (Kelas 1 untuk MI, Kelas 7 untuk MTS, Kelas 10 untuk MA, PAUD, TK)
 const isFirstYearClass = (kelas: KelasItem, jenjang?: string): boolean => {
-  const namaKelas = (kelas.nama_kelas || "").toLowerCase()
-  const kodeKelas = (kelas.kode_kelas || "").toLowerCase()
   const normalizedJenjang = (jenjang || "").toUpperCase()
 
-  // Untuk PAUD dan TK, tampilkan semua
+  // Untuk PAUD dan TK, tampilkan semua kelas yang cocok dengan jenjang
   if (normalizedJenjang === "PAUD" || normalizedJenjang === "TK") {
-    return true
+    return classMatchesJenjang(kelas, jenjang)
   }
 
-  // Untuk MI, MTS, MA: hanya tampilkan kelas 1
-  if (normalizedJenjang === "MI" || normalizedJenjang === "MTS" || normalizedJenjang === "MA") {
-    // Cek apakah mengandung "kelas 1" atau "1 " atau diawali dengan "1-"
-    return (
-      namaKelas.includes("kelas 1") ||
-      namaKelas.includes("1 ") ||
-      kodeKelas.includes("1-") ||
-      /^1[^0-9]/.test(kodeKelas) ||
-      /^1$/.test(kodeKelas)
+  // Untuk MI: hanya tampilkan kelas 1
+  if (normalizedJenjang === "MI") {
+    return classMatchesJenjang(kelas, jenjang) && (
+      hasGradeMarker(kelas.kode_kelas, "1") || hasGradeMarker(kelas.nama_kelas, "1")
     )
   }
 
-  return false
+  // Untuk MTS: hanya tampilkan kelas 7 (tingkat awal MTS)
+  if (normalizedJenjang === "MTS") {
+    return classMatchesJenjang(kelas, jenjang) && (
+      hasGradeMarker(kelas.kode_kelas, "7") || hasGradeMarker(kelas.nama_kelas, "7")
+    )
+  }
+
+  // Untuk MA: hanya tampilkan kelas 10 (tingkat awal MA)
+  if (normalizedJenjang === "MA") {
+    return classMatchesJenjang(kelas, jenjang) && (
+      hasGradeMarker(kelas.kode_kelas, "10") || hasGradeMarker(kelas.nama_kelas, "10")
+    )
+  }
+
+  // Fallback default jika jenjang tidak cocok
+  return hasGradeMarker(kelas.kode_kelas, "1") || hasGradeMarker(kelas.nama_kelas, "1")
 }
 
 import { toErrorMessage } from "@/hooks/shared/react-query-helpers"
@@ -360,7 +402,7 @@ export default function PpdbPage() {
     if (status === "Diterima") {
       setTerimaPendaftar(p)
       setIsTerimaOpen(true)
-      void loadKelasList()
+      void loadKelasList(p)
       return
     }
 
@@ -380,7 +422,7 @@ export default function PpdbPage() {
     } catch (err) { alert(getErrorMessage(err, "Gagal memperbarui verifikasi")) }
   }
 
-  const loadKelasList = useCallback(async () => {
+  const loadKelasList = useCallback(async (pendaftar?: PpdbDetail | null) => {
     setKelasLoading(true)
     try {
       const kelasParams = {
@@ -390,16 +432,20 @@ export default function PpdbPage() {
       } as Parameters<typeof dataKelasService.getAll>[0] & { status_ppdb: "AKTIF" }
 
       const result = await dataKelasService.getAll(kelasParams)
-      const jenjangPendaftar = terimaPendaftar?.jenjang || terimaPendaftar?.programPendaftaran
+      const activePendaftar = pendaftar ?? terimaPendaftar
+      const jenjangPendaftar = activePendaftar?.jenjang || activePendaftar?.programPendaftaran
       
       const mappedList = result.data
         .map(item => ({
           id: item.id_kelas ?? item.id ?? -1,
           kode_kelas: item.kode_kelas ?? "",
           nama_kelas: item.nama_kelas ?? "",
+          kode_unit: item.kode_unit ?? item.unit?.kode_unit ?? "",
+          status: item.status ?? undefined,
           tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? (item.tahun_ajaran_relasi as any)?.tahun_ajaran ?? "",
         }))
         .filter(item => item.kode_kelas)
+        .filter(item => !item.status || item.status === "AKTIF")
         // Filter untuk menampilkan hanya kelas penerimaan awal
         .filter(item => isFirstYearClass(item, jenjangPendaftar))
       
@@ -701,7 +747,7 @@ export default function PpdbPage() {
       {/* Konfirmasi Terima Dialog */}
       <Dialog open={isTerimaOpen} onOpenChange={(open) => {
         setIsTerimaOpen(open)
-        if (open) void loadKelasList()
+        if (open) void loadKelasList(terimaPendaftar)
       }}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>

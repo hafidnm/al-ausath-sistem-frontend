@@ -57,7 +57,7 @@ const statusBadgeClassMap: Record<StatusPembayaran, string> = {
   dibatalkan: "bg-slate-500/15 text-slate-600 border-0 text-xs font-semibold",
 }
 
-const ppdbAcceptedStatusRegex = /diterima|lulus|accepted/i
+const ppdbAcceptedStatusRegex = /diterima|lulus|accepted|aktif/i
 
 function isPpdbAcceptedStatus(status?: string | null) {
   return Boolean(status && ppdbAcceptedStatusRegex.test(status))

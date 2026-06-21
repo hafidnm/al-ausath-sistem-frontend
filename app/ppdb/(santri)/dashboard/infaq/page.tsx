@@ -13,6 +13,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+import { buildPpdbUpdatePayload, mapDashboardToForm } from '@/lib/ppdb/santri/dashboard';
+import { initialPpdbDashboardFiles } from '@/types/ppdb/santri/dashboard';
 import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
 const OPSI_UANG_GEDUNG = [
@@ -138,9 +140,16 @@ export default function PpdbInfoInfaqPage() {
 
     setSubmitting(true);
     try {
+      const existingPayload = data
+        ? buildPpdbUpdatePayload(mapDashboardToForm(data), initialPpdbDashboardFiles, data)
+        : {};
+
       await ppdbPortalApi.updateForm({
-        is_anak_guru: isAnakGuru,
+        ...existingPayload,
+        is_anak_guru: isAnakGuru ? 1 : 0,
+        pilihanUangGedung,
         pilihan_uang_gedung: pilihanUangGedung,
+        pilihanInfaqBulanan,
         pilihan_infaq_bulanan: pilihanInfaqBulanan,
         ...(buktiAnakGuruFile ? { bukti_ortu_guru: buktiAnakGuruFile } : {}),
       });

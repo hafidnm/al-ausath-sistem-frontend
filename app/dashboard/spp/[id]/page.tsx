@@ -88,8 +88,9 @@ type InvoiceRow = {
 }
 
 const StatusBadge = ({ statusKey, jenisTagihan }: { statusKey: string; jenisTagihan?: string }) => {
-  // Issue 11: Highlight Infaq status
-  if (jenisTagihan === 'INFAQ') {
+  // Issue 11: Highlight Infaq status (compare lowercase)
+  const jenisTaLayer = (jenisTagihan || '').toLowerCase();
+  if (jenisTaLayer === 'infaq' || jenisTaLayer === 'infak') {
     switch (statusKey) {
       case "lunas":
         return <Badge className="bg-purple-500/15 text-purple-700 border-0 text-xs">Lunas</Badge>
@@ -381,8 +382,23 @@ export default function SppTagihanDetailPage() {
       'Lainnya': 0
     };
     (data?.invoice ?? []).forEach((inv: InvoiceRow) => {
-      const type = inv.jenis_tagihan || 'Lainnya';
-      breakdown[type] = (breakdown[type] || 0) + (inv.jumlah_tunggakan || 0);
+      const raw = (inv.jenis_tagihan || '').toLowerCase();
+      let category: string;
+      if (raw === 'spp') {
+        category = 'SPP';
+      } else if (raw === 'infaq' || raw === 'infak') {
+        category = 'INFAQ';
+      } else if (raw === 'ppdb') {
+        // PPDB tagihan (biaya pendaftaran) treated as Lainnya
+        category = 'Lainnya';
+      } else if (raw === 'bebas') {
+        category = 'Lainnya';
+      } else if (raw === 'uang_gedung') {
+        category = 'Lainnya';
+      } else {
+        category = 'Lainnya';
+      }
+      breakdown[category] = (breakdown[category] || 0) + (inv.jumlah_tunggakan || 0);
     });
     return breakdown;
   }, [data?.invoice]);
@@ -418,10 +434,11 @@ export default function SppTagihanDetailPage() {
 
   // Issue 10: Summary cards and tunggakan breakdown
   const tunggakanCards = Object.entries(tunggakanByType).map(([type, amount]) => ({
-    label: type,
+    label: type === 'SPP' ? 'SPP' : type === 'INFAQ' ? 'Infaq' : 'Lainnya',
     amount,
     color: type === 'SPP' ? 'text-blue-600' : type === 'INFAQ' ? 'text-purple-600' : 'text-amber-600'
   }))
+
 
   return (
     <div className="space-y-6">

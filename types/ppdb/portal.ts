@@ -105,8 +105,11 @@ export interface PpdbPortalFormRequest {
   id_pendaftaran?: string;
   bukti_uang_pangkal?: File | null;
   bukti_spp?: File | null;
-  is_anak_guru?: boolean;
+  isAnakGuru?: boolean | number;
+  is_anak_guru?: boolean | number;
+  pilihanUangGedung?: number;
   pilihan_uang_gedung?: number;
+  pilihanInfaqBulanan?: number;
   pilihan_infaq_bulanan?: number;
 }
 

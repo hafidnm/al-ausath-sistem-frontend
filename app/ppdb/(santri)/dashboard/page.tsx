@@ -15,6 +15,10 @@ import {
   RefreshCw,
   UserCircle2,
   Info,
+  GraduationCap,
+  CheckCircle2,
+  Percent,
+  UploadCloud,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -104,8 +108,17 @@ export default function PpdbDashboardPage() {
     buktiOrtuGuru?: string;
   }>({});
 
-  // Isu 5: Teacher proof upload file
-  const [buktiOrtuGuruFile, setBuktiOrtuGuruFile] = useState<File | null>(null);
+
+  // Isu 5: Teacher proof upload file (moved to infaq section, use buktiAnakGuruFile below)
+
+  // Infaq & Anak Guru state (now merged into main form)
+  const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
+  const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
+  const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
+  const [buktiAnakGuruFile, setBuktiAnakGuruFile] = useState<File | null>(null);
+  const [buktiAnakGuruPreview, setBuktiAnakGuruPreview] = useState<string | null>(null);
+  const buktiOrtuGuruRef = useRef<HTMLInputElement>(null);
+
 
   // Isu 4: Multi-student selector (satu email untuk beberapa siswa)
   const [selectedPendaftaranId, setSelectedPendaftaranId] = useState<number | null>(null);
@@ -118,7 +131,7 @@ export default function PpdbDashboardPage() {
 
   const resetPendingFiles = useCallback(() => {
     setFiles(initialPpdbDashboardFiles);
-    setBuktiOrtuGuruFile(null);
+    setBuktiAnakGuruFile(null);
     setFilePreviewUrls((prev) => {
       Object.values(prev).forEach((url) => {
         if (url?.startsWith('blob:')) {
@@ -198,6 +211,17 @@ export default function PpdbDashboardPage() {
     hasHydratedFromServerRef.current = true;
     setAutoSaveStatus('idle');
 
+    // Sync infaq/anak-guru choices from server data
+    if (data.pilihanUangGedung === 1 || data.pilihanUangGedung === 2) {
+      setPilihanUangGedung(data.pilihanUangGedung);
+    }
+    if (data.pilihanInfaqBulanan === 1 || data.pilihanInfaqBulanan === 2) {
+      setPilihanInfaqBulanan(data.pilihanInfaqBulanan);
+    }
+    if (typeof data.isAnakGuru === 'boolean') {
+      setIsAnakGuru(data.isAnakGuru);
+    }
+
     // Auto-redirect ke halaman sesuai flow
     const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
     const shouldGoTes = data.step === 'tes' && !hasSubmittedTesAnswer;
@@ -207,43 +231,22 @@ export default function PpdbDashboardPage() {
       return;
     }
 
-    // Step 'infaq': wajib dilewati sebelum pembayaran
-    if (data.step === 'infaq') {
-      router.replace('/ppdb/dashboard/infaq');
-      return;
-    }
+    const statusVerifikasi = (data.statusVerifikasi || data.status || '').toLowerCase();
+    const isDecided = ['diterima', 'lulus', 'accepted', 'ditolak', 'rejected', 'tidak_diterima', 'tidak diterima'].includes(statusVerifikasi);
 
-    if (data.step === 'pembayaran-uang-pangkal' || data.step === 'gagal-bayar-uang-pangkal') {
-      router.replace('/ppdb/dashboard/uang-pangkal');
-      return;
-    }
-
-    if (data.step === 'pembayaran-spp' || data.step === 'gagal-bayar-spp') {
-      router.replace('/ppdb/dashboard/spp');
-      return;
-    }
-
-    if (data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/siap-menjadi-santri');
-      return;
-    }
-
-    if (data.step === 'pembayaran-ppdb') {
-      router.replace('/ppdb/dashboard/pembayaran');
-      return;
-    }
-
-    // Redirect ke pengumuman HANYA jika:
-    // 1. Backend mengembalikan step 'menunggu-pengumuman' atau 'pengumuman'
-    // 2. DAN user sudah klik tombol Simpan (hasUserSubmittedRef) ATAU sudah selesai sejak sebelumnya
-    //    (step bukan 'lengkapi-form' lagi — artinya backend sudah konfirmasi form selesai)
-    // Jangan redirect hanya karena formCompleted+allDocs agar autosave tidak memicu redirect.
     const shouldGoPengumuman = Boolean(
       !shouldGoTes
       && (
-        data.step === 'menunggu-pengumuman'
-        || (data.step === 'pengumuman' && data.statusVerifikasi !== 'diterima' && data.statusVerifikasi !== 'lulus' && data.statusVerifikasi !== 'accepted')
-      ),
+        isDecided
+        || data.step === 'menunggu-pengumuman'
+        || data.step === 'pengumuman'
+        || data.step === 'pembayaran-uang-pangkal'
+        || data.step === 'gagal-bayar-uang-pangkal'
+        || data.step === 'pembayaran-spp'
+        || data.step === 'gagal-bayar-spp'
+        || data.step === 'siap-menjadi-santri'
+        || data.step === 'pembayaran-ppdb'
+      )
     );
 
     if (shouldGoPengumuman) {
@@ -284,7 +287,14 @@ export default function PpdbDashboardPage() {
         );
 
         try {
-          await updateForm(buildPpdbUpdatePayload(snapshotForm, snapshotFiles, data));
+          await updateForm({
+            ...buildPpdbUpdatePayload(snapshotForm, snapshotFiles, data),
+            is_anak_guru: isAnakGuru ? 1 : 0,
+            pilihanUangGedung,
+            pilihan_uang_gedung: pilihanUangGedung,
+            pilihanInfaqBulanan,
+            pilihan_infaq_bulanan: pilihanInfaqBulanan,
+          });
 
           if (hasPendingFiles) {
             // Only clear the specific files that were sent, not newer ones
@@ -365,7 +375,15 @@ export default function PpdbDashboardPage() {
     setAutoSaveStatus('saving');
 
     try {
-      await updateForm(buildPpdbUpdatePayload(form, files, data));
+      await updateForm({
+        ...buildPpdbUpdatePayload(form, files, data),
+        is_anak_guru: isAnakGuru ? 1 : 0,
+        pilihanUangGedung,
+        pilihan_uang_gedung: pilihanUangGedung,
+        pilihanInfaqBulanan,
+        pilihan_infaq_bulanan: pilihanInfaqBulanan,
+        ...(buktiAnakGuruFile ? { bukti_ortu_guru: buktiAnakGuruFile } : {}),
+      });
 
       if (hasPendingFiles) {
         resetPendingFiles();
@@ -406,16 +424,6 @@ export default function PpdbDashboardPage() {
         return;
       }
 
-      // Step 'infaq': backend akan redirect, tapi jika ternyata ada data refreshed
-      if (refreshedDashboard?.step === 'infaq') {
-        router.replace('/ppdb/dashboard/infaq');
-        return;
-      }
-
-      if (refreshedDashboard?.step === 'pembayaran-ppdb') {
-        router.replace('/ppdb/dashboard/pembayaran');
-        return;
-      }
 
       if (refreshedDashboard?.step === 'siap-menjadi-santri') {
         router.replace('/ppdb/dashboard/siap-menjadi-santri');
@@ -430,11 +438,21 @@ export default function PpdbDashboardPage() {
         refreshedDashboard?.berkasSuratPernyataanUrl
       );
 
+      const statusVerifikasi = (refreshedDashboard?.statusVerifikasi || refreshedDashboard?.status || '').toLowerCase();
+      const isDecided = ['diterima', 'lulus', 'accepted', 'ditolak', 'rejected', 'tidak_diterima', 'tidak diterima'].includes(statusVerifikasi);
+
       const shouldGoPengumuman = Boolean(
         !shouldGoTes
         && (
-          refreshedDashboard?.step === 'menunggu-pengumuman'
+          isDecided
+          || refreshedDashboard?.step === 'menunggu-pengumuman'
           || refreshedDashboard?.step === 'pengumuman'
+          || refreshedDashboard?.step === 'pembayaran-uang-pangkal'
+          || refreshedDashboard?.step === 'gagal-bayar-uang-pangkal'
+          || refreshedDashboard?.step === 'pembayaran-spp'
+          || refreshedDashboard?.step === 'gagal-bayar-spp'
+          || refreshedDashboard?.step === 'siap-menjadi-santri'
+          || refreshedDashboard?.step === 'pembayaran-ppdb'
           || refreshedDashboard?.pendaftaranSelesai
           || (refreshedDashboard?.formCompleted && allDocsUploaded)
         ),
@@ -897,48 +915,6 @@ export default function PpdbDashboardPage() {
                   ) : null}
                 </div>
 
-                {/* Isu 5: Bukti Orang Tua/Guru Upload */}
-                <div className="space-y-2">
-                  <Label htmlFor="bukti-ortu-guru">Bukti Orang Tua / Guru (Jika berlaku)</Label>
-                  <Input
-                    id="bukti-ortu-guru"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] || null;
-                      setBuktiOrtuGuruFile(file);
-                      setFilePreviewUrls((prev) => {
-                        const currentUrl = prev.buktiOrtuGuru;
-                        if (currentUrl?.startsWith('blob:')) {
-                          URL.revokeObjectURL(currentUrl);
-                        }
-                        return {
-                          ...prev,
-                          buktiOrtuGuru: file ? URL.createObjectURL(file) : undefined,
-                        };
-                      });
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">Untuk orang tua/wali yang berprofesi sebagai guru</p>
-                  {filePreviewUrls.buktiOrtuGuru && (
-                    <div className="space-y-1">
-                      {buktiOrtuGuruFile?.type === 'application/pdf' ? (
-                        <iframe src={filePreviewUrls.buktiOrtuGuru} className="w-full h-36 rounded border border-border/50" title="Preview Bukti Orang Tua/Guru" />
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={filePreviewUrls.buktiOrtuGuru} alt="Preview Bukti Orang Tua/Guru" className="max-h-28 rounded border border-border/50 object-cover"
-                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                      )}
-                    </div>
-                  )}
-                  {data?.buktiOrtuGuruUrl && !filePreviewUrls.buktiOrtuGuru ? (
-                    <a href={data.buktiOrtuGuruUrl} target="_blank" rel="noreferrer" download
-                      className="text-xs text-primary hover:underline inline-flex items-center gap-1">
-                      <Paperclip className="w-3 h-3" />
-                      Lihat Bukti Orang Tua/Guru Tersimpan
-                    </a>
-                  ) : null}
-                </div>
               </div>
 
               {[
@@ -984,6 +960,175 @@ export default function PpdbDashboardPage() {
                   </div>
                 </div>
               ) : null}
+            </div>
+
+            {/* ── Pilihan Infaq & Anak Guru ──────────────────────────────── */}
+            <div className="rounded-lg border border-border p-4 space-y-4 bg-muted/20">
+              <p className="font-medium text-foreground text-sm flex items-center gap-2">
+                <GraduationCap className="w-4 h-4 text-primary" />
+                Pilihan Infaq Pendidikan
+              </p>
+
+              {/* Uang Gedung */}
+              <div className="space-y-2">
+                <Label className="text-sm">Pilihan Uang Gedung</Label>
+                <div className="flex gap-3">
+                  {([
+                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 1.500.000' },
+                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 2.000.000' },
+                  ]).map((opsi) => (
+                    <button
+                      key={opsi.value}
+                      type="button"
+                      onClick={() => setPilihanUangGedung(opsi.value)}
+                      className={`flex-1 rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-all focus:outline-none ${
+                        pilihanUangGedung === opsi.value
+                          ? 'border-primary bg-primary text-primary-foreground shadow-md'
+                          : 'border-border bg-background text-foreground hover:border-primary/60'
+                      }`}
+                    >
+                      <span className="block text-xs font-normal mb-0.5 opacity-80">{opsi.label}</span>
+                      {opsi.display}
+                      {pilihanUangGedung === opsi.value && (
+                        <CheckCircle2 className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Infaq Bulanan */}
+              <div className="space-y-2">
+                <Label className="text-sm">Pilihan Infaq Bulanan / SPP</Label>
+                <div className="flex gap-3">
+                  {([
+                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 650.000 / bln' },
+                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 700.000 / bln' },
+                  ]).map((opsi) => (
+                    <button
+                      key={opsi.value}
+                      type="button"
+                      onClick={() => setPilihanInfaqBulanan(opsi.value)}
+                      className={`flex-1 rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-all focus:outline-none ${
+                        pilihanInfaqBulanan === opsi.value
+                          ? 'border-amber-500 bg-amber-500 text-white shadow-md'
+                          : 'border-border bg-background text-foreground hover:border-amber-400'
+                      }`}
+                    >
+                      <span className="block text-xs font-normal mb-0.5 opacity-80">{opsi.label}</span>
+                      {opsi.display}
+                      {pilihanInfaqBulanan === opsi.value && (
+                        <CheckCircle2 className="inline-block w-3.5 h-3.5 ml-1.5 -mt-0.5" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Infaq bulanan dibayarkan setelah santri masuk KBM (dibayar via portal santri setelah diterima).
+                </p>
+              </div>
+
+              {/* Anak Guru */}
+              <div className="space-y-2">
+                <Label className="text-sm flex items-center gap-1.5">
+                  <Percent className="w-3.5 h-3.5 text-amber-600" />
+                  Anak Guru / Pengajar Pondok?
+                </Label>
+                <div className="flex gap-6">
+                  {[
+                    { label: 'Ya', val: true },
+                    { label: 'Tidak', val: false },
+                  ].map(({ label, val }) => (
+                    <label key={label} className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <div
+                        role="radio"
+                        aria-checked={isAnakGuru === val}
+                        tabIndex={0}
+                        onClick={() => setIsAnakGuru(val)}
+                        onKeyDown={(e) => e.key === 'Enter' && setIsAnakGuru(val)}
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors cursor-pointer focus:outline-none ${
+                          isAnakGuru === val
+                            ? 'border-amber-500 bg-amber-500'
+                            : 'border-muted-foreground/40 hover:border-amber-400'
+                        }`}
+                      >
+                        {isAnakGuru === val && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                      <span className="text-sm font-medium">{label}</span>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Upload bukti anak guru — hanya muncul jika isAnakGuru = true */}
+                {isAnakGuru && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-4 space-y-3 mt-2">
+                    <p className="text-xs font-semibold text-amber-900 flex items-center gap-2">
+                      <Paperclip className="w-3.5 h-3.5 text-amber-600" />
+                      Upload Bukti Anak Guru <span className="text-destructive">*</span>
+                    </p>
+                    <p className="text-xs text-amber-700">
+                      Surat keterangan atau bukti bahwa orang tua / wali adalah guru / pengajar pondok.
+                      Format: JPG, PNG, PDF (maks. 5MB).
+                    </p>
+                    {data?.buktiOrtuGuruUrl && !buktiAnakGuruPreview && (
+                      <div className="flex items-center gap-2 text-xs text-emerald-700">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <a href={data.buktiOrtuGuruUrl} target="_blank" rel="noreferrer" className="underline">
+                          Bukti tersimpan — klik untuk melihat
+                        </a>
+                        <span className="text-muted-foreground">(bisa diperbarui)</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 border-amber-300 text-amber-800 hover:bg-amber-50"
+                        onClick={() => buktiOrtuGuruRef.current?.click()}
+                      >
+                        <UploadCloud className="w-3.5 h-3.5" />
+                        Pilih File
+                      </Button>
+                      <input
+                        type="file"
+                        ref={buktiOrtuGuruRef}
+                        className="hidden"
+                        accept=".jpg,.jpeg,.png,.pdf"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          if (file.size > 5 * 1024 * 1024) {
+                            toast({ title: 'File terlalu besar', description: 'Maksimal 5MB', variant: 'destructive' });
+                            return;
+                          }
+                          if (buktiAnakGuruPreview) URL.revokeObjectURL(buktiAnakGuruPreview);
+                          setBuktiAnakGuruFile(file);
+                          setBuktiAnakGuruPreview(URL.createObjectURL(file));
+                        }}
+                      />
+                      <span className="text-xs text-muted-foreground truncate max-w-[180px]">
+                        {buktiAnakGuruFile ? buktiAnakGuruFile.name : 'Tidak ada file terpilih'}
+                      </span>
+                    </div>
+                    {buktiAnakGuruPreview && (
+                      <div className="max-w-xs border rounded overflow-hidden mt-2">
+                        {buktiAnakGuruFile?.type === 'application/pdf' ? (
+                          <div className="p-3 bg-muted text-xs text-center">PDF: {buktiAnakGuruFile.name}</div>
+                        ) : (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={buktiAnakGuruPreview} alt="Preview bukti anak guru" className="w-full h-auto object-contain max-h-40" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                <Info className="inline w-3 h-3 mr-1 text-primary" />
+                Pilihan infaq disimpan bersama form pendaftaran. Tagihan SPP dan infaq bulanan hanya muncul di portal santri setelah diterima.
+              </p>
             </div>
 
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">

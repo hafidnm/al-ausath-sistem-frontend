@@ -211,7 +211,7 @@ const adminMenuItems: MenuItem[] = [
     icon: Wallet,
     label: "Administrasi",
     subItems: [
-      { icon: Receipt, label: "Tagihan SPP", href: "/dashboard/spp" },
+      { icon: Receipt, label: "Tagihan", href: "/dashboard/spp" },
       { icon: Receipt, label: "Administrasi Bebas", href: "/dashboard/bebas" },
       { icon: Wallet, label: "Pembayaran", href: "/dashboard/pembayaran" },
       { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },

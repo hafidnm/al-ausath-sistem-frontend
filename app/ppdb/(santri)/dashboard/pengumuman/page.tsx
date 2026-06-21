@@ -42,15 +42,6 @@ export default function PpdbPengumumanPage() {
       return;
     }
 
-    // Diterima & pembayaran sudah diverifikasi → langsung ke pembayaran/siap santri
-    if (data.step === 'pembayaran-ppdb') {
-      router.replace('/ppdb/dashboard/pembayaran');
-      return;
-    }
-    if (data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/siap-menjadi-santri');
-      return;
-    }
   }, [data, router]);
 
   if (loading && !data) {
