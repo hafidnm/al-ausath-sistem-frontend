@@ -52,9 +52,10 @@ interface PpdbTableProps {
   searchQuery: string
   selectedStatus: string
   selectedProgram: string
-  // Issue 6: Add kelas filter props
+  // POIN 2: Filter kelas dengan opsi dinamis
   selectedKelas?: string
   selectedStatusKelas?: string
+  kelasOptions?: Array<{ kode_kelas: string; nama_kelas: string; tahun_ajaran?: string }>
   programOptions: string[]
   verificationLoading: boolean
   deleteLoading: boolean
@@ -115,9 +116,10 @@ export function PpdbTable({
   searchQuery,
   selectedStatus,
   selectedProgram,
-  // Issue 6: Destructure kelas filter props
+  // POIN 2: Destructure kelas filter props
   selectedKelas = "all",
   selectedStatusKelas = "all",
+  kelasOptions = [],
   programOptions,
   verificationLoading,
   deleteLoading,
@@ -176,7 +178,7 @@ export function PpdbTable({
                 <SelectItem value="Ditolak">Ditolak</SelectItem>
               </SelectContent>
             </Select>
-            {/* Issue 6: Add kelas filters */}
+            {/* POIN 2: Filter kelas dengan opsi dinamis dari backend */}
             {onKelasChange && (
               <Select value={selectedKelas} onValueChange={onKelasChange}>
                 <SelectTrigger className="w-full sm:w-[160px]">
@@ -184,6 +186,12 @@ export function PpdbTable({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua Kelas</SelectItem>
+                  {kelasOptions.map((k) => (
+                    <SelectItem key={k.kode_kelas} value={k.kode_kelas}>
+                      {k.kode_kelas}
+                      {k.nama_kelas ? ` — ${k.nama_kelas}` : ''}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}

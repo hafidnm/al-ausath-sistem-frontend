@@ -139,6 +139,19 @@ const hasFilePayload = (payload: PpdbPortalFormRequest): boolean =>
 const shouldFallbackToCreateIdentitas = (status?: number): boolean =>
   status === 404 || status === 405 || status === 409;
 
+const extractValidationMessage = (error: unknown): string | null => {
+  const responseData = asRecord((error as { response?: { data?: unknown } })?.response?.data);
+  const message = asString(responseData.message).trim();
+  const errors = asRecord(responseData.errors);
+
+  const firstError = Object.values(errors)
+    .flatMap((value) => Array.isArray(value) ? value : [value])
+    .map((value) => asString(value).trim())
+    .find(Boolean);
+
+  return firstError || message || null;
+};
+
 const normalizeStep = (value: unknown): PpdbPortalStep => {
   const step = asString(value).trim().toLowerCase();
   if (!step) return 'lengkapi-form';
@@ -496,6 +509,10 @@ export const ppdbPortalApi = {
     } catch (error) {
       const status =
         (error as { response?: { status?: number } })?.response?.status;
+
+      if (status === 422) {
+        throw new Error(extractValidationMessage(error) ?? 'Data yang dikirim belum sesuai validasi backend.');
+      }
 
       if (!shouldFallbackToCreateIdentitas(status)) {
         throw error;

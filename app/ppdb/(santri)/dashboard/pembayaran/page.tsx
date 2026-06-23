@@ -7,16 +7,8 @@ import { ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Downlo
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalPembayaranStatus } from '@/hooks/ppdb/santri';
-import { usePpdbAvailableKelas } from '@/hooks/ppdb/santri/use-ppdb-available-kelas';
 import api from '@/lib/axios';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import type { PpdbPortalBillingInfo } from '@/types/ppdb/portal';
@@ -37,12 +29,10 @@ export default function PpdbPembayaranPage() {
   const { toast } = useToast();
   const { data, loading, fetchPembayaranStatus } = usePpdbPortalPembayaranStatus();
   const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
-  
-  // Issue 3: Available kelas selection
-  const [selectedJenjang, setSelectedJenjang] = useState('');
-  const [selectedKelas, setSelectedKelas] = useState('');
-  const { data: availableKelas, loading: kelasLoading } = usePpdbAvailableKelas(selectedJenjang, Boolean(selectedJenjang));
-  
+
+  // POIN 17: Dropdown jenjang & kelas dihapus dari halaman pembayaran santri.
+  // Pengaturan jenjang dan kelas hanya dilakukan oleh admin.
+
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -233,37 +223,7 @@ export default function PpdbPembayaranPage() {
               </div>
             </div>
 
-            {/* Issue 3: Available kelas selection */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 border rounded-lg p-4 bg-muted/50">
-              <div className="space-y-2">
-                <Label htmlFor="jenjang-select" className="text-sm font-medium">Pilih Jenjang</Label>
-                <Select value={selectedJenjang} onValueChange={setSelectedJenjang}>
-                  <SelectTrigger id="jenjang-select">
-                    <SelectValue placeholder="Pilih jenjang..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="MI">MI (Madrasah Ibtidaiyah)</SelectItem>
-                    <SelectItem value="MTS">MTs (Madrasah Tsanawiyah)</SelectItem>
-                    <SelectItem value="MA">MA (Madrasah Aliyah)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kelas-select" className="text-sm font-medium">Pilih Kelas</Label>
-                <Select value={selectedKelas} onValueChange={setSelectedKelas} disabled={!selectedJenjang || kelasLoading}>
-                  <SelectTrigger id="kelas-select">
-                    <SelectValue placeholder={kelasLoading ? "Memuat..." : "Pilih kelas..."} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableKelas.map((k) => (
-                      <SelectItem key={String(k.id)} value={String(k.id)}>
-                        {k.nama_kelas} {k.kuota_sisa !== undefined ? `(Sisa: ${k.kuota_sisa})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            {/* POIN 17: Pilih jenjang & kelas dihapus dari halaman pembayaran santri */}
 
             {!paymentInfo?.has_tagihan ? (
               <div className="rounded-lg border border-warning/20 bg-warning/5 p-4 flex gap-3">

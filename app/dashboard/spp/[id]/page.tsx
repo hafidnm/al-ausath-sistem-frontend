@@ -18,10 +18,11 @@ import {
   PlusCircle,
   Percent,
   BadgeCheck,
+  AlertTriangle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle,CardDescription} from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -87,8 +88,9 @@ type InvoiceRow = {
 }
 
 const StatusBadge = ({ statusKey, jenisTagihan }: { statusKey: string; jenisTagihan?: string }) => {
-  // Issue 11: Highlight Infaq status
-  if (jenisTagihan === 'INFAQ') {
+  // Issue 11: Highlight Infaq status (compare lowercase)
+  const jenisTaLayer = (jenisTagihan || '').toLowerCase();
+  if (jenisTaLayer === 'infaq' || jenisTaLayer === 'infak') {
     switch (statusKey) {
       case "lunas":
         return <Badge className="bg-purple-500/15 text-purple-700 border-0 text-xs">Lunas</Badge>
@@ -374,10 +376,29 @@ export default function SppTagihanDetailPage() {
 
   // Issue 10: Calculate tunggakan breakdown by type
   const tunggakanByType = useMemo(() => {
-    const breakdown: Record<string, number> = {};
+    const breakdown: Record<string, number> = {
+      'SPP': 0,
+      'INFAQ': 0,
+      'Lainnya': 0
+    };
     (data?.invoice ?? []).forEach((inv: InvoiceRow) => {
-      const type = inv.jenis_tagihan || 'Lainnya';
-      breakdown[type] = (breakdown[type] || 0) + (inv.jumlah_tunggakan || 0);
+      const raw = (inv.jenis_tagihan || '').toLowerCase();
+      let category: string;
+      if (raw === 'spp') {
+        category = 'SPP';
+      } else if (raw === 'infaq' || raw === 'infak') {
+        category = 'INFAQ';
+      } else if (raw === 'ppdb') {
+        // PPDB tagihan (biaya pendaftaran) treated as Lainnya
+        category = 'Lainnya';
+      } else if (raw === 'bebas') {
+        category = 'Lainnya';
+      } else if (raw === 'uang_gedung') {
+        category = 'Lainnya';
+      } else {
+        category = 'Lainnya';
+      }
+      breakdown[category] = (breakdown[category] || 0) + (inv.jumlah_tunggakan || 0);
     });
     return breakdown;
   }, [data?.invoice]);
@@ -413,10 +434,11 @@ export default function SppTagihanDetailPage() {
 
   // Issue 10: Summary cards and tunggakan breakdown
   const tunggakanCards = Object.entries(tunggakanByType).map(([type, amount]) => ({
-    label: type,
+    label: type === 'SPP' ? 'SPP' : type === 'INFAQ' ? 'Infaq' : 'Lainnya',
     amount,
     color: type === 'SPP' ? 'text-blue-600' : type === 'INFAQ' ? 'text-purple-600' : 'text-amber-600'
   }))
+
 
   return (
     <div className="space-y-6">
@@ -587,40 +609,6 @@ export default function SppTagihanDetailPage() {
             <CardTitle className="text-base">Daftar Tagihan</CardTitle>
           </CardHeader>
           <CardContent>
-            {data.profil?.sumber === 'ppdb' && (
-              <div className="mb-4 space-y-3">
-                {/* Issue 11: Infaq Display Highlight */}
-                <div className="rounded-lg border border-purple-200 bg-purple-50/70 p-3 text-sm text-purple-900">
-                  <div className="flex items-start gap-2">
-                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold">Tagihan Infaq (Sumbangan Sukarela)</p>
-                      <p className="mt-1 text-xs text-purple-800">
-                        Infaq akan ditampilkan sebagai tagihan terpisah sesuai pilihan Anda saat registrasi.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                {/* Issue 9: Uang Gedung + SPP Bundling Info */}
-                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 text-sm text-emerald-900">
-                  <div className="flex items-start gap-2">
-                    <BadgeCheck className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="font-semibold">Uang Gedung + SPP Bulan Pertama (Tergabung)</p>
-                      <p className="mt-1 text-xs text-emerald-800">
-                        Saat pembayaran awal, Uang Gedung dan SPP bulan pertama dijadikan satu tagihan. Lihat rincian tagihan di bawah untuk detail.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 text-sm text-blue-900">
-                  <p className="font-semibold">Status Tagihan PPDB</p>
-                  <p className="mt-1 text-xs text-blue-800">
-                    Semua tagihan PPDB akan muncul di daftar ini setelah pendaftar dinyatakan diterima.
-                  </p>
-                </div>
-              </div>
-            )}
             <Tabs defaultValue="belum-lunas" className="space-y-4">
               <TabsList>
                 <TabsTrigger value="belum-lunas" id="tab-belum-lunas">

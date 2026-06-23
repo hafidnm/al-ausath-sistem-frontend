@@ -148,6 +148,8 @@ export interface TestQuestion {
   type: TestQuestionType;
   question: string;
   options?: string[];
+  /** Indeks opsi yang menjadi jawaban benar untuk pilihan ganda */
+  correctAnswerIndex?: number;
   /** URL gambar pendukung soal (opsional) */
   image_url?: string;
   /** Bahasa soal per-pertanyaan: 'id' (Indonesia) atau 'ar' (Arab) */
