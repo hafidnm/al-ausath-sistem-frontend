@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { raporService, type RaporDetail, type RaporItem } from "@/lib/services/rapor.service"
 import { santriService } from "@/lib/services/santri.service"
+import { dataKelasService } from "@/lib/services/kelas.service"
 import { RaporCatatanCard } from "./components/rapor-catatan-card"
 import { RaporEkstraCard, type EkstraItem } from "./components/rapor-ekstra-card"
 import { RaporFeedbackAlert } from "./components/rapor-feedback-alert"
@@ -102,6 +103,8 @@ export default function AdminPanelRaporPage() {
   const [isSearchingSantri, setIsSearchingSantri] = useState(false)
   const [santriOptions, setSantriOptions] = useState<Array<{ nomor_induk: string; nama_lengkap?: string; kode_kelas?: string }>>([])
   const [ekstraList, setEkstraList] = useState<EkstraItem[]>([])
+  const [namaWaliSantri, setNamaWaliSantri] = useState<string | null>(null)
+  const [namaWaliKelas, setNamaWaliKelas] = useState<string | null>(null)
   const selectedIdentity = selected ? getRaporIdentity(selected) : null
 
   const selectedParams = useMemo(() => {
@@ -142,6 +145,31 @@ export default function AdminPanelRaporPage() {
     }
   }, [])
 
+  // Fetch wali santri (nama_orang_tua_aktif) and wali kelas (dari data_kelas)
+  const fetchWaliInfo = useCallback(async (nomor_induk: string, kode_kelas: string) => {
+    try {
+      const [waliSantriRes, kelasRes] = await Promise.all([
+        raporService.getWaliSantri(nomor_induk).catch(() => null),
+        dataKelasService.getAll({ q: kode_kelas, per_page: 1 }).catch(() => ({ data: [] })),
+      ])
+
+      setNamaWaliSantri(waliSantriRes?.nama_orang_tua_aktif ?? null)
+
+      const kelasList = kelasRes?.data ?? []
+      const kelas = kelasList.find(
+        (k) => (k.kode_kelas ?? "").toUpperCase() === kode_kelas.toUpperCase()
+      ) ?? kelasList[0]
+
+      const waliNama =
+        kelas?.wali_kelas?.nama_lengkap ??
+        kelas?.waliKelas?.nama_lengkap ??
+        null
+      setNamaWaliKelas(waliNama)
+    } catch {
+      // Non-blocking — keep previous values
+    }
+  }, [])
+
   const loadReportDetail = useCallback(async (item: RaporItem) => {
     try {
       setIsSelecting(true)
@@ -172,13 +200,18 @@ export default function AdminPanelRaporPage() {
 
       setDetail(reportDetail)
       hydrateCatatanForm(reportDetail, catatan)
+
+      // Fetch wali info in background
+      if (item.nomor_induk && item.kode_kelas) {
+        fetchWaliInfo(item.nomor_induk, item.kode_kelas)
+      }
     } catch (err: any) {
       setDetail(null)
       setError(err?.response?.data?.message || "Gagal memuat detail rapor")
     } finally {
       setIsSelecting(false)
     }
-  }, [hydrateCatatanForm])
+  }, [hydrateCatatanForm, fetchWaliInfo])
 
   const fetchReports = useCallback(async (searchOverride?: string) => {
     try {
@@ -368,6 +401,12 @@ export default function AdminPanelRaporPage() {
       setSelected(generated)
       setDetail(reportDetail)
       hydrateCatatanForm(reportDetail, catatan)
+
+      // Fetch wali info after generate
+      if (generated.nomor_induk && generated.kode_kelas) {
+        fetchWaliInfo(generated.nomor_induk, generated.kode_kelas)
+      }
+
       setSuccess("Rapor santri berhasil di-generate")
       await fetchReports()
     } catch (err: any) {
@@ -665,6 +704,8 @@ export default function AdminPanelRaporPage() {
             onCatatanFormChange={setCatatanForm}
             onSaveCatatan={handleSaveCatatan}
             onReloadDetail={() => selected && loadReportDetail(selected)}
+            namaWaliSantri={namaWaliSantri}
+            namaWaliKelas={namaWaliKelas}
           />
 
           <RaporEkstraCard
