@@ -15,7 +15,6 @@ type PreviewRow = {
   nomor_induk: string
   nama_lengkap: string
   peran_akun: string
-  pilihan_unit: string
   alamat_email: string
   nomor_telepon: string
   status: string
@@ -58,7 +57,6 @@ const parseCsvText = (content: string): PreviewRow[] => {
       nomor_induk: rowObj.nomor_induk || "",
       nama_lengkap: rowObj.nama_lengkap || "",
       peran_akun: rowObj.peran_akun || "",
-      pilihan_unit: rowObj.pilihan_unit || "",
       alamat_email: rowObj.alamat_email || "",
       nomor_telepon: rowObj.nomor_telepon || "",
       status: rowObj.status || "",
@@ -96,7 +94,6 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       nomor_induk: rowObj.nomor_induk || "",
       nama_lengkap: rowObj.nama_lengkap || "",
       peran_akun: rowObj.peran_akun || "",
-      pilihan_unit: rowObj.pilihan_unit || "",
       alamat_email: rowObj.alamat_email || "",
       nomor_telepon: rowObj.nomor_telepon || "",
       status: rowObj.status || "",
@@ -291,7 +288,6 @@ export default function GuruImportPage() {
                 <TableHead>NOMOR INDUK</TableHead>
                 <TableHead>NAMA LENGKAP</TableHead>
                 <TableHead>PERAN AKUN</TableHead>
-                <TableHead>PILIHAN UNIT</TableHead>
                 <TableHead>ALAMAT EMAIL</TableHead>
                 <TableHead>NOMOR TELEPON</TableHead>
                 <TableHead>STATUS</TableHead>
@@ -301,13 +297,13 @@ export default function GuruImportPage() {
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -318,7 +314,6 @@ export default function GuruImportPage() {
                     <TableCell>{row.nomor_induk || "-"}</TableCell>
                     <TableCell>{row.nama_lengkap || "-"}</TableCell>
                     <TableCell>{row.peran_akun || "-"}</TableCell>
-                    <TableCell>{row.pilihan_unit || "-"}</TableCell>
                     <TableCell>{row.alamat_email || "-"}</TableCell>
                     <TableCell>{row.nomor_telepon || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>

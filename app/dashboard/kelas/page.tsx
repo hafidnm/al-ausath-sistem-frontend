@@ -53,6 +53,8 @@ interface KelasRow {
   santriLulus: number
   santriKeluar: number
   status: UiStatus
+  idWaliKelas: number | null
+  namaWaliKelas: string
 }
 
 interface KelasFormData {
@@ -62,6 +64,7 @@ interface KelasFormData {
   namaJurusan: string
   tahunAjaran: string
   status: UiStatus
+  idWaliKelas: string // "" = tidak ada
 }
 
 interface UnitOption {
@@ -88,6 +91,7 @@ const defaultFormState: KelasFormData = {
   namaJurusan: "",
   tahunAjaran: "",
   status: "Aktif",
+  idWaliKelas: "",
 }
 
 const toText = (value: unknown): string => {
@@ -118,6 +122,8 @@ const normalizeKelasRow = (raw: DataKelasApiItem): KelasRow => ({
   santriLulus: toNumber(raw.jumlah_santri_lulus),
   santriKeluar: toNumber(raw.jumlah_santri_keluar),
   status: fromBackendStatus(raw.status),
+  idWaliKelas: raw.id_wali_kelas ?? null,
+  namaWaliKelas: toText(raw.waliKelas?.nama_lengkap ?? raw.wali_kelas?.nama_lengkap) || "-",
 })
 
 const getErrorMessage = (error: unknown, fallback: string): string => {
@@ -174,6 +180,7 @@ export default function KelasPage() {
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
   const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
+  const [petugasOptions, setPetugasOptions] = useState<{ value: string; label: string }[]>([])
 
   const [keyword, setKeyword] = useState("")
   const [kelasFilter, setKelasFilter] = useState("all")
@@ -290,6 +297,18 @@ export default function KelasPage() {
         setUnitOptions(units)
         setTahunOptions(years)
         setKelasOptions(mappedKelas)
+
+        // Load petugas options
+        const petugasMapped: { value: string; label: string }[] = []
+        for (const item of (initData.petugas_list || [])) {
+          const id = toNumber(item.id_petugas ?? item.id, -1)
+          if (id <= 0) continue
+          petugasMapped.push({
+            value: String(id),
+            label: toText(item.nama_lengkap).trim() || `Petugas #${id}`,
+          })
+        }
+        setPetugasOptions(petugasMapped)
         
         setIsInitDone(true)
       } catch (error) {
@@ -362,6 +381,7 @@ export default function KelasPage() {
       namaJurusan: target.namaJurusan,
       tahunAjaran: target.tahunAjaran,
       status: target.status,
+      idWaliKelas: target.idWaliKelas ? String(target.idWaliKelas) : "",
     })
     setIsEditDialogOpen(true)
   }
@@ -386,6 +406,7 @@ export default function KelasPage() {
           nama_jurusan: formData.namaJurusan || null,
           tahun_ajaran: formData.tahunAjaran,
           status: toBackendStatus(formData.status),
+          id_wali_kelas: formData.idWaliKelas ? Number(formData.idWaliKelas) : null,
         })
 
         toast({
@@ -432,6 +453,7 @@ export default function KelasPage() {
           nama_jurusan: editingFormData.namaJurusan || null,
           tahun_ajaran: editingFormData.tahunAjaran,
           status: toBackendStatus(editingFormData.status),
+          id_wali_kelas: editingFormData.idWaliKelas ? Number(editingFormData.idWaliKelas) : null,
         })
 
         toast({
@@ -642,6 +664,26 @@ export default function KelasPage() {
                     </Select>
                   </div>
                 </div>
+
+                <div className="space-y-2">
+                  <Label>Wali Kelas (opsional)</Label>
+                  <Select
+                    value={formData.idWaliKelas}
+                    onValueChange={(value) => setFormData((prev) => ({ ...prev, idWaliKelas: value === "none" ? "" : value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Pilih wali kelas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Tidak Ada</SelectItem>
+                      {petugasOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <DialogFooter>
@@ -818,6 +860,7 @@ export default function KelasPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI AKTIF</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI LULUS</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SANTRI KELUAR</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">WALI KELAS</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">AKSI</TableHead>
                 </TableRow>
@@ -848,6 +891,12 @@ export default function KelasPage() {
                       <TableCell>{row.santriAktif}</TableCell>
                       <TableCell>{row.santriLulus}</TableCell>
                       <TableCell>{row.santriKeluar}</TableCell>
+                      <TableCell>
+                        {row.namaWaliKelas !== "-"
+                          ? <span className="text-sm font-medium">{row.namaWaliKelas}</span>
+                          : <span className="text-muted-foreground text-xs italic">–</span>
+                        }
+                      </TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={row.status === "Aktif" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
                           {row.status}
@@ -1012,6 +1061,26 @@ export default function KelasPage() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Wali Kelas (opsional)</Label>
+              <Select
+                value={editingFormData.idWaliKelas}
+                onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, idWaliKelas: value === "none" ? "" : value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih wali kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Tidak Ada</SelectItem>
+                  {petugasOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

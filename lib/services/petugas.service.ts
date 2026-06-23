@@ -14,6 +14,16 @@ export interface DataPetugasApiItem {
   last_login?: string | null
   created_at?: string | null
   updated_at?: string | null
+  kelasWali?: Array<{
+    id_kelas?: number
+    kode_kelas?: string
+    nama_kelas?: string
+  }>
+  kelas_wali?: Array<{
+    id_kelas?: number
+    kode_kelas?: string
+    nama_kelas?: string
+  }>
 }
 
 export interface DataPetugasListParams {

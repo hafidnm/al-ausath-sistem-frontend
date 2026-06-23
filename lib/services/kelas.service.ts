@@ -30,6 +30,17 @@ export interface DataKelasApiItem {
     kode_tahun?: string
     nama_tahun?: string
   } | null
+  id_wali_kelas?: number | null
+  wali_kelas?: {
+    id_petugas?: number
+    nama_lengkap?: string
+    nomor_induk?: string
+  } | null
+  waliKelas?: {
+    id_petugas?: number
+    nama_lengkap?: string
+    nomor_induk?: string
+  } | null
 }
 
 export interface DataKelasListParams {
@@ -59,6 +70,7 @@ export interface DataKelasPayload {
   nama_jurusan?: string | null
   tahun_ajaran: string
   status?: BackendKelasStatus | null
+  id_wali_kelas?: number | null
 }
 
 export interface DataKelasPaginationMeta {

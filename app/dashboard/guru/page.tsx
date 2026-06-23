@@ -54,6 +54,7 @@ interface GuruRow {
   peran: string[]
   status: GuruStatus
   terakhirMasuk: string
+  kelasWali: string[]
 }
 
 interface GuruFormData {
@@ -112,6 +113,10 @@ const normalizePetugasRow = (raw: DataPetugasApiItem): GuruRow => ({
   })(),
   status: fromBackendStatus(raw.status),
   terakhirMasuk: toText(raw.last_login) || "-",
+  kelasWali: (() => {
+    const arr = raw.kelasWali || raw.kelas_wali || []
+    return arr.map(k => toText(k.nama_kelas)).filter(Boolean)
+  })(),
 })
 
 const formatLastLogin = (value: string): string => {
@@ -926,6 +931,15 @@ export default function GuruPage() {
                 <p className="text-sm text-muted-foreground">Terakhir Masuk</p>
                 <p className="font-medium">{formatLastLogin(detailData?.terakhirMasuk || "-")}</p>
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Wali Kelas</p>
+              <p className="font-medium">
+                {detailData?.kelasWali && detailData.kelasWali.length > 0 
+                  ? detailData.kelasWali.join(", ") 
+                  : "-"}
+              </p>
             </div>
           </div>
 
