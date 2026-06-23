@@ -13,9 +13,14 @@ import {
 } from "@/components/ui/select"
 import { Check } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
-import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
+import { useUnit } from "@/contexts/unit-context"
+import { kelasService } from "@/lib/services/kelas.service"
+import { useMemo } from "react"
 
 interface NilaiAkhlakFiltersProps {
+  kodeKelas: string
+  onKodeKelasChange: (value: string) => void
   nomorInduk: string
   onNomorIndukChange: (value: string) => void
   semester: string
@@ -28,6 +33,8 @@ interface NilaiAkhlakFiltersProps {
 }
 
 export function NilaiAkhlakFilters({
+  kodeKelas,
+  onKodeKelasChange,
   nomorInduk,
   onNomorIndukChange,
   semester,
@@ -45,6 +52,31 @@ export function NilaiAkhlakFilters({
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
   const [santriSearchError, setSantriSearchError] = useState("")
   const [openSantriPopover, setOpenSantriPopover] = useState(false)
+
+  const [rawKelasOptions, setRawKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+
+  const { selectedUnit } = useUnit()
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+
+  useEffect(() => {
+    kelasService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setRawKelasOptions(res.map(k => ({ 
+        value: k.kode_kelas ?? "", 
+        label: k.nama_kelas ?? k.kode_kelas ?? "",
+        kode_unit: k.kode_unit
+      }))))
+      .catch(console.error)
+  }, [])
+
+  const displayedKelasOptions = useMemo(() => {
+    let filtered = rawKelasOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+    return filtered
+  }, [rawKelasOptions, kodeUnitFromContext])
 
   const applySelectedSantri = (santri: SantriItem) => {
     onNomorIndukChange(santri.nomor_induk)
@@ -67,7 +99,12 @@ export function NilaiAkhlakFilters({
       try {
         setIsLoadingSantri(true)
         setSantriSearchError("")
-        const results = await santriService.search(searchInput.trim())
+        let results = await santriService.search(searchInput.trim())
+        
+        if (kodeUnitFromContext) {
+          results = results.filter(r => !r.kode_unit || r.kode_unit.toUpperCase() === kodeUnitFromContext)
+        }
+
         if (!cancelled) {
           setSantriResults(results)
         }
@@ -179,6 +216,18 @@ export function NilaiAkhlakFilters({
               </div>
             )}
           </div>
+
+          <Select value={kodeKelas} onValueChange={onKodeKelasChange}>
+            <SelectTrigger className="w-full lg:w-40">
+              <SelectValue placeholder="Semua Kelas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Kelas</SelectItem>
+              {displayedKelasOptions.map((item) => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Select value={semester} onValueChange={onSemesterChange}>
             <SelectTrigger className="w-full lg:w-36">

@@ -18,6 +18,7 @@ export interface GetNilaiAkhlakParams {
   semester?: string
   aspek?: string
   per_page?: string
+  kode_kelas?: string
 }
 
 export interface GetAkhlakKelasIndexParams {

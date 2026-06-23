@@ -30,6 +30,7 @@ import { kelasService } from "@/lib/services/kelas.service"
 import { authService } from "@/lib/services/auth.service"
 import { semesterOptions } from "../utils/constants"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 interface SantriRow {
   id: number
@@ -68,7 +69,11 @@ const parseNilai = (val: string): number => {
 
 export function NilaiAkhlakForm() {
   const { selectedTahunAjaran } = useTahunAjaran()
-  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
+  const { selectedUnit } = useUnit()
+  
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+
+  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
   
   const [kodeKelas, setKodeKelas] = useState("")
   const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
@@ -90,9 +95,35 @@ export function NilaiAkhlakForm() {
   useEffect(() => {
     authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
     kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setKelasOptions(res.map(k => ({ value: k.kode_kelas, label: k.nama_kelas ?? k.kode_kelas }))))
+      .then(res => setKelasOptions(res.map(k => ({ 
+        value: k.kode_kelas ?? "", 
+        label: k.nama_kelas ?? k.kode_kelas ?? "",
+        kode_unit: k.kode_unit
+      }))))
       .catch(console.error)
   }, [])
+
+  const displayedKelasOptions = useMemo(() => {
+    let filtered = kelasOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+
+    const activeCode = kodeKelas.trim()
+
+    if (!activeCode) return filtered
+    if (filtered.some(item => item.value === activeCode)) return filtered
+
+    return [
+      {
+        value: activeCode,
+        label: `${activeCode} (Tersimpan)`,
+      },
+      ...filtered,
+    ]
+  }, [kelasOptions, kodeKelas, kodeUnitFromContext])
 
   // Fetch Data Santri and existing Nilai
   useEffect(() => {
@@ -209,7 +240,7 @@ export function NilaiAkhlakForm() {
               <Select value={kodeKelas} onValueChange={setKodeKelas}>
                 <SelectTrigger><SelectValue placeholder="Pilih Kelas" /></SelectTrigger>
                 <SelectContent>
-                  {kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                  {displayedKelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -13,6 +13,7 @@ export default function NilaiAkhlakPage() {
   const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
 
   const [nomorInduk, setNomorInduk] = useState("")
+  const [kodeKelas, setKodeKelas] = useState("all")
   const [semester, setSemester] = useState("all")
   const [aspek, setAspek] = useState("all")
   const [perPage, setPerPage] = useState("10")
@@ -30,6 +31,7 @@ export default function NilaiAkhlakPage() {
 
       const sharedParams = {
         tahun_ajaran: tahunAjaran,
+        kode_kelas: kodeKelas === "all" ? undefined : kodeKelas,
         semester: semester === "all" ? undefined : semester,
         aspek: aspek === "all" ? undefined : aspek,
         per_page: perPage,
@@ -49,7 +51,7 @@ export default function NilaiAkhlakPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [aspek, nomorInduk, perPage, semester, selectedTahunAjaran, isTahunLoading])
+  }, [aspek, nomorInduk, kodeKelas, perPage, semester, selectedTahunAjaran, isTahunLoading])
 
   useEffect(() => {
     fetchNilaiAkhlak()
@@ -72,6 +74,8 @@ export default function NilaiAkhlakPage() {
       />
 
       <NilaiAkhlakFilters
+        kodeKelas={kodeKelas}
+        onKodeKelasChange={setKodeKelas}
         nomorInduk={nomorInduk}
         onNomorIndukChange={setNomorInduk}
         semester={semester}
