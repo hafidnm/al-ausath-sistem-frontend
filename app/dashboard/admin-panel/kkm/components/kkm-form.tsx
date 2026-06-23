@@ -93,19 +93,29 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
   }, [mapelOptions, kodeMapel])
 
   const displayedMapelOptions = useMemo(() => {
+    let filtered = mapelOptions
+
+    // Jika ada unit yang dipilih di header, filter mapel agar hanya menampilkan mapel untuk unit tersebut
+    // atau mapel yang berlaku umum (tidak memiliki kode_unit spesifik)
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter((item) => {
+        return !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      })
+    }
+
     const activeCode = kodeMapel.trim().toUpperCase()
 
-    if (!activeCode) return mapelOptions
-    if (mapelOptions.some((item) => item.kode_mapel === activeCode)) return mapelOptions
+    if (!activeCode) return filtered
+    if (filtered.some((item) => item.kode_mapel === activeCode)) return filtered
 
     return [
       {
         kode_mapel: activeCode,
         nama_mapel: "Mapel tersimpan (tidak ditemukan di daftar aktif)",
       },
-      ...mapelOptions,
+      ...filtered,
     ]
-  }, [mapelOptions, kodeMapel])
+  }, [mapelOptions, kodeMapel, kodeUnitFromContext])
 
   const availableUnitOptions = useMemo(() => {
     if (!selectedMapel?.kode_unit) return kodeUnitOptions
@@ -231,7 +241,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
               <Select
                 value={kodeMapel}
                 onValueChange={(v) => { setKodeMapel(v); setError("") }}
-                disabled={isLoadingMapel || displayedMapelOptions.length === 0}
+                disabled={isEdit || isLoadingMapel || displayedMapelOptions.length === 0}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={isLoadingMapel ? "Memuat mata pelajaran..." : "Pilih mata pelajaran"} />
@@ -259,7 +269,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
 
             <div className="space-y-2">
               <Label>Semester</Label>
-              <Select value={semester} onValueChange={(v) => { setSemester(v); setError("") }}>
+              <Select value={semester} onValueChange={(v) => { setSemester(v); setError("") }} disabled={isEdit}>
                 <SelectTrigger>
                   <SelectValue placeholder="Pilih semester" />
                 </SelectTrigger>
