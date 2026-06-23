@@ -97,7 +97,9 @@ function EkskulForm({ data, onChange, unitOptions }: EkskulFormProps) {
 
 export default function EkskulPage() {
   const { toast } = useToast()
-  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+  const contextReady = !isUnitLoading
+  const initDoneRef = useRef(false)
   const initCalledRef = useRef(false)
 
   const [rows, setRows] = useState<EkskulApiItem[]>([])
@@ -129,8 +131,7 @@ export default function EkskulPage() {
   }
 
   useEffect(() => {
-    if (initCalledRef.current) return
-    initCalledRef.current = true
+    if (!contextReady) return
     const load = async () => {
       try {
         const initData = await dataMasterService.getInitOptions()
@@ -138,13 +139,23 @@ export default function EkskulPage() {
           value: u.kode_unit,
           label: u.nama_unit || u.kode_unit,
         })))
-      } catch { /* fallback to empty */ }
-      await fetchRows()
+      } catch { /* fallback to empty */ } finally {
+        initDoneRef.current = true
+        await fetchRows()
+      }
     }
-    void load()
-  }, [])
+    if (!initCalledRef.current) {
+      initCalledRef.current = true
+      void load()
+    } else if (initDoneRef.current) {
+      void fetchRows()
+    }
+  }, [contextReady])
 
-  useEffect(() => { void fetchRows() }, [selectedKodeUnit, filterStatus])
+  useEffect(() => {
+    if (!initDoneRef.current) return
+    void fetchRows()
+  }, [selectedKodeUnit, filterStatus])
 
   const handleCreate = async () => {
     if (!formData.nama_ekskul.trim()) {

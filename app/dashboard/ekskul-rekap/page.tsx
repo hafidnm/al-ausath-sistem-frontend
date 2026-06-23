@@ -316,9 +316,11 @@ function EditPendaftarDialog({ open, onClose, onSaved, row, allKelas, ekskulOpti
 // ─── Main Page ──────────────────────────────────────────────────────────────────
 export default function EkskulRekapPage() {
   const { toast } = useToast()
-  const { selectedKodeUnit } = useUnit()
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+  const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const contextReady = !isUnitLoading && !isTahunLoading
   const initCalledRef = useRef(false)
+  const initDoneRef = useRef(false)
 
   const [rows, setRows] = useState<PendaftaranApiItem[]>([])
   const [ekskulOptions, setEkskulOptions] = useState<EkskulApiItem[]>([])
@@ -360,8 +362,7 @@ export default function EkskulRekapPage() {
   }, [buildParams])
 
   useEffect(() => {
-    if (initCalledRef.current) return
-    initCalledRef.current = true
+    if (!contextReady) return
     const load = async () => {
       try {
         const [initData, ekskulData] = await Promise.all([
@@ -371,13 +372,23 @@ export default function EkskulRekapPage() {
         setUnitOptions((initData.unit ?? []).map((u: any) => ({ value: u.kode_unit, label: u.nama_unit || u.kode_unit })))
         setAllKelas(initData.kelas ?? [])
         setEkskulOptions(ekskulData.data ?? ekskulData)
-      } catch { /* continue */ }
-      await fetchRows()
+      } catch { /* continue */ } finally {
+        initDoneRef.current = true
+        await fetchRows()
+      }
     }
-    void load()
-  }, [])
+    if (!initCalledRef.current) {
+      initCalledRef.current = true
+      void load()
+    } else if (initDoneRef.current) {
+      void fetchRows()
+    }
+  }, [contextReady])
 
-  useEffect(() => { void fetchRows() }, [currentPage, filterEkskul, selectedKodeUnit, keyword])
+  useEffect(() => {
+    if (!initDoneRef.current) return
+    void fetchRows()
+  }, [currentPage, filterEkskul, selectedKodeUnit, keyword])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()

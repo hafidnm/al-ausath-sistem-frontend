@@ -12,10 +12,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
-import { dataUnitService } from "@/lib/services/unit.service"
-import { kelasService } from "@/lib/services/kelas.service"
-import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 import {
   Table,
   TableBody,
@@ -31,7 +30,6 @@ import {
   Calendar,
   RefreshCw,
   BookOpen,
-  Filter,
 } from "lucide-react"
 
 interface OverviewData {
@@ -67,79 +65,74 @@ const getStatusBadge = (status: string) => {
 
 export default function PresensiOverviewPage() {
   const { toast } = useToast()
-  
-  // Default to today in YYYY-MM-DD
-  const today = new Date().toISOString().split("T")[0]
+
+  // --- Global Context Filters (dari header dashboard) ---
+  const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+
+  // Context dianggap siap ketika keduanya selesai loading
+  const contextReady = !isTahunLoading && !isUnitLoading
+
   const [selectedDate, setSelectedDate] = useState("")
   const [periode, setPeriode] = useState<"semua" | "harian" | "mingguan" | "bulanan">("semua")
-  const [selectedUnit, setSelectedUnit] = useState<string>("ALL")
   const [selectedKelas, setSelectedKelas] = useState<string>("ALL")
-  
-  const [unitOptions, setUnitOptions] = useState<any[]>([])
+
   const [kelasOptions, setKelasOptions] = useState<any[]>([])
-  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
 
   const [data, setData] = useState<OverviewData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Guard: cegah double-invoke & cascade re-fetch
-  const initCalledRef = useRef(false)
   const initDoneRef = useRef(false)
 
-  // Memoize filtered kelas options based on selectedUnit
+  // Memoize filtered kelas options based on global context (unit + tahun ajaran)
   const filteredKelasOptions = useMemo(() => {
-    if (selectedUnit === "ALL") {
-      return kelasOptions
+    let opts = kelasOptions
+    if (selectedKodeTahun) {
+      opts = opts.filter((k: any) => k.tahun_ajaran === selectedKodeTahun)
     }
-    return kelasOptions.filter((k: any) => k.kode_unit === selectedUnit)
-  }, [selectedUnit, kelasOptions])
+    if (selectedKodeUnit) {
+      opts = opts.filter((k: any) => k.kode_unit === selectedKodeUnit)
+    }
+    return opts
+  }, [selectedKodeUnit, selectedKodeTahun, kelasOptions])
 
+  // Reset kelas filter ketika unit atau tahun ajaran berubah
   useEffect(() => {
+    setSelectedKelas("ALL")
+  }, [selectedKodeUnit, selectedKodeTahun])
+
+  // Load kelas options dan tunggu context siap sebelum fetch pertama
+  useEffect(() => {
+    if (!contextReady) return
     const loadOptions = async () => {
       try {
         const initData = await sesiAbsensiService.adminPresensiSantriInit()
-        
-        setUnitOptions(initData.unit || [])
         setKelasOptions(initData.kelas || [])
-        
-        const tahunList = initData.tahun_ajaran || []
-        setTahunAjaranOptions(tahunList)
-        
-        const activeTahun = tahunList.find((t: any) => t.status === "AKTIF")
-        if (activeTahun?.kode_tahun) {
-          setSelectedTahunAjaran(activeTahun.kode_tahun)
-        }
-        
-        initDoneRef.current = true
-        // Langsung panggil fetchData pertama kali agar tidak bergantung sepenuhnya ke useEffect
-        void fetchData(activeTahun?.kode_tahun)
       } catch (error) {
         console.error("Gagal memuat filter options", error)
-        initDoneRef.current = true // fallback agar fetchData tetap bisa jalan walau error
+      } finally {
+        initDoneRef.current = true
+        void fetchData()
       }
     }
+    if (!initDoneRef.current) {
+      void loadOptions()
+    } else {
+      void fetchData()
+    }
+  }, [contextReady])
 
-    if (initCalledRef.current) return
-    initCalledRef.current = true
-    void loadOptions()
-  }, [])
-
-  const fetchData = async (tahunAjaranOverride?: string) => {
+  const fetchData = async () => {
     setIsLoading(true)
     try {
       const params: any = { periode }
-      // Only send tanggal when periode requires it and date is filled
       if (periode !== "semua" && selectedDate) {
         params.tanggal = selectedDate
       }
-      if (selectedUnit !== "ALL") params.kode_unit = selectedUnit
+      // Gunakan nilai dari global context header
+      if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKelas !== "ALL") params.kode_kelas = selectedKelas
-      
-      const activeTahun = tahunAjaranOverride !== undefined ? tahunAjaranOverride : selectedTahunAjaran
-      if (activeTahun && activeTahun !== "ALL") {
-        params.tahun_ajaran = activeTahun
-      }
+      if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
 
       const res = await api.get("/akademik/presensi/overview", { params })
       setData(res.data)
@@ -150,10 +143,11 @@ export default function PresensiOverviewPage() {
     }
   }
 
+  // Re-fetch ketika filter lokal atau context global berubah
   useEffect(() => {
     if (!initDoneRef.current) return
     void fetchData()
-  }, [selectedDate, periode, selectedUnit, selectedKelas, selectedTahunAjaran])
+  }, [selectedDate, periode, selectedKelas, selectedKodeTahun, selectedKodeUnit])
 
   return (
     <div className="space-y-6">
@@ -161,27 +155,14 @@ export default function PresensiOverviewPage() {
       <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 bg-card/60 backdrop-blur-md p-4 rounded-xl border border-border/40 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Overview Presensi</h1>
-          <p className="text-muted-foreground text-sm">Ringkasan statistik kehadiran santri dan guru</p>
+          <p className="text-muted-foreground text-sm">
+            Ringkasan statistik kehadiran santri dan guru
+            {selectedKodeTahun && <span className="ml-1 text-primary font-medium">— {selectedKodeTahun}</span>}
+            {selectedKodeUnit && <span className="ml-1 text-primary font-medium">/ {selectedKodeUnit}</span>}
+          </p>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Tahun Ajaran Filter */}
-          <div className="flex items-center gap-2">
-            <Select value={selectedTahunAjaran} onValueChange={(val) => setSelectedTahunAjaran(val)}>
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Tahun Ajaran" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Tahun</SelectItem>
-                {tahunAjaranOptions.map((t) => (
-                  <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                    {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
 
+        <div className="flex flex-wrap items-center gap-3">
           {/* Periode Filter */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Periode:</span>
@@ -194,23 +175,6 @@ export default function PresensiOverviewPage() {
                 <SelectItem value="harian">Harian</SelectItem>
                 <SelectItem value="mingguan">Mingguan</SelectItem>
                 <SelectItem value="bulanan">Bulanan</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Unit Filter */}
-          <div className="flex items-center gap-2">
-            <Select value={selectedUnit} onValueChange={(val) => { setSelectedUnit(val); setSelectedKelas("ALL"); }}>
-              <SelectTrigger className="w-36 h-9">
-                <SelectValue placeholder="Semua Unit" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">Semua Unit</SelectItem>
-                {unitOptions.map((u) => (
-                  <SelectItem key={u.kode_unit} value={u.kode_unit}>
-                    {u.nama_unit}
-                  </SelectItem>
-                ))}
               </SelectContent>
             </Select>
           </div>

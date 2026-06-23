@@ -309,8 +309,9 @@ const mapGuruStatusToApi = (status: GuruStatus): "HADIR" | "IZIN" | "SAKIT" => {
 
 export default function GuruPanelPage() {
   const { toast } = useToast()
-  const { selectedKodeTahun } = useTahunAjaran()
-  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+  const contextReady = !isTahunLoading && !isUnitLoading
   // Guard: cegah double-invocation dari React StrictMode (development)
   const initCalledRef = useRef(false)
 
@@ -454,10 +455,8 @@ export default function GuruPanelPage() {
 
     if (!currentPetugasId) return today
 
-    if (isAdminUser) return today
-
     return today.filter((jadwal) => Number(jadwal.id_petugas_hadir) === Number(currentPetugasId))
-  }, [currentPetugasId, dayName, jadwalMengajar, isAdminUser, selectedKodeUnit])
+  }, [currentPetugasId, dayName, jadwalMengajar, selectedKodeUnit])
 
   const todayDateStr = useMemo(() => {
     const d = new Date()
@@ -587,7 +586,7 @@ export default function GuruPanelPage() {
         .map((item: any) => {
           const id = normalizeNumber(item.id_petugas ?? item.id ?? 0)
           if (id <= 0) return null
-          const nama = String(item.nama_lengkap || "").trim() || `Petugas #${id}`
+          const nama = String(item.nama_lengkap || "").trim() || `Pengajar #${id}`
           return { id, label: `${nama} (ID: ${id})` }
         })
         .filter((item): item is PetugasOption => item !== null)
@@ -682,11 +681,13 @@ export default function GuruPanelPage() {
   }
 
   // Mount: 2 call paralel (me + guru-panel/init), dengan guard untuk cegah double-invoke
+  // Tunggu context siap dulu sebelum fetch agar filter tahun_ajaran dari header tersedia
   useEffect(() => {
+    if (!contextReady) return
     if (initCalledRef.current) return
     initCalledRef.current = true
     void loadInitData()
-  }, [])
+  }, [contextReady])
 
   // Lazy load: data sesi historis & rekap baru diambil saat tab Riwayat pertama kali dibuka
   useEffect(() => {
@@ -1058,7 +1059,7 @@ export default function GuruPanelPage() {
                             {jadwal.hari || "-"} | {jadwal.jam}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Ruangan: {jadwal.ruangan || "-"} | Petugas: {jadwal.nama_petugas || "-"}
+                            Ruangan: {jadwal.ruangan || "-"} | Pengajar: {jadwal.nama_petugas || "-"}
                           </p>
                         </div>
                       </div>
@@ -1141,7 +1142,7 @@ export default function GuruPanelPage() {
                             {item.kelas} ({item.jenjang}) - {item.hari || "-"} | {item.jam}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            Petugas pengganti: {getPetugasLabel(item.id_petugas_pengganti)} | Ruangan: {item.ruangan || "-"}
+                            Pengajar pengganti: {getPetugasLabel(item.id_petugas_pengganti)} | Ruangan: {item.ruangan || "-"}
                           </p>
                         </div>
                       </div>
@@ -1212,13 +1213,13 @@ export default function GuruPanelPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Petugas</Label>
+                  <Label>Pengajar</Label>
                   <Select value={petugasFilter} onValueChange={setPetugasFilter}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Semua petugas" />
+                      <SelectValue placeholder="Semua pengajar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Semua Petugas</SelectItem>
+                      <SelectItem value="all">Semua Pengajar</SelectItem>
                       {petugasFilterOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -1268,7 +1269,7 @@ export default function GuruPanelPage() {
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
                       <TableHead>Ruangan</TableHead>
-                      <TableHead>Petugas</TableHead>
+                      <TableHead>Pengajar</TableHead>
                       <TableHead>Jam</TableHead>
                       <TableHead>Status Jadwal</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
@@ -1554,7 +1555,7 @@ export default function GuruPanelPage() {
                           <Select value={guruPenggantiId || undefined} onValueChange={setGuruPenggantiId}>
                             <SelectTrigger id="guru-pengganti-id">
                               <SelectValue
-                                placeholder={isLoadingPetugas ? "Memuat petugas..." : "Pilih guru pengganti"}
+                                placeholder={isLoadingPetugas ? "Memuat pengajar..." : "Pilih guru pengganti"}
                               />
                             </SelectTrigger>
                             <SelectContent>
@@ -1857,7 +1858,7 @@ export default function GuruPanelPage() {
                     return pengajarList.map((ap: any, idx: number) => {
                       const namaPetugas = ap.petugas?.nama_lengkap
                         ?? petugasLabelById.get(Number(ap.id_petugas))?.split(' (')[0]
-                        ?? `Petugas #${ap.id_petugas}`
+                        ?? `Pengajar #${ap.id_petugas}`
                       const isGuru = Number(ap.id_petugas) === Number(selectedRiwayat.id_petugas_hadir)
                       const isPengganti = Number(ap.id_petugas) === Number(selectedRiwayat.id_petugas_pengganti)
                       const status = String(ap.status_kehadiran || "").toUpperCase()

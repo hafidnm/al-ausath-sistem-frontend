@@ -586,7 +586,7 @@ export default function JadwalPembelajaranPage() {
             const idPetugas = toNumber(item.id_petugas, 0)
             return {
               value: idPetugas > 0 ? String(idPetugas) : "",
-              label: toText(item.nama_lengkap).trim() || `Petugas #${idPetugas}`,
+              label: toText(item.nama_lengkap).trim() || `Pengajar #${idPetugas}`,
             }
           })
           .filter((item: any) => item.value)
@@ -1042,8 +1042,8 @@ export default function JadwalPembelajaranPage() {
                     <Input className="w-full" value={selectedCreateKelasMapel?.kodeUnit || ""} readOnly placeholder="Terisi otomatis" />
                   </div>
                   <div className="space-y-2 min-w-0">
-                    <Label>Petugas</Label>
-                    <Input className="w-full" value={selectedCreateKelasMapel?.namaPetugas || "Tanpa Petugas"} readOnly placeholder="Terisi otomatis" />
+                    <Label>Pengajar</Label>
+                    <Input className="w-full" value={selectedCreateKelasMapel?.namaPetugas || "Tanpa Pengajar"} readOnly placeholder="Terisi otomatis" />
                   </div>
                 </div>
 
@@ -1214,13 +1214,13 @@ export default function JadwalPembelajaranPage() {
                   </Select>
                 </div>
                 <div className="space-y-2 min-w-0">
-                  <Label>Petugas</Label>
+                  <Label>Pengajar</Label>
                   <Select value={draftPetugasFilter} onValueChange={setDraftPetugasFilter}>
                     <SelectTrigger className="w-full min-w-0">
-                      <SelectValue className="truncate" placeholder="Pilih petugas" />
+                      <SelectValue className="truncate" placeholder="Pilih pengajar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Semua Petugas</SelectItem>
+                      <SelectItem value="all">Semua Pengajar</SelectItem>
                       {petugasOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                       ))}
@@ -1339,7 +1339,7 @@ export default function JadwalPembelajaranPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">MAPEL</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">HARI</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">JAM</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">PETUGAS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">PENGAJAR</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TAHUN/SEM</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">RUANG</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
@@ -1493,8 +1493,8 @@ export default function JadwalPembelajaranPage() {
                 <Input className="w-full" value={selectedEditKelasMapel?.kodeUnit || ""} readOnly placeholder="Terisi otomatis" />
               </div>
               <div className="space-y-2 min-w-0">
-                <Label>Petugas</Label>
-                <Input className="w-full" value={selectedEditKelasMapel?.namaPetugas || "Tanpa Petugas"} readOnly placeholder="Terisi otomatis" />
+                <Label>Pengajar</Label>
+                <Input className="w-full" value={selectedEditKelasMapel?.namaPetugas || "Tanpa Pengajar"} readOnly placeholder="Terisi otomatis" />
               </div>
             </div>
 
@@ -1619,7 +1619,7 @@ export default function JadwalPembelajaranPage() {
                 <p className="font-medium">{detailData.namaMapel || detailData.kodeMapel || "-"}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground">Petugas</p>
+                <p className="text-xs text-muted-foreground">Pengajar</p>
                 <p className="font-medium">{detailData.namaPetugas || "-"}</p>
               </div>
               <div className="rounded-lg border p-3">

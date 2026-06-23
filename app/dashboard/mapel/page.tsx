@@ -134,7 +134,8 @@ const downloadBlob = (blob: Blob, filename: string): void => {
 
 export default function MapelPage() {
   const { toast } = useToast()
-  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+  const contextReady = !isUnitLoading
 
   const [rows, setRows] = useState<MapelRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -212,6 +213,7 @@ export default function MapelPage() {
   }
 
   useEffect(() => {
+    if (!contextReady) return
     const loadOptions = async () => {
       try {
         const initData = await dataMasterService.getInitOptions()
@@ -227,20 +229,21 @@ export default function MapelPage() {
         }
         setUnitOptions(options)
         setAllMapelOptions(initData.mapel || [])
-        
-        initDoneRef.current = true
-        void fetchRows()
       } catch (error) {
         console.error("Gagal memuat opsi filter awal", error)
+      } finally {
         initDoneRef.current = true
         void fetchRows()
       }
     }
 
-    if (initCalledRef.current) return
-    initCalledRef.current = true
-    void loadOptions()
-  }, [])
+    if (!initCalledRef.current) {
+      initCalledRef.current = true
+      void loadOptions()
+    } else if (initDoneRef.current) {
+      void fetchRows()
+    }
+  }, [contextReady])
 
   const kelompokMapelOptions = useMemo(() => {
     const values = new Set<string>()

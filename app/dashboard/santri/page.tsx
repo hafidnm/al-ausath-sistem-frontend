@@ -231,8 +231,10 @@ export default function SantriPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
 
-  const { selectedKodeTahun } = useTahunAjaran()
-  const { selectedKodeUnit } = useUnit()
+  const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const { selectedKodeUnit, isLoading: isUnitLoading } = useUnit()
+
+  const contextReady = !isTahunLoading && !isUnitLoading
 
   // Guard: cegah double-invoke & cascade re-fetch
   const initCalledRef = useRef(false)
@@ -341,6 +343,7 @@ export default function SantriPage() {
   }
 
   useEffect(() => {
+    if (!contextReady) return
     const loadOptions = async () => {
       try {
         const initData = await dataMasterService.getInitOptions()
@@ -353,21 +356,21 @@ export default function SantriPage() {
         }))
 
         setKelasOptions(mappedKelas)
-        
-        initDoneRef.current = true
-        // Langsung eksekusi fetch pertama agar aman
-        void fetchRows()
       } catch (error) {
         console.error("Gagal memuat opsi filter awal", error)
+      } finally {
         initDoneRef.current = true
         void fetchRows()
       }
     }
 
-    if (initCalledRef.current) return
-    initCalledRef.current = true
-    void loadOptions()
-  }, [])
+    if (!initCalledRef.current) {
+      initCalledRef.current = true
+      void loadOptions()
+    } else if (initDoneRef.current) {
+      void fetchRows()
+    }
+  }, [contextReady])
 
   useEffect(() => {
     setCurrentPage(1)

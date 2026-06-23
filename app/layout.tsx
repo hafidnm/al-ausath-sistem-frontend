@@ -6,7 +6,10 @@ import { Toaster } from '@/components/ui/toaster'
 import { ReactQueryProvider } from '@/components/react-query-provider'
 import './globals.css'
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
 
 export const metadata: Metadata = {
   title: 'e-Rapor Pesantren - Sistem Penilaian Digital',
@@ -38,7 +41,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+      <body className={`${inter.className} ${inter.variable} font-sans antialiased`} suppressHydrationWarning>
         <ReactQueryProvider>
           {children}
           <Analytics />

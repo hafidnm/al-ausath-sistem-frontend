@@ -76,7 +76,8 @@ const formatDate = (v: string) => {
 
 export default function SantriPanelPage() {
   const { toast } = useToast()
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const contextReady = !isTahunLoading
 
   const [user, setUser] = useState<UserInfo | null>(null)
   const [rekap, setRekap] = useState<RekapSantri | null>(null)
@@ -180,10 +181,11 @@ export default function SantriPanelPage() {
       }
     }
     
+    if (!contextReady) return
     if (initCalledRef.current) return
     initCalledRef.current = true
     void init()
-  }, [])
+  }, [contextReady])
 
   // Trigger ulang riwayat saat filter periode atau tahun ajaran berubah
   useEffect(() => {

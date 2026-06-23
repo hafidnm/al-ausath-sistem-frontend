@@ -109,7 +109,7 @@ function TahunAjaranSelector() {
   )
 }
 
-function UnitSelector() {
+function UnitSelector({ role }: { role?: string }) {
   const { allUnit, selectedUnit, setSelectedUnit, isLoading } = useUnit()
 
   if (isLoading) {
@@ -118,8 +118,8 @@ function UnitSelector() {
     )
   }
 
-  // Only show if there's more than one unit
-  if (allUnit.length <= 1) return null
+  // Only show if there's more than one unit, and role is not santri
+  if (role === "santri" || allUnit.length <= 1) return null
 
   return (
     <DropdownMenu>
@@ -216,7 +216,7 @@ const adminMenuItems: MenuItem[] = [
 ]
 
 const guruMenuItems: MenuItem[] = [
-  { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/guru-panel" },
+  { icon: LayoutDashboard, label: "Dashboard Guru", href: "/dashboard/guru-panel" },
   { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/admin-panel/nilai-mapel" },
   { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
   { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
@@ -254,6 +254,40 @@ const santriMenuItems: MenuItem[] = [
   { icon: Receipt, label: "Administrasi", href: "/dashboard/santri-panel/administrasi" },
   { icon: Megaphone, label: "Pengumuman", href: "/dashboard/santri-panel/pengumuman" },
 ]
+
+// Merge menu items from multiple roles, deduplicating by href/label
+function mergeMenuItems(peran: string[]): MenuItem[] {
+  const collected: MenuItem[][] = []
+
+  if (peran.includes('Petugas Admin')) collected.push(adminMenuItems)
+  if (peran.includes('Petugas SPP'))  collected.push(sppMenuItems)
+  if (peran.includes('Petugas PPDB')) collected.push(ppdbMenuItems)
+  if (peran.includes('Staf Pengajar')) collected.push(stafPengajarMenuItems)
+
+  // Fallback: any other petugas role → guru menu
+  const knownRoles = ['Petugas Admin', 'Petugas SPP', 'Petugas PPDB', 'Staf Pengajar']
+  if (collected.length === 0 || peran.some((p) => !knownRoles.includes(p) && !collected.length)) {
+    collected.push(guruMenuItems)
+  }
+
+  if (collected.length === 1) return collected[0]
+
+  // Merge: preserve order, deduplicate by href (for leaf items) or label (for groups)
+  const merged: MenuItem[] = []
+  const seen = new Set<string>()
+
+  for (const menu of collected) {
+    for (const item of menu) {
+      const key = item.href ?? item.label
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push(item)
+      }
+    }
+  }
+
+  return merged
+}
 
 export default function DashboardLayout({
   children,
@@ -412,11 +446,7 @@ export default function DashboardLayout({
                    const peran: string[] = Array.isArray(user?.peran_akun)
                      ? user.peran_akun.flat().map(String)
                      : (user?.peran_akun ? [String(user.peran_akun)] : [])
-                   if (peran.includes('Petugas Admin')) return adminMenuItems
-                   if (peran.includes('Petugas SPP'))  return sppMenuItems
-                   if (peran.includes('Petugas PPDB')) return ppdbMenuItems
-                   if (peran.includes('Staf Pengajar')) return stafPengajarMenuItems
-                   return guruMenuItems // Petugas Tata Usaha dan lainnya
+                   return mergeMenuItems(peran)
                  })()
                : santriMenuItems
              ).map((item) => {
@@ -549,7 +579,7 @@ export default function DashboardLayout({
               {/* Tahun Ajaran Global Selector */}
               <TahunAjaranSelector />
               {/* Unit / Jenjang Global Selector */}
-              <UnitSelector />
+              <UnitSelector role={role} />
             </div>
 
             <div className="flex items-center gap-2">

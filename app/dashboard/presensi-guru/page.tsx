@@ -334,7 +334,7 @@ export default function PresensiGuruPage() {
   const handleSaveEdit = async () => {
     if (!selectedSesi?.id_sesi) return
     if (!editData.id_petugas) {
-      toast({ title: "Validasi Gagal", description: "Pilih petugas terlebih dahulu.", variant: "destructive" })
+      toast({ title: "Validasi Gagal", description: "Pilih pengajar terlebih dahulu.", variant: "destructive" })
       return
     }
 
@@ -382,7 +382,7 @@ export default function PresensiGuruPage() {
 
   const handleBukaSesi = async () => {
     if (!bukaSesiData.id_jadwal || !bukaSesiData.tanggal || !bukaSesiData.id_petugas_hadir) {
-      toast({ title: "Validasi Gagal", description: "Jadwal, Tanggal, dan Petugas Hadir wajib diisi.", variant: "destructive" })
+      toast({ title: "Validasi Gagal", description: "Jadwal, Tanggal, dan Pengajar Hadir wajib diisi.", variant: "destructive" })
       return
     }
 
@@ -495,7 +495,7 @@ export default function PresensiGuruPage() {
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow>
-                      <TableHead>Nama Petugas</TableHead>
+                      <TableHead>Nama Pengajar</TableHead>
                       <TableHead>Peran</TableHead>
                       <TableHead className="text-center">Total</TableHead>
                       <TableHead className="text-center">Hadir</TableHead>
@@ -588,10 +588,10 @@ export default function PresensiGuruPage() {
                   
                   <Select value={filterSesi.id_petugas_hadir} onValueChange={(val) => setFilterSesi({ ...filterSesi, id_petugas_hadir: val })}>
                     <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Petugas" />
+                      <SelectValue placeholder="Pengajar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ALL">Semua Petugas</SelectItem>
+                      <SelectItem value="ALL">Semua Pengajar</SelectItem>
                       {petugasOptions.map((p) => (
                         <SelectItem key={p.id} value={String(p.id)}>{p.label.split(' (')[0]}</SelectItem>
                       ))}
@@ -618,7 +618,7 @@ export default function PresensiGuruPage() {
                       <TableHead>Hari</TableHead>
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
-                      <TableHead>Petugas Hadir</TableHead>
+                      <TableHead>Pengajar Hadir</TableHead>
                       <TableHead>Status Guru</TableHead>
                       <TableHead>Status Sesi</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
@@ -726,7 +726,7 @@ export default function PresensiGuruPage() {
                       <TableHead>Waktu</TableHead>
                       <TableHead>Mata Pelajaran</TableHead>
                       <TableHead>Kelas</TableHead>
-                      <TableHead>Petugas (Default)</TableHead>
+                      <TableHead>Pengajar (Default)</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -851,7 +851,7 @@ export default function PresensiGuruPage() {
                                 </Badge>
                               </TableCell>
                               <TableCell className="font-medium text-xs">
-                                {log.nama_admin || `ID Petugas: ${log.id_petugas}`}
+                                {log.nama_admin || `ID Pengajar: ${log.id_petugas}`}
                               </TableCell>
                               <TableCell className="text-xs font-medium max-w-md break-words">
                                 {log.deskripsi}
@@ -924,7 +924,7 @@ export default function PresensiGuruPage() {
                                 </span>
                               </TableCell>
                               <TableCell className="font-medium text-xs">
-                                {audit.nama_admin || `ID Petugas: ${audit.diubah_oleh}`}
+                                {audit.nama_admin || `ID Pengajar: ${audit.diubah_oleh}`}
                               </TableCell>
                             </TableRow>
                           ))
@@ -951,10 +951,10 @@ export default function PresensiGuruPage() {
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Pilih Petugas (Pengajar)</Label>
+              <Label>Pilih Pengajar</Label>
               <Select value={String(editData.id_petugas)} onValueChange={(v) => setEditData({...editData, id_petugas: Number(v)})}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Pilih petugas" />
+                  <SelectValue placeholder="Pilih pengajar" />
                 </SelectTrigger>
                 <SelectContent>
                   {petugasOptions.map(p => (
@@ -1054,10 +1054,10 @@ export default function PresensiGuruPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Petugas Hadir (Pengajar)</Label>
+                <Label>Pengajar Hadir</Label>
                 <Select value={String(bukaSesiData.id_petugas_hadir)} onValueChange={(v) => setBukaSesiData({...bukaSesiData, id_petugas_hadir: Number(v)})}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih petugas" />
+                    <SelectValue placeholder="Pilih pengajar" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {petugasOptions.map(p => (

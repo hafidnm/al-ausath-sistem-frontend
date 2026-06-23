@@ -41,7 +41,9 @@ import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { dataMasterService } from "@/lib/services/data-master.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
-import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload } from "lucide-react"
+import { ChevronDown, Download, Eye, Filter, MoreVertical, PencilLine, PlusCircle, Trash2, Upload, Check, ChevronsUpDown } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 
 type UiStatus = "Aktif" | "Nonaktif"
 
@@ -183,6 +185,8 @@ export default function MapelPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false)
+  const [openAddMapel, setOpenAddMapel] = useState(false)
+  const [openEditMapel, setOpenEditMapel] = useState(false)
 
   const [editingId, setEditingId] = useState<number | null>(null)
   const [detailData, setDetailData] = useState<KelasMapelRow | null>(null)
@@ -383,7 +387,7 @@ export default function MapelPage() {
           if (idPetugas <= 0) continue
           petugas.push({
             value: String(idPetugas),
-            label: toText(item.nama_lengkap).trim() || `Petugas #${idPetugas}`,
+            label: toText(item.nama_lengkap).trim() || `Pengajar #${idPetugas}`,
           })
         }
 
@@ -520,7 +524,7 @@ export default function MapelPage() {
       if (!formData.kodeKelas || !formData.kodeMapel.trim() || !formData.tahunAjaran || !formData.idPetugas || formData.idPetugas === "none") {
         toast({
           title: "Validasi",
-          description: "Kode kelas, kode mapel, tahun ajaran, dan petugas wajib diisi.",
+          description: "Kode kelas, kode mapel, tahun ajaran, dan pengajar wajib diisi.",
           variant: "destructive",
         })
         return
@@ -567,7 +571,7 @@ export default function MapelPage() {
       if (!editingFormData.kodeKelas || !editingFormData.kodeMapel.trim() || !editingFormData.tahunAjaran || !editingFormData.idPetugas || editingFormData.idPetugas === "none") {
         toast({
           title: "Validasi",
-          description: "Kode kelas, kode mapel, tahun ajaran, dan petugas wajib diisi.",
+          description: "Kode kelas, kode mapel, tahun ajaran, dan pengajar wajib diisi.",
           variant: "destructive",
         })
         return
@@ -774,32 +778,65 @@ export default function MapelPage() {
                   </div>
                   <div className="space-y-2">
                     <Label>Kode Mapel</Label>
-                    <Select value={formData.kodeMapel} onValueChange={(value) => setFormData((prev) => ({ ...prev, kodeMapel: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Pilih kode mapel" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formMapelByUnit.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.value} - {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={openAddMapel} onOpenChange={setOpenAddMapel}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={openAddMapel}
+                          className="w-full justify-between font-normal"
+                        >
+                          {formData.kodeMapel
+                            ? formMapelByUnit.find((option) => option.value === formData.kodeMapel)?.label
+                              ? `${formData.kodeMapel} - ${formMapelByUnit.find((option) => option.value === formData.kodeMapel)?.label}`
+                              : formData.kodeMapel
+                            : "Pilih kode mapel"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Cari mapel..." />
+                          <CommandList>
+                            <CommandEmpty>Mapel tidak ditemukan.</CommandEmpty>
+                            <CommandGroup>
+                              {formMapelByUnit.map((option) => (
+                                <CommandItem
+                                  key={option.value}
+                                  value={`${option.value} ${option.label}`}
+                                  onSelect={() => {
+                                    setFormData((prev) => ({ ...prev, kodeMapel: option.value }))
+                                    setOpenAddMapel(false)
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.kodeMapel === option.value ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {option.value} - {option.label}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>
-                      Petugas <span className="text-destructive">*</span>
+                      Pengajar <span className="text-destructive">*</span>
                     </Label>
                     <Select
                       value={formData.idPetugas}
                       onValueChange={(value) => setFormData((prev) => ({ ...prev, idPetugas: value }))}
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Pilih petugas" />
+                        <SelectValue placeholder="Pilih pengajar" />
                       </SelectTrigger>
                       <SelectContent>
                         {petugasOptions.map((option) => (
@@ -937,16 +974,16 @@ export default function MapelPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Nama Petugas</Label>
+                  <Label>Nama Pengajar</Label>
                   <Select
                     value={draftPetugasFilter}
                     onValueChange={(value) => setDraftPetugasFilter(value)}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Pilih petugas" />
+                      <SelectValue placeholder="Pilih pengajar" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Semua Petugas</SelectItem>
+                      <SelectItem value="all">Semua Pengajar</SelectItem>
                       {petugasOptions.map((option) => (
                         <SelectItem key={option.value} value={option.value}>
                           {option.label}
@@ -1067,7 +1104,7 @@ export default function MapelPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA KELAS</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KODE MAPEL</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA MAPEL</TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA PETUGAS</TableHead>
+                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA PENGAJAR</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">TAHUN AJARAN</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">SEMESTER</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
@@ -1231,35 +1268,65 @@ export default function MapelPage() {
               </div>
               <div className="space-y-2">
                 <Label>Kode Mapel</Label>
-                <Select
-                  value={editingFormData.kodeMapel}
-                  onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, kodeMapel: value }))}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih kode mapel" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {editMapelByUnit.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.value} - {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openEditMapel} onOpenChange={setOpenEditMapel}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openEditMapel}
+                      className="w-full justify-between font-normal"
+                    >
+                      {editingFormData.kodeMapel
+                        ? editMapelByUnit.find((option) => option.value === editingFormData.kodeMapel)?.label
+                          ? `${editingFormData.kodeMapel} - ${editMapelByUnit.find((option) => option.value === editingFormData.kodeMapel)?.label}`
+                          : editingFormData.kodeMapel
+                        : "Pilih kode mapel"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Cari mapel..." />
+                      <CommandList>
+                        <CommandEmpty>Mapel tidak ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {editMapelByUnit.map((option) => (
+                            <CommandItem
+                              key={option.value}
+                              value={`${option.value} ${option.label}`}
+                              onSelect={() => {
+                                setEditingFormData((prev) => ({ ...prev, kodeMapel: option.value }))
+                                setOpenEditMapel(false)
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  editingFormData.kodeMapel === option.value ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {option.value} - {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>
-                  Petugas <span className="text-destructive">*</span>
+                  Pengajar <span className="text-destructive">*</span>
                 </Label>
                 <Select
                   value={editingFormData.idPetugas}
                   onValueChange={(value) => setEditingFormData((prev) => ({ ...prev, idPetugas: value }))}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Pilih petugas (wajib)" />
+                    <SelectValue placeholder="Pilih pengajar (wajib)" />
                   </SelectTrigger>
                   <SelectContent>
                     {petugasOptions.map((option) => (
@@ -1373,11 +1440,11 @@ export default function MapelPage() {
                 <p className="font-medium">{detailData.semester || "-"}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground">ID Petugas</p>
+                <p className="text-xs text-muted-foreground">ID Pengajar</p>
                 <p className="font-medium">{detailData.idPetugas ?? "-"}</p>
               </div>
               <div className="rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground">Nama Petugas</p>
+                <p className="text-xs text-muted-foreground">Nama Pengajar</p>
                 <p className="font-medium">{detailData.namaPetugas || "-"}</p>
               </div>
               <div className="rounded-lg border p-3 md:col-span-2">
