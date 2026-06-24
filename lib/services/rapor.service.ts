@@ -328,4 +328,16 @@ export const raporService = {
     const response = await api.post("/akademik/raport/tarik", payload)
     return normalizeRaporItem(response.data?.data ?? response.data)
   },
+
+  async getWaliSantri(nomor_induk: string): Promise<{
+    nama_orang_tua_aktif: string | null
+    nama_wali: string | null
+  }> {
+    const response = await api.get(`/akademik/wali-santri/${nomor_induk}`)
+    const data = response.data?.data ?? response.data ?? {}
+    return {
+      nama_orang_tua_aktif: data?.nama_orang_tua_aktif ?? null,
+      nama_wali: data?.nama_wali ?? null,
+    }
+  },
 }

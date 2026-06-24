@@ -38,6 +38,8 @@ interface RaporCatatanCardProps {
   onCatatanFormChange: (updater: (current: CatatanFormState) => CatatanFormState) => void
   onSaveCatatan: () => void
   onReloadDetail: () => void
+  namaWaliSantri?: string | null
+  namaWaliKelas?: string | null
 }
 
 export function RaporCatatanCard({
@@ -51,6 +53,8 @@ export function RaporCatatanCard({
   onCatatanFormChange,
   onSaveCatatan,
   onReloadDetail,
+  namaWaliSantri,
+  namaWaliKelas,
 }: RaporCatatanCardProps) {
   return (
     <Card className="border-border/50">
@@ -69,6 +73,23 @@ export function RaporCatatanCard({
             <div className="mt-1"><ReportStatusBadge status={detail?.status || selected?.status} /></div>
           </div>
         </div>
+
+        {(namaWaliSantri || namaWaliKelas) && (
+          <div className="grid gap-4 sm:grid-cols-2 rounded-lg border border-border/50 bg-muted/30 px-4 py-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Wali Santri</p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {namaWaliSantri || <span className="text-muted-foreground italic">Tidak ada</span>}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Wali Kelas</p>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {namaWaliKelas || <span className="text-muted-foreground italic">Belum ditetapkan</span>}
+              </p>
+            </div>
+          </div>
+        )}
 
         <Separator />
 
@@ -116,15 +137,9 @@ export function RaporCatatanCard({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>ID wali kelas</Label>
-              <Input className="mt-2" value={catatanForm.id_wali_kelas} onChange={(event) => onCatatanFormChange((current) => ({ ...current, id_wali_kelas: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="Opsional" />
-            </div>
-            <div>
-              <Label>Semester aktif</Label>
-              <Input className="mt-2" value={catatanForm.semester} disabled />
-            </div>
+          <div>
+            <Label>Semester aktif</Label>
+            <Input className="mt-2" value={catatanForm.semester} disabled />
           </div>
         </div>
 
