@@ -220,12 +220,76 @@ const normalizeUlanganItem = (raw: any): NilaiMapelUlanganItem => ({
   diawasi_pengajar: toBoolean(raw?.diawasi_pengajar),
 })
 
+/**
+ * Parse string nilai_detail dari DB: "Tugas:[85.00,90.00];Ulangan:[70.00,80.00];UjianAkhir:88.00;..."
+ * Mengembalikan { tugas, ulangan, ujianAkhir } dalam bentuk array yang siap dipakai.
+ */
+const parseNilaiDetail = (nilaiDetail: string | null | undefined): {
+  tugas: NilaiMapelTugasItem[]
+  ulangan: NilaiMapelUlanganItem[]
+  ujianAkhir: number | null
+} => {
+  const empty = { tugas: [], ulangan: [], ujianAkhir: null }
+  if (!nilaiDetail || typeof nilaiDetail !== "string") return empty
+
+  try {
+    // Extract Tugas values: Tugas:[85.00,90.00,75.00]
+    const tugasMatch = nilaiDetail.match(/Tugas:\[([^\]]*)\]/)
+    const tugasValues: NilaiMapelTugasItem[] = tugasMatch
+      ? tugasMatch[1]
+          .split(",")
+          .filter(Boolean)
+          .map((v, i) => ({
+            nilai: parseFloat(v.trim()) || 0,
+            // Fallback jenis berdasarkan urutan jika tidak ada info lain
+            jenis: (["PR", "TUGAS_PENGGANTI", "MODUL_KOMPETENSI"][i] ?? "PR") as NilaiMapelTugasItem["jenis"],
+          }))
+      : []
+
+    // Extract Ulangan values: Ulangan:[70.00,80.00,90.00]
+    const ulanganMatch = nilaiDetail.match(/Ulangan:\[([^\]]*)\]/)
+    const ulanganValues: NilaiMapelUlanganItem[] = ulanganMatch
+      ? ulanganMatch[1]
+          .split(",")
+          .filter(Boolean)
+          .map((v) => ({
+            nilai: parseFloat(v.trim()) || 0,
+            soal_disusun_pengajar: true,
+            diawasi_pengajar: true,
+          }))
+      : []
+
+    // Extract UjianAkhir value
+    const ujianMatch = nilaiDetail.match(/UjianAkhir:([\d.]+)/)
+    const ujianAkhir = ujianMatch ? parseFloat(ujianMatch[1]) : null
+
+    return { tugas: tugasValues, ulangan: ulanganValues, ujianAkhir }
+  } catch {
+    return empty
+  }
+}
+
 const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
   const rawId = raw?.id ?? raw?.id_nilai ?? raw?.id_nilai_mapel ?? raw?.nilai_mapel_id
   const raporFlag = normalizeRaporFlag(raw?.flag_warna_rapor)
 
   const tugasRaw = Array.isArray(raw?.tugas) ? raw.tugas : []
   const ulanganRaw = Array.isArray(raw?.ulangan) ? raw.ulangan : []
+
+  // Jika backend tidak mengembalikan array tugas/ulangan, parse dari string nilai_detail
+  const parsed = (tugasRaw.length === 0 || ulanganRaw.length === 0)
+    ? parseNilaiDetail(raw?.nilai_detail)
+    : null
+
+  const tugasFinal = tugasRaw.length > 0 ? tugasRaw.map(normalizeTugasItem) : (parsed?.tugas ?? [])
+  const ulanganFinal = ulanganRaw.length > 0 ? ulanganRaw.map(normalizeUlanganItem) : (parsed?.ulangan ?? [])
+
+  // ujian_akhir: ambil dari field langsung, atau fallback nilai_uas, atau hasil parse nilai_detail
+  const ujianAkhir = raw?.ujian_akhir != null
+    ? toNumber(raw?.ujian_akhir, 0)
+    : raw?.nilai_uas != null
+      ? toNumber(raw?.nilai_uas, 0)
+      : (parsed?.ujianAkhir ?? 0)
 
   return {
     id: toNumber(rawId, -1),
@@ -236,9 +300,9 @@ const normalizeNilaiMapelItem = (raw: any): NilaiMapelItem => {
     kode_kelas: toText(raw?.kode_kelas ?? raw?.kelas?.kode_kelas) ?? "",
     tahun_ajaran: toText(raw?.tahun_ajaran) ?? "",
     semester: toNumber(raw?.semester, 0),
-    tugas: tugasRaw.map(normalizeTugasItem),
-    ulangan: ulanganRaw.map(normalizeUlanganItem),
-    ujian_akhir: toNumber(raw?.ujian_akhir ?? raw?.nilai_uas ?? raw?.nilai_ujian_akhir, 0),
+    tugas: tugasFinal,
+    ulangan: ulanganFinal,
+    ujian_akhir: ujianAkhir,
     nilai_rapor_tampil: raw?.nilai_rapor_tampil != null ? toNumber(raw?.nilai_rapor_tampil, 0) : undefined,
     flag_warna_rapor: raporFlag.isRed,
     flag_warna_rapor_raw: raporFlag.raw,
