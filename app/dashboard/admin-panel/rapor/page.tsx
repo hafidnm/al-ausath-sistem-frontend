@@ -101,9 +101,6 @@ export default function AdminPanelRaporPage() {
   const [success, setSuccess] = useState("")
   const [catatanForm, setCatatanForm] = useState<CatatanFormState>(initialCatatanForm)
   const [santriNameByNomorInduk, setSantriNameByNomorInduk] = useState<Record<string, string>>({})
-  const [santriSearch, setSantriSearch] = useState("")
-  const [isSearchingSantri, setIsSearchingSantri] = useState(false)
-  const [santriOptions, setSantriOptions] = useState<Array<{ nomor_induk: string; nama_lengkap?: string; kode_kelas?: string }>>([])
   const [ekstraList, setEkstraList] = useState<EkstraItem[]>([])
   const [namaWaliSantri, setNamaWaliSantri] = useState<string | null>(null)
   const [namaWaliKelas, setNamaWaliKelas] = useState<string | null>(null)
@@ -322,31 +319,7 @@ export default function AdminPanelRaporPage() {
     }
   }, [pdfPreviewUrl])
 
-  useEffect(() => {
-    const keyword = santriSearch.trim()
 
-    if (keyword.length < 2) {
-      setSantriOptions([])
-      setIsSearchingSantri(false)
-      return
-    }
-
-    const timer = window.setTimeout(async () => {
-      try {
-        setIsSearchingSantri(true)
-        const rows = await santriService.search(keyword, 10)
-        setSantriOptions(rows)
-      } catch {
-        setSantriOptions([])
-      } finally {
-        setIsSearchingSantri(false)
-      }
-    }, 300)
-
-    return () => {
-      window.clearTimeout(timer)
-    }
-  }, [santriSearch])
 
   const handleReset = () => {
     setQuery("")
@@ -670,25 +643,11 @@ export default function AdminPanelRaporPage() {
           <RaporGenerateCard
             catatanForm={catatanForm}
             onCatatanFormChange={setCatatanForm}
-            isSearchingSantri={isSearchingSantri}
-            santriOptions={santriOptions}
-            onNomorIndukSearchChange={setSantriSearch}
-            onSantriOptionPick={(option) => {
-              setCatatanForm((current) => ({
+            onSantriNameResolved={(nomorInduk, name) => {
+              setSantriNameByNomorInduk((current) => ({
                 ...current,
-                nomor_induk: option.nomor_induk,
-                kode_kelas: current.kode_kelas || option.kode_kelas || "",
+                [nomorInduk]: name,
               }))
-
-              if (option.nama_lengkap) {
-                setSantriNameByNomorInduk((current) => ({
-                  ...current,
-                  [option.nomor_induk]: option.nama_lengkap || "",
-                }))
-              }
-
-              setSantriOptions([])
-              setSantriSearch("")
             }}
             isGenerating={isGenerating}
             isReportReady={isReportReady}

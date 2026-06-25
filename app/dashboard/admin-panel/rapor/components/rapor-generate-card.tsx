@@ -1,14 +1,16 @@
 "use client"
 
-import { Download, Eye, Loader2, Sparkles } from "lucide-react"
+import { useEffect, useState, useMemo } from "react"
+import { Download, Eye, Loader2, Sparkles, BookMarked } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BookMarked } from "lucide-react"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
+import { kelasService } from "@/lib/services/kelas.service"
+import { santriService, type SantriItem } from "@/lib/services/santri.service"
 
 interface CatatanFormState {
   nomor_induk: string
@@ -26,19 +28,10 @@ interface CatatanFormState {
   keseharian_ketaatan: string
 }
 
-interface SantriOption {
-  nomor_induk: string
-  nama_lengkap?: string
-  kode_kelas?: string
-}
-
 interface RaporGenerateCardProps {
   catatanForm: CatatanFormState
   onCatatanFormChange: (updater: (current: CatatanFormState) => CatatanFormState) => void
-  isSearchingSantri: boolean
-  santriOptions: SantriOption[]
-  onNomorIndukSearchChange: (value: string) => void
-  onSantriOptionPick: (option: SantriOption) => void
+  onSantriNameResolved: (nomorInduk: string, name: string) => void
   isGenerating: boolean
   isReportReady: boolean
   isPublishedReport: boolean
@@ -50,10 +43,7 @@ interface RaporGenerateCardProps {
 export function RaporGenerateCard({
   catatanForm,
   onCatatanFormChange,
-  isSearchingSantri,
-  santriOptions,
-  onNomorIndukSearchChange,
-  onSantriOptionPick,
+  onSantriNameResolved,
   isGenerating,
   isReportReady,
   isPublishedReport,
@@ -62,7 +52,87 @@ export function RaporGenerateCard({
   onDownloadPdf,
 }: RaporGenerateCardProps) {
   const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedUnit } = useUnit()
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
   const tahunAjaran = selectedTahunAjaran?.nama_tahun || catatanForm.tahun_ajaran
+
+  // Raw kelas options (all, unfiltered)
+  const [rawKelasOptions, setRawKelasOptions] = useState<{ value: string; label: string; kode_unit?: string }[]>([])
+
+  // Santri for selected kelas
+  const [classSantris, setClassSantris] = useState<SantriItem[]>([])
+  const [isLoadingSantri, setIsLoadingSantri] = useState(false)
+
+  // Load all kelas on mount
+  useEffect(() => {
+    kelasService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setRawKelasOptions(res.map(k => ({
+        value: k.kode_kelas ?? "",
+        label: k.nama_kelas ?? k.kode_kelas ?? "",
+        kode_unit: k.kode_unit,
+      }))))
+      .catch(console.error)
+  }, [])
+
+  // Filter kelas by unit from header
+  const displayedKelasOptions = useMemo(() => {
+    let filtered = rawKelasOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item =>
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+    return filtered
+  }, [rawKelasOptions, kodeUnitFromContext])
+
+  // When unit changes, reset kelas and santri selections if no longer valid
+  useEffect(() => {
+    if (!kodeUnitFromContext) return
+    if (!catatanForm.kode_kelas) return
+    const stillValid = displayedKelasOptions.some(k => k.value === catatanForm.kode_kelas)
+    if (!stillValid) {
+      onCatatanFormChange(curr => ({ ...curr, kode_kelas: "", nomor_induk: "" }))
+    }
+  }, [kodeUnitFromContext, displayedKelasOptions, catatanForm.kode_kelas, onCatatanFormChange])
+
+  // When kelas changes, load santri for that kelas
+  useEffect(() => {
+    if (!catatanForm.kode_kelas) {
+      setClassSantris([])
+      return
+    }
+
+    let cancelled = false
+    setIsLoadingSantri(true)
+
+    santriService.getAll({ kode_kelas: catatanForm.kode_kelas, status: "AKTIF", per_page: "200" })
+      .then(res => {
+        if (!cancelled) {
+          let results = res
+          if (kodeUnitFromContext) {
+            results = results.filter(r => !r.kode_unit || r.kode_unit.toUpperCase() === kodeUnitFromContext)
+          }
+          setClassSantris(results)
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (!cancelled) setIsLoadingSantri(false)
+      })
+
+    return () => { cancelled = true }
+  }, [catatanForm.kode_kelas, kodeUnitFromContext])
+
+  // When kelas changes, reset santri if no longer in list
+  useEffect(() => {
+    if (!catatanForm.kode_kelas && catatanForm.nomor_induk) {
+      onCatatanFormChange(curr => ({ ...curr, nomor_induk: "" }))
+    } else if (catatanForm.kode_kelas && classSantris.length > 0 && catatanForm.nomor_induk) {
+      if (!classSantris.find(s => s.nomor_induk === catatanForm.nomor_induk)) {
+        onCatatanFormChange(curr => ({ ...curr, nomor_induk: "" }))
+      }
+    }
+  }, [catatanForm.kode_kelas, classSantris, catatanForm.nomor_induk, onCatatanFormChange])
 
   return (
     <Card className="border-border/50">
@@ -73,46 +143,58 @@ export function RaporGenerateCard({
       <CardContent className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label>Nomor induk</Label>
-            <Input
-              className="mt-2"
-              value={catatanForm.nomor_induk}
-              onChange={(event) => {
-                const value = event.target.value
-                onCatatanFormChange((current) => ({ ...current, nomor_induk: value }))
-                onNomorIndukSearchChange(value)
-              }}
-              placeholder="Cari nama santri atau nomor induk"
-            />
-
-            {(isSearchingSantri || santriOptions.length > 0) && (
-              <div className="mt-2 rounded-md border border-border bg-background">
-                {isSearchingSantri && (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">Mencari santri...</p>
-                )}
-
-                {!isSearchingSantri && santriOptions.length > 0 && (
-                  <div className="max-h-44 overflow-y-auto">
-                    {santriOptions.map((option) => (
-                      <button
-                        key={`${option.nomor_induk}-${option.kode_kelas || "kelas"}`}
-                        type="button"
-                        className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left hover:bg-muted/50"
-                        onClick={() => onSantriOptionPick(option)}
-                      >
-                        <span className="text-sm text-foreground">{option.nama_lengkap || "Tanpa nama"}</span>
-                        <span className="text-xs text-muted-foreground">{option.nomor_induk}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            <Label>Kelas</Label>
+            <Select 
+              value={catatanForm.kode_kelas} 
+              onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, kode_kelas: val, nomor_induk: "" }))}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Pilih Kelas" />
+              </SelectTrigger>
+              <SelectContent>
+                {displayedKelasOptions.map(k => (
+                  <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          
           <div>
-            <Label>Kode kelas</Label>
-            <Input className="mt-2" value={catatanForm.kode_kelas} onChange={(event) => onCatatanFormChange((current) => ({ ...current, kode_kelas: event.target.value }))} />
+            <Label>Santri</Label>
+            <Select
+              value={catatanForm.nomor_induk || "none"}
+              onValueChange={(val) => {
+                const selected = val === "none" ? "" : val
+                onCatatanFormChange((current) => ({ ...current, nomor_induk: selected }))
+                
+                // Set name map if available
+                const santri = classSantris.find(s => s.nomor_induk === selected)
+                if (santri && santri.nama_lengkap) {
+                   onSantriNameResolved(santri.nomor_induk, santri.nama_lengkap)
+                }
+              }}
+              disabled={!catatanForm.kode_kelas || isLoadingSantri}
+            >
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder={
+                  !catatanForm.kode_kelas ? "Pilih kelas dulu" :
+                  isLoadingSantri ? "Memuat santri..." :
+                  "Pilih Santri"
+                } />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none" disabled>
+                  {!catatanForm.kode_kelas ? "Pilih kelas dulu" : "Pilih Santri"}
+                </SelectItem>
+                {classSantris.map(s => (
+                  <SelectItem key={s.id} value={s.nomor_induk}>
+                    {s.nomor_induk} - {s.nama_lengkap}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
+          
           <div>
             <Label>Tahun ajaran</Label>
             <div className="flex h-10 mt-2 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
@@ -136,7 +218,7 @@ export function RaporGenerateCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button onClick={onGenerate} disabled={isGenerating || isPublishedReport}>
+          <Button onClick={onGenerate} disabled={isGenerating || isPublishedReport || !catatanForm.nomor_induk}>
             {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
             {isPublishedReport ? "Rapor Sudah Terbit" : "Generate Rapor"}
           </Button>
