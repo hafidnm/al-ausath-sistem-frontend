@@ -6,8 +6,6 @@ import { KkmFilters } from "./components/kkm-filters"
 import { KkmHeader } from "./components/kkm-header"
 import { KkmTable } from "./components/kkm-table"
 import { KkmItem, kkmService } from "@/lib/services/kkm.service"
-import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
-import { kelasService, KelasItem } from "@/lib/services/kelas.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
 
@@ -18,23 +16,14 @@ export default function KkmPage() {
 
   const [query, setQuery] = useState("")
   const [semester, setSemester] = useState("all")
-  const [kodeKelas, setKodeKelas] = useState("all")
   const [perPage, setPerPage] = useState("10")
   const [items, setItems] = useState<KkmItem[]>([])
-  const [kelasList, setKelasList] = useState<KelasItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
   // Track apakah ini fetch pertama setelah context ready
   const contextReadyRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
-
-  // Ambil daftar kelas untuk dropdown filter — hanya sekali, per_page kecil
-  useEffect(() => {
-    kelasService.getAll({ status: "AKTIF", per_page: "50" })
-      .then(setKelasList)
-      .catch(() => setKelasList([]))
-  }, [])
 
   const fetchKkm = useCallback(async () => {
     // Jangan fetch jika context masih loading
@@ -63,29 +52,10 @@ export default function KkmPage() {
       // Satu API call — filter query dilakukan client-side
       let data = await kkmService.getAll(sharedParams)
 
+      // Filter by kode_mapel if selected (query holds kode_mapel from dropdown)
       if (queryTrimmed) {
-        const normalizedQuery = queryTrimmed.toLowerCase()
         data = data.filter((item) =>
-          item.kode_mapel.toLowerCase().includes(normalizedQuery)
-          || (item.mapel ?? "").toLowerCase().includes(normalizedQuery)
-        )
-      }
-
-      // Filter berdasarkan kelas jika dipilih (client-side via kelas-mapel)
-      if (kodeKelas !== "all") {
-        const kelasMapelRes = await dataKelasMapelService.getAll({
-          kode_kelas: kodeKelas,
-          tahun_ajaran: tahunAjaran,
-          semester: semester === "all" ? undefined : Number(semester),
-          per_page: 500,
-        })
-        const kodeMapelDiKelas = new Set(
-          kelasMapelRes.data
-            .map((km) => (km.kode_mapel ?? "").toUpperCase())
-            .filter(Boolean)
-        )
-        data = data.filter((item) =>
-          kodeMapelDiKelas.has(item.kode_mapel.toUpperCase())
+          item.kode_mapel.toLowerCase() === queryTrimmed.toLowerCase()
         )
       }
 
@@ -101,7 +71,7 @@ export default function KkmPage() {
         setIsLoading(false)
       }
     }
-  }, [isTahunLoading, isUnitLoading, selectedTahunAjaran, selectedUnit, kodeKelas, perPage, query, semester])
+  }, [isTahunLoading, isUnitLoading, selectedTahunAjaran, selectedUnit, perPage, query, semester])
 
   // Hanya trigger fetch ketika context sudah selesai loading
   useEffect(() => {
@@ -138,9 +108,6 @@ export default function KkmPage() {
         onQueryChange={setQuery}
         semester={semester}
         onSemesterChange={setSemester}
-        kodeKelas={kodeKelas}
-        onKodeKelasChange={setKodeKelas}
-        kelasList={kelasList}
         perPage={perPage}
         onPerPageChange={setPerPage}
       />
