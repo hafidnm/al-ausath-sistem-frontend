@@ -48,7 +48,7 @@ export function KkmFilters({
     mataPelajaranService.getAll({
       kode_unit: kodeUnitFromContext || undefined,
       status: "AKTIF",
-      per_page: 200,
+      per_page: "200",
     })
       .then(rows => {
         if (!cancelled) {
