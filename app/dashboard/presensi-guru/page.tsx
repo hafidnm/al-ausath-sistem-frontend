@@ -64,7 +64,7 @@ export default function PresensiGuruPage() {
   const [selectedKelasSesi, setSelectedKelasSesi] = useState("ALL")
   const [filterSesi, setFilterSesi] = useState({
     tanggal: "",
-    status_sesi: "SELESAI",
+    status_sesi: "ALL",
     q: "",
     id_petugas_hadir: "ALL",
   })
@@ -248,6 +248,7 @@ export default function PresensiGuruPage() {
     try {
       const params: any = { ...filterSesi, per_page: 100 }
       if (params.id_petugas_hadir === "ALL") delete params.id_petugas_hadir
+      if (params.status_sesi === "ALL") delete params.status_sesi
       if (selectedKelasSesi !== "ALL") params.kode_kelas = selectedKelasSesi
       if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (selectedKodeTahun) params.tahun_ajaran = selectedKodeTahun
@@ -585,6 +586,19 @@ export default function PresensiGuruPage() {
                       onChange={(e) => setFilterSesi({ ...filterSesi, q: e.target.value })}
                     />
                   </div>
+
+                  <Select value={filterSesi.status_sesi} onValueChange={(val) => setFilterSesi({ ...filterSesi, status_sesi: val })}>
+                    <SelectTrigger className="w-36">
+                      <SelectValue placeholder="Status Sesi" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ALL">Semua Status</SelectItem>
+                      <SelectItem value="SELESAI">Selesai</SelectItem>
+                      <SelectItem value="BERLANGSUNG">Berlangsung</SelectItem>
+                      <SelectItem value="MENUNGGU_PENGGANTI">Menunggu</SelectItem>
+                      <SelectItem value="BATAL">Batal</SelectItem>
+                    </SelectContent>
+                  </Select>
                   
                   <Select value={filterSesi.id_petugas_hadir} onValueChange={(val) => setFilterSesi({ ...filterSesi, id_petugas_hadir: val })}>
                     <SelectTrigger className="w-40">
@@ -618,8 +632,7 @@ export default function PresensiGuruPage() {
                       <TableHead>Hari</TableHead>
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
-                      <TableHead>Pengajar Hadir</TableHead>
-                      <TableHead>Status Guru</TableHead>
+                      <TableHead>Pengajar & Status</TableHead>
                       <TableHead>Status Sesi</TableHead>
                       <TableHead className="text-right">Aksi</TableHead>
                     </TableRow>
@@ -641,16 +654,30 @@ export default function PresensiGuruPage() {
                           <TableCell>{sesi.hari || (sesi.jadwal as any)?.hari || "-"}</TableCell>
                           <TableCell>{sesi.mapel || sesi.mata_pelajaran || (sesi.jadwal as any)?.kelas_mapel?.mata_pelajaran?.nama_mapel || (sesi.jadwal as any)?.kelasMapel?.mataPelajaran?.nama_mapel || "-"}</TableCell>
                           <TableCell>{sesi.kelas || sesi.kode_kelas || (sesi.jadwal as any)?.kelas_mapel?.kelas?.nama_kelas || (sesi.jadwal as any)?.kelasMapel?.kelas?.nama_kelas || "-"}</TableCell>
-                          <TableCell>{
-                            petugasOptions.find(p => p.id === Number(sesi.id_petugas_hadir))?.label?.split(' (')[0] 
-                            || `ID: ${sesi.id_petugas_hadir || '-'}`
-                          }</TableCell>
                           <TableCell>
-                            {getStatusBadge(
-                              ((sesi.absensi_pengajar as any[])?.[0]?.status_kehadiran) || 
-                              (((sesi as any).absensiPengajar as any[])?.[0]?.status_kehadiran) || 
-                              "-"
-                            )}
+                            <div className="flex flex-col gap-1.5">
+                              {(() => {
+                                const absList = (sesi.absensi_pengajar || (sesi as any).absensiPengajar || []) as any[];
+                                if (absList.length === 0) {
+                                  const fallbackName = petugasOptions.find(p => p.id === Number(sesi.id_petugas_hadir))?.label?.split(' (')[0] || `ID: ${sesi.id_petugas_hadir || '-'}`;
+                                  return (
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium w-[120px] truncate" title={fallbackName}>{fallbackName}</span>
+                                      {getStatusBadge("-")}
+                                    </div>
+                                  );
+                                }
+                                return absList.map((abs: any, idx: number) => {
+                                  const petugasName = petugasOptions.find(p => p.id === Number(abs.id_petugas))?.label?.split(' (')[0] || `ID: ${abs.id_petugas}`;
+                                  return (
+                                    <div key={idx} className="flex items-center gap-2">
+                                      <span className="text-sm font-medium w-[120px] truncate" title={petugasName}>{petugasName}</span>
+                                      {getStatusBadge(abs.status_kehadiran)}
+                                    </div>
+                                  );
+                                });
+                              })()}
+                            </div>
                           </TableCell>
                           <TableCell>{getStatusBadge(sesi.status_sesi || "")}</TableCell>
                           <TableCell className="text-right">

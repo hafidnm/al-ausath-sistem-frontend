@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, LineChart, Line } from "recharts"
 import api from "@/lib/axios"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
@@ -34,12 +35,13 @@ import {
 
 interface OverviewData {
   summary: {
-    santri: { total: number; hadir: number; sakit: number; izin: number; alfa: number; percentage: number }
-    guru: { total: number; hadir: number; tidakHadir: number; percentage: number }
+    santri: { total_aktif: number; total: number; hadir: number; sakit: number; izin: number; alfa: number; percentage: number }
+    guru: { total_aktif: number; total: number; hadir: number; sakit: number; izin: number; alfa: number; tidakHadir: number; percentage: number }
   }
-  perKelas: { kelas: string; jenjang: string; total: number; hadir: number; sakit: number; izin: number; alfa: number; percentage: number }[]
+  perKelas: { kelas: string; jenjang: string; total_pertemuan: number; total: number; hadir: number; sakit: number; izin: number; alfa: number; percentage: number }[]
   perMapel: { mapel: string; guru: string; sessions: number; avgHadir: number }[]
-  guru: { id: number; nama: string; nip: string; jabatan: string; status: string; jamMasuk: string; mapelHariIni: number; keterangan?: string }[]
+  trend: { tanggal: string; hadir: number; sakit: number; izin: number; alfa: number; total_entri: number; percentage: number }[]
+  guru: { id: number; nama: string; nip: string; jabatan: string; status: string; jamMasuk: string; mapelHariIni: number; keterangan?: string; total_pertemuan: number; jumlah_hadir: number; jumlah_sakit: number; jumlah_izin: number; jumlah_alfa: number; persentase_kehadiran: number }[]
 }
 
 const getInitials = (name: string) => {
@@ -81,6 +83,7 @@ export default function PresensiOverviewPage() {
 
   const [data, setData] = useState<OverviewData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("kelas")
 
   const initDoneRef = useRef(false)
 
@@ -234,7 +237,7 @@ export default function PresensiOverviewPage() {
                   {isLoading ? <Skeleton className="h-8 w-24" /> : (
                     <>
                       <p className="text-2xl font-extrabold text-primary">{data?.summary?.santri?.hadir ?? 0}</p>
-                      <span className="text-sm text-muted-foreground">/ {data?.summary?.santri?.total ?? 0}</span>
+                      <span className="text-sm text-muted-foreground">/ {data?.summary?.santri?.total ?? 0} Entri ({data?.summary?.santri?.total_aktif ?? 0} Aktif)</span>
                     </>
                   )}
                 </div>
@@ -262,7 +265,7 @@ export default function PresensiOverviewPage() {
                   {isLoading ? <Skeleton className="h-8 w-24" /> : (
                     <>
                       <p className="text-2xl font-extrabold text-emerald-600">{data?.summary?.guru?.hadir ?? 0}</p>
-                      <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total ?? 0}</span>
+                      <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total ?? 0} Entri ({data?.summary?.guru?.total_aktif ?? 0} Aktif)</span>
                     </>
                   )}
                 </div>
@@ -316,7 +319,7 @@ export default function PresensiOverviewPage() {
                       {data?.summary?.guru?.tidakHadir ?? 0}
                     </p>
                   )}
-                  <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total ?? 0}</span>
+                  <span className="text-sm text-muted-foreground">/ {data?.summary?.guru?.total_aktif ?? 0} Aktif</span>
                 </div>
                 <p className="text-xs text-muted-foreground pt-2">Memerlukan tindak lanjut / jadwal pengganti</p>
               </div>
@@ -328,8 +331,196 @@ export default function PresensiOverviewPage() {
         </Card>
       </div>
 
+      {/* Charts Section */}
+      {!isLoading && data && (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            {/* Trend Kehadiran — Multi-line */}
+            <Card className="col-span-1 border-border/50 shadow-sm flex flex-col">
+              <CardHeader className="pb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-semibold">Trend Kehadiran Santri</CardTitle>
+                    <CardDescription>Jumlah entri absensi per tanggal sesi</CardDescription>
+                  </div>
+                </div>
+                {/* Legend */}
+                <div className="flex flex-wrap gap-4 text-xs font-semibold mt-1">
+                  <span className="flex items-center gap-1.5 text-emerald-600"><span className="w-6 h-0.5 bg-emerald-500 rounded-full inline-block"></span>Hadir</span>
+                  <span className="flex items-center gap-1.5 text-yellow-600"><span className="w-6 h-0.5 bg-yellow-500 rounded-full inline-block"></span>Sakit</span>
+                  <span className="flex items-center gap-1.5 text-blue-600"><span className="w-6 h-0.5 bg-blue-500 rounded-full inline-block"></span>Izin</span>
+                  <span className="flex items-center gap-1.5 text-red-600"><span className="w-6 h-0.5 bg-red-500 rounded-full inline-block"></span>Alfa</span>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-[300px] pt-4 pb-4 px-2">
+                {data.trend && data.trend.length > 0 ? (
+                  <div className="w-full h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={data.trend}
+                        margin={{ top: 10, right: 20, left: -20, bottom: 0 }}
+                      >
+                        <CartesianGrid
+                          strokeDasharray="3 3"
+                          vertical={true}
+                          horizontal={true}
+                          stroke="#e2e8f0"
+                        />
+                        <XAxis
+                          dataKey="tanggal"
+                          axisLine={{ stroke: "#cbd5e1" }}
+                          tickLine={{ stroke: "#cbd5e1" }}
+                          tick={{ fontSize: 11 }}
+                          tickMargin={12}
+                          tickFormatter={(val) => {
+                            const d = new Date(val);
+                            return `${d.getDate()}/${d.getMonth() + 1}`;
+                          }}
+                        />
+                        <YAxis
+                          allowDecimals={false}
+                          axisLine={{ stroke: "#cbd5e1" }}
+                          tickLine={{ stroke: "#cbd5e1" }}
+                          tick={{ fontSize: 11 }}
+                          width={38}
+                        />
+                        <Tooltip
+                          labelFormatter={(label) => {
+                            const d = new Date(label);
+                            return d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+                          }}
+                          formatter={(value: number, name: string) => {
+                            const map: Record<string, string> = { hadir: "Hadir", sakit: "Sakit", izin: "Izin", alfa: "Alfa" };
+                            return [`${value} entri`, map[name] ?? name];
+                          }}
+                          contentStyle={{
+                            borderRadius: "10px",
+                            border: "1px solid hsl(var(--border))",
+                            boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+                            fontSize: 13,
+                          }}
+                          cursor={{ stroke: "hsl(var(--muted-foreground)/0.3)", strokeWidth: 1.5 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="hadir"
+                          stroke="#10b981"
+                          strokeWidth={2.5}
+                          dot={{ r: 4, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: "#10b981", stroke: "#fff", strokeWidth: 2 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="sakit"
+                          stroke="#eab308"
+                          strokeWidth={2.5}
+                          dot={{ r: 4, fill: "#eab308", stroke: "#fff", strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: "#eab308", stroke: "#fff", strokeWidth: 2 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="izin"
+                          stroke="#3b82f6"
+                          strokeWidth={2.5}
+                          dot={{ r: 4, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: "#3b82f6", stroke: "#fff", strokeWidth: 2 }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="alfa"
+                          stroke="#ef4444"
+                          strokeWidth={2.5}
+                          dot={{ r: 4, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }}
+                          activeDot={{ r: 6, fill: "#ef4444", stroke: "#fff", strokeWidth: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Belum ada data trend kehadiran.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Tingkat Kehadiran (Dinamis Kelas/Mapel/Guru) */}
+            <Card className="col-span-1 border-border/50 shadow-sm flex flex-col">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-lg font-semibold">
+                  Tingkat Kehadiran {activeTab === 'guru' ? 'Guru' : activeTab === 'mapel' ? 'per Mapel' : 'per Kelas'}
+                </CardTitle>
+                <CardDescription>Persentase & rincian kehadiran seluruh data</CardDescription>
+              </CardHeader>
+              <CardContent className="flex-1 min-h-[300px] pt-6 pb-4">
+                {(activeTab === 'guru' && data.guru?.length > 0) || (activeTab === 'mapel' && data.perMapel?.length > 0) || (activeTab === 'kelas' && data.perKelas?.length > 0) ? (() => {
+                  const chartData = activeTab === 'guru'
+                    ? [...data.guru].sort((a, b) => b.persentase_kehadiran - a.persentase_kehadiran).map(g => ({
+                        name: g.nama.split(' ')[0],
+                        percentage: g.persentase_kehadiran,
+                        hadir: g.jumlah_hadir,
+                        sakit: g.jumlah_sakit,
+                        izin: g.jumlah_izin,
+                        alfa: g.jumlah_alfa,
+                        total: g.total_pertemuan,
+                      }))
+                    : activeTab === 'mapel'
+                      ? [...data.perMapel].sort((a, b) => b.avgHadir - a.avgHadir).map(m => ({
+                          name: m.mapel,
+                          percentage: m.avgHadir,
+                          hadir: null, sakit: null, izin: null, alfa: null, total: m.sessions,
+                        }))
+                      : [...data.perKelas].sort((a, b) => b.percentage - a.percentage).map(k => ({
+                          name: k.kelas,
+                          percentage: k.percentage,
+                          hadir: k.hadir,
+                          sakit: k.sakit,
+                          izin: k.izin,
+                          alfa: k.alfa,
+                          total: k.total,
+                        }));
+                  return (
+                    <div className="w-full h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartData} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="name" axisLine={{ stroke: "#cbd5e1" }} tickLine={false} tick={{ fontSize: 11 }} tickMargin={10} />
+                          <YAxis axisLine={{ stroke: "#cbd5e1" }} tickLine={false} tick={{ fontSize: 11 }} domain={[0, 100]} />
+                          <Tooltip
+                            cursor={false}
+                            content={({ active, payload, label }) => {
+                              if (!active || !payload?.length) return null;
+                              const d = payload[0]?.payload;
+                              return (
+                                <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", fontSize: 13, minWidth: 170 }}>
+                                  <p style={{ fontWeight: 700, marginBottom: 6, color: "#1e293b" }}>{label}</p>
+                                  <p style={{ color: "#10b981", margin: "2px 0" }}>✔ Hadir: <b>{d.hadir ?? "-"}</b></p>
+                                  <p style={{ color: "#eab308", margin: "2px 0" }}>🤒 Sakit: <b>{d.sakit ?? "-"}</b></p>
+                                  <p style={{ color: "#3b82f6", margin: "2px 0" }}>📋 Izin: <b>{d.izin ?? "-"}</b></p>
+                                  <p style={{ color: "#ef4444", margin: "2px 0" }}>✘ Alfa: <b>{d.alfa ?? "-"}</b></p>
+                                  <p style={{ color: "#64748b", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Kehadiran: <b>{d.percentage}%</b></p>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Bar dataKey="percentage" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })() : (
+                  <div className="h-full flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Belum ada data presensi untuk kriteria ini.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      )}
+
       {/* Tabs for detailed views */}
-      <Tabs defaultValue="kelas" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <TabsList className="bg-muted/50 p-1 border border-border/40">
             <TabsTrigger value="kelas" className="data-[state=active]:bg-card data-[state=active]:shadow-sm">
@@ -361,6 +552,7 @@ export default function PresensiOverviewPage() {
                     <TableRow className="bg-muted/30">
                       <TableHead className="font-bold">Kelas</TableHead>
                       <TableHead className="font-bold">Jenjang</TableHead>
+                      <TableHead className="text-center font-bold">Total Pertemuan</TableHead>
                       <TableHead className="text-center font-bold">Total Santri</TableHead>
                       <TableHead className="text-center font-bold">Hadir</TableHead>
                       <TableHead className="text-center font-bold text-yellow-600">Sakit</TableHead>
@@ -371,9 +563,9 @@ export default function PresensiOverviewPage() {
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Memuat data kelas...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Memuat data kelas...</TableCell></TableRow>
                     ) : data?.perKelas?.length === 0 ? (
-                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Belum ada absensi kelas untuk kriteria ini.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="text-center py-8 text-muted-foreground">Belum ada absensi kelas untuk kriteria ini.</TableCell></TableRow>
                     ) : (
                       data?.perKelas?.map((item, idx) => (
                         <TableRow key={idx} className="hover:bg-muted/20 transition-colors">
@@ -381,6 +573,7 @@ export default function PresensiOverviewPage() {
                           <TableCell>
                             <Badge variant="outline" className="bg-transparent border-border/60">{item.jenjang || "-"}</Badge>
                           </TableCell>
+                          <TableCell className="text-center font-medium text-foreground">{item.total_pertemuan ?? "-"}</TableCell>
                           <TableCell className="text-center font-medium text-foreground">{item.total}</TableCell>
                           <TableCell className="text-center">
                             <span className="font-semibold text-primary">{item.hadir}</span>
@@ -419,7 +612,7 @@ export default function PresensiOverviewPage() {
                       <TableHead className="font-bold">Mata Pelajaran</TableHead>
                       <TableHead className="font-bold">Guru Pengampu</TableHead>
                       <TableHead className="text-center font-bold">Total Sesi</TableHead>
-                      <TableHead className="font-bold">Rata-rata Kehadiran</TableHead>
+                      <TableHead className="font-bold">Rata-rata Kehadiran Santri</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -471,17 +664,20 @@ export default function PresensiOverviewPage() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead className="font-bold">Nama Guru</TableHead>
-                      <TableHead className="font-bold">NIP</TableHead>
                       <TableHead className="font-bold">Jabatan</TableHead>
-                      <TableHead className="font-bold">Status Kehadiran</TableHead>
-                      <TableHead className="font-bold">Keterangan Terlambat / Jam Masuk</TableHead>
+                      <TableHead className="text-center font-bold">Total Pertemuan</TableHead>
+                      <TableHead className="text-center font-bold text-emerald-600">Hadir</TableHead>
+                      <TableHead className="text-center font-bold text-yellow-600">Sakit</TableHead>
+                      <TableHead className="text-center font-bold text-blue-600">Izin</TableHead>
+                      <TableHead className="text-center font-bold text-destructive">Alfa</TableHead>
+                      <TableHead className="text-right font-bold">% Kehadiran</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {isLoading ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Memuat data guru...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Memuat data guru...</TableCell></TableRow>
                     ) : data?.guru?.length === 0 ? (
-                      <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Belum ada data absensi guru.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Belum ada data absensi guru.</TableCell></TableRow>
                     ) : (
                       data?.guru?.map((guru) => (
                         <TableRow key={guru.id} className="hover:bg-muted/20 transition-colors">
@@ -495,30 +691,21 @@ export default function PresensiOverviewPage() {
                               <span className="font-semibold text-foreground text-sm">{guru.nama}</span>
                             </div>
                           </TableCell>
-                          <TableCell className="text-muted-foreground text-sm font-medium">{guru.nip || "-"}</TableCell>
                           <TableCell className="text-foreground text-sm font-medium">{guru.jabatan}</TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1 items-start">
-                              {getStatusBadge(guru.status)}
-                              {guru.keterangan && (
-                                <span className="text-xs text-muted-foreground font-medium bg-muted px-2 py-0.5 rounded">{guru.keterangan}</span>
-                              )}
-                            </div>
+                          <TableCell className="text-center font-medium text-foreground">{(guru as any).total_pertemuan ?? 0}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-semibold text-emerald-600">{(guru as any).jumlah_hadir ?? 0}</span>
                           </TableCell>
-                          <TableCell className="text-foreground text-sm font-semibold">
-                            {guru.status?.toUpperCase() === "HADIR" ? (
-                              guru.jamMasuk?.includes("+") ? (
-                                <span className="text-amber-600 bg-amber-500/10 px-2 py-1 rounded-md text-xs">
-                                  Terlambat ({guru.jamMasuk})
-                                </span>
-                              ) : (
-                                <span className="text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-md text-xs">
-                                  Tepat Waktu
-                                </span>
-                              )
-                            ) : (
-                              <span className="text-muted-foreground font-normal">-</span>
-                            )}
+                          <TableCell className="text-center font-medium text-yellow-600">{(guru as any).jumlah_sakit ?? 0}</TableCell>
+                          <TableCell className="text-center font-medium text-blue-600">{(guru as any).jumlah_izin ?? 0}</TableCell>
+                          <TableCell className="text-center font-medium text-destructive">{(guru as any).jumlah_alfa ?? 0}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge
+                              variant="outline"
+                              className={(guru as any).persentase_kehadiran >= 90 ? 'text-emerald-600 border-emerald-200' : 'text-destructive border-destructive/30'}
+                            >
+                              {(guru as any).persentase_kehadiran ?? 0}%
+                            </Badge>
                           </TableCell>
                         </TableRow>
                       ))
