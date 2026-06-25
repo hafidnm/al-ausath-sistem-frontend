@@ -16,6 +16,7 @@ import RaporPreviewDialog from "./components/rapor-preview-dialog"
 import { RaporSummaryCards } from "./components/rapor-summary-cards"
 import { RaporTable } from "./components/rapor-table"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 type CatatanFormState = {
   nomor_induk: string
@@ -78,6 +79,7 @@ const isTerbitStatus = (status?: string) => {
 export default function AdminPanelRaporPage() {
   const router = useRouter()
   const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
+  const { selectedUnit } = useUnit()
 
   const [query, setQuery] = useState("")
   const [kodeKelas, setKodeKelas] = useState("all")
@@ -228,11 +230,14 @@ export default function AdminPanelRaporPage() {
       
       const tahunAjaranParam = selectedTahunAjaran?.nama_tahun || undefined
 
+      const kodeUnitParam = selectedUnit?.kode_unit || undefined
+
       const data = await raporService.getAll({
         q: searchText || undefined,
         nama: searchIsNomorInduk ? undefined : searchText || undefined,
         nomor_induk: searchText || undefined,
         kode_kelas: kodeKelasParam,
+        kode_unit: kodeUnitParam,
         tahun_ajaran: tahunAjaranParam,
         semester: semester === "all" ? undefined : semester,
         status: status === "all" ? undefined : status,
@@ -302,7 +307,7 @@ export default function AdminPanelRaporPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [kodeKelas, perPage, query, santriNameByNomorInduk, selectedIdentity, semester, status, selectedTahunAjaran])
+  }, [kodeKelas, perPage, query, santriNameByNomorInduk, selectedIdentity, semester, status, selectedTahunAjaran, selectedUnit])
 
   useEffect(() => {
     if (isTahunLoading) return

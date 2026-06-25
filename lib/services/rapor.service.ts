@@ -50,6 +50,7 @@ export interface GetRaporParams {
   status?: string
   nomor_induk?: string
   kode_kelas?: string
+  kode_unit?: string
   tahun_ajaran?: string
   semester?: string
   include_nilai_mapel?: boolean
