@@ -208,7 +208,13 @@ const normalizeRaporItem = (raw: any): RaporItem => ({
             : raw?.avg != null
               ? toNumber(raw?.avg, 0)
               : undefined,
-  ranking: raw?.ranking != null ? toNumber(raw?.ranking, 0) : undefined,
+  ranking: raw?.ranking != null 
+    ? toNumber(raw?.ranking, 0) 
+    : raw?.peringkat_kelas != null 
+      ? toNumber(raw?.peringkat_kelas, 0)
+      : raw?.peringkat != null
+        ? toNumber(raw?.peringkat, 0)
+        : undefined,
   catatan_wali: raw?.catatan_wali != null ? toText(raw?.catatan_wali) ?? null : undefined,
   id_wali_kelas: raw?.id_wali_kelas != null ? toNumber(raw?.id_wali_kelas, 0) : undefined,
 })

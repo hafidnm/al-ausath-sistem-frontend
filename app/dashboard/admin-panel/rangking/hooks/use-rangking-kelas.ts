@@ -4,12 +4,15 @@ import { kelasService } from "@/lib/services/kelas.service"
 import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
 import type { KelasOption, RankingItem } from "../types"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 const defaultTahunAjaran = "2025/2026"
 
 export function useRangkingKelas() {
   const { toast } = useToast()
   const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedUnit } = useUnit()
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
 
   const tahunAjaran = selectedTahunAjaran?.nama_tahun || defaultTahunAjaran
 
@@ -20,12 +23,13 @@ export function useRangkingKelas() {
   const [isLoadingKelas, setIsLoadingKelas] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
 
-  const loadKelasOptions = useCallback(async () => {
+  const loadKelasOptions = useCallback(async (unitCode: string) => {
     try {
       setIsLoadingKelas(true)
       const rows = await kelasService.getAll({
         per_page: "100",
         status: "AKTIF",
+        kode_unit: unitCode || undefined,
       })
 
       const mapped: KelasOption[] = rows.map((row) => ({
@@ -50,8 +54,18 @@ export function useRangkingKelas() {
   }, [toast])
 
   useEffect(() => {
-    void loadKelasOptions()
-  }, [loadKelasOptions])
+    void loadKelasOptions(kodeUnitFromContext)
+  }, [loadKelasOptions, kodeUnitFromContext])
+
+  useEffect(() => {
+    if (selectedClassCode && kelasOptions.length > 0) {
+      const stillValid = kelasOptions.some(k => k.kodeKelas === selectedClassCode)
+      if (!stillValid) {
+        setSelectedClassCode("")
+        setRankedData([])
+      }
+    }
+  }, [kelasOptions, selectedClassCode])
 
   const selectedClass = useMemo(() => {
     return kelasOptions.find((item) => item.kodeKelas === selectedClassCode)

@@ -150,6 +150,7 @@ export interface DataKelasImportApiResponse {
 }
 
 export interface KelasItem {
+  jenjang: any
   id: number
   kode_kelas: string
   nama_kelas?: string
