@@ -22,7 +22,7 @@ export function NilaiMapelHeader({ onAdd, onRefresh }: NilaiMapelHeaderProps) {
         </Button>
         <Button size="sm" onClick={onAdd}>
           <Plus className="w-4 h-4 mr-2" />
-          Input Nilai
+          Input / Edit Nilai
         </Button>
       </div>
     </div>

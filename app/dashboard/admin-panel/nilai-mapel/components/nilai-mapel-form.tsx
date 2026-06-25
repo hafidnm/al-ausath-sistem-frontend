@@ -45,6 +45,7 @@ import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/he
 import { semesterOptions } from "../utils/constants"
 import { downloadNilaiTemplate, parseNilaiCsv, CsvParseResult, CsvSantriRow } from "../utils/csv-helpers"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useUnit } from "@/contexts/unit-context"
 
 interface SantriRow {
   id: number
@@ -86,8 +87,11 @@ const parseNilai = (val: string): number => {
 export function NilaiMapelForm() {
   const { selectedTahunAjaran } = useTahunAjaran()
 
-  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string}[]>([])
-  const [mapelOptions, setMapelOptions] = useState<{value: string, label: string}[]>([])
+  const [rawKelasOptions, setRawKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+  const [rawMapelOptions, setRawMapelOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+  
+  const { selectedUnit } = useUnit()
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
   
   const [kodeKelas, setKodeKelas] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
@@ -118,12 +122,32 @@ export function NilaiMapelForm() {
   useEffect(() => {
     authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
     kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setKelasOptions(res.map(k => ({ value: k.kode_kelas, label: k.nama_kelas ?? k.kode_kelas }))))
+      .then(res => setRawKelasOptions(res.map(k => ({ value: k.kode_kelas ?? "", label: k.nama_kelas ?? k.kode_kelas ?? "", kode_unit: k.kode_unit }))))
       .catch(console.error)
-    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setMapelOptions(res.map(m => ({ value: m.kode_mapel, label: m.nama_mapel ?? m.kode_mapel }))))
+    mataPelajaranService.getAll({ status: "AKTIF", per_page: 200 })
+      .then(res => setRawMapelOptions(res.map(m => ({ value: m.kode_mapel ?? "", label: m.nama_mapel ?? m.kode_mapel ?? "", kode_unit: m.kode_unit ?? undefined }))))
       .catch(console.error)
   }, [])
+
+  const kelasOptions = useMemo(() => {
+    let filtered = rawKelasOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+    return filtered
+  }, [rawKelasOptions, kodeUnitFromContext])
+
+  const mapelOptions = useMemo(() => {
+    let filtered = rawMapelOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+    return filtered
+  }, [rawMapelOptions, kodeUnitFromContext])
 
   // Load KKM and Bobot when mapel/ta/semester change
   useEffect(() => {

@@ -14,8 +14,8 @@ export default function NilaiMapelPage() {
   const { selectedTahunAjaran, isLoading: isTahunLoading } = useTahunAjaran()
 
   const [nomorInduk, setNomorInduk] = useState("")
-  const [kodeMapel, setKodeMapel] = useState("")
-  const [kodeKelas, setKodeKelas] = useState("")
+  const [kodeMapel, setKodeMapel] = useState("all")
+  const [kodeKelas, setKodeKelas] = useState("all")
   const [semester, setSemester] = useState("all")
   const [perPage, setPerPage] = useState("10")
   const [items, setItems] = useState<NilaiMapelItem[]>([])
@@ -41,8 +41,8 @@ export default function NilaiMapelPage() {
 
       const data = await nilaiMapelService.getAll({
         nomor_induk: nomorInduk.trim(),
-        kode_mapel: kodeMapel.trim() || undefined,
-        kode_kelas: kodeKelas.trim() || undefined,
+        kode_mapel: kodeMapel === "all" ? undefined : kodeMapel.trim(),
+        kode_kelas: kodeKelas === "all" ? undefined : kodeKelas.trim(),
         tahun_ajaran: tahunAjaran,
         semester: semester === "all" ? undefined : semester,
         per_page: perPage,

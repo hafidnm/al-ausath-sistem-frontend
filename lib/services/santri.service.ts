@@ -83,11 +83,11 @@ export interface GetSantriParams {
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/+$/, "")
 const SANTRI_ENDPOINT = API_BASE_URL.endsWith("/api")
-  ? "/master/data-santri"
-  : "/api/master/data-santri"
-const SANTRI_FALLBACK_ENDPOINT = SANTRI_ENDPOINT === "/master/data-santri"
-  ? "/api/master/data-santri"
-  : "/master/data-santri"
+  ? "/akademik/santri"
+  : "/api/akademik/santri"
+const SANTRI_FALLBACK_ENDPOINT = SANTRI_ENDPOINT === "/akademik/santri"
+  ? "/api/akademik/santri"
+  : "/akademik/santri"
 const SANTRI_OPTIONS_ENDPOINT = API_BASE_URL.endsWith("/api")
   ? "/master/data-santri/options"
   : "/api/master/data-santri/options"

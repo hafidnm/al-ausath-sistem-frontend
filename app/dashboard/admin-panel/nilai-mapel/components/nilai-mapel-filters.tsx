@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/select"
 import { Check } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
-import { semesterOptions, tahunAjaranOptions } from "../utils/constants"
+import { semesterOptions } from "../utils/constants"
+import { useUnit } from "@/contexts/unit-context"
+import { kelasService } from "@/lib/services/kelas.service"
+import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
+import { useMemo } from "react"
 
 interface NilaiMapelFiltersProps {
   nomorInduk: string
@@ -42,159 +46,142 @@ export function NilaiMapelFilters({
   onPerPageChange,
   onApply,
 }: NilaiMapelFiltersProps) {
-  const [selectedNama, setSelectedNama] = useState("")
-  const [selectedSantriId, setSelectedSantriId] = useState<number | null>(null)
-  const [searchInput, setSearchInput] = useState("")
-  const [santriResults, setSantriResults] = useState<SantriItem[]>([])
+  const [classSantris, setClassSantris] = useState<SantriItem[]>([])
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
-  const [santriSearchError, setSantriSearchError] = useState("")
-  const [openSantriPopover, setOpenSantriPopover] = useState(false)
 
-  const applySelectedSantri = (santri: SantriItem) => {
-    onNomorIndukChange(santri.nomor_induk)
-    setSelectedNama(santri.nama_lengkap ?? "")
-    setSelectedSantriId(santri.id)
-    setSearchInput("")
-    setOpenSantriPopover(false)
-  }
+  const [rawKelasOptions, setRawKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+  const [rawMapelOptions, setRawMapelOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+
+  const { selectedUnit } = useUnit()
+  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
 
   useEffect(() => {
-    if (!searchInput.trim()) {
-      setSantriResults([])
-      setSantriSearchError("")
-      return
+    kelasService.getAll({ status: "AKTIF", per_page: "200" })
+      .then(res => setRawKelasOptions(res.map(k => ({ 
+        value: k.kode_kelas ?? "", 
+        label: k.nama_kelas ?? k.kode_kelas ?? "",
+        kode_unit: k.kode_unit
+      }))))
+      .catch(console.error)
+
+    mataPelajaranService.getAll({ status: "AKTIF", per_page: 200 })
+      .then(res => {
+        setRawMapelOptions(res.map(m => ({
+          value: m.kode_mapel ?? "",
+          label: `${m.kode_mapel} - ${m.nama_mapel}`,
+          kode_unit: m.kode_unit ?? undefined
+        })))
+      })
+      .catch(console.error)
+  }, [])
+
+  const displayedKelasOptions = useMemo(() => {
+    let filtered = rawKelasOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
     }
+    return filtered
+  }, [rawKelasOptions, kodeUnitFromContext])
 
-    let cancelled = false
+  const displayedMapelOptions = useMemo(() => {
+    let filtered = rawMapelOptions
+    if (kodeUnitFromContext) {
+      filtered = filtered.filter(item => 
+        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+      )
+    }
+    return filtered
+  }, [rawMapelOptions, kodeUnitFromContext])
 
-    const searchSantri = async () => {
-      try {
-        setIsLoadingSantri(true)
-        setSantriSearchError("")
-        const results = await santriService.search(searchInput.trim())
-        if (!cancelled) {
-          setSantriResults(results)
-        }
-      } catch {
-        if (!cancelled) {
-          setSantriResults([])
-          setSantriSearchError("Gagal mengambil data santri dari server")
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoadingSantri(false)
-        }
+  useEffect(() => {
+    if (kodeKelas && kodeKelas !== "all") {
+      let cancelled = false
+      setIsLoadingSantri(true)
+      
+      santriService.getAll({ kode_kelas: kodeKelas, status: "AKTIF", per_page: "200" })
+        .then(res => {
+          if (!cancelled) {
+            let results = res
+            if (kodeUnitFromContext) {
+               results = results.filter(r => !r.kode_unit || r.kode_unit.toUpperCase() === kodeUnitFromContext)
+            }
+            setClassSantris(results)
+          }
+        })
+        .catch(err => console.error(err))
+        .finally(() => {
+          if (!cancelled) setIsLoadingSantri(false)
+        })
+
+      return () => { cancelled = true }
+    } else {
+      setClassSantris([])
+    }
+  }, [kodeKelas, kodeUnitFromContext])
+
+  useEffect(() => {
+    if (kodeKelas === "all" && nomorInduk) {
+      onNomorIndukChange("")
+    } else if (kodeKelas !== "all" && classSantris.length > 0 && nomorInduk) {
+      if (!classSantris.find(s => s.nomor_induk === nomorInduk)) {
+        onNomorIndukChange("")
       }
     }
-
-    const timer = setTimeout(searchSantri, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [searchInput])
-
-  useEffect(() => {
-    const query = searchInput.trim().toLowerCase()
-    if (!query || selectedSantriId) return
-
-    const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-    if (exact) {
-      applySelectedSantri(exact)
-    }
-  }, [santriResults, searchInput, selectedSantriId])
-
-  useEffect(() => {
-    if (nomorInduk) return
-    setSelectedNama("")
-    setSelectedSantriId(null)
-    setSearchInput("")
-  }, [nomorInduk])
+  }, [kodeKelas, classSantris, nomorInduk, onNomorIndukChange])
 
   return (
     <Card className="border-border/50">
       <CardContent className="p-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-          <div className="relative">
-            <Input
-              value={nomorInduk && !searchInput ? `${nomorInduk}${selectedNama ? " - " + selectedNama : ""}` : searchInput}
-              placeholder="Nomor induk (wajib)"
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return
-                e.preventDefault()
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
+          <Select value={kodeKelas} onValueChange={onKodeKelasChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Semua Kelas" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Kelas</SelectItem>
+              {displayedKelasOptions.map((item) => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-                const query = searchInput.trim().toLowerCase()
-                if (!query || santriResults.length === 0) return
+          <Select 
+            value={nomorInduk || "none"} 
+            onValueChange={(val) => onNomorIndukChange(val === "none" ? "" : val)}
+            disabled={kodeKelas === "all" || isLoadingSantri}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={
+                kodeKelas === "all" ? "Pilih kelas dulu" : 
+                isLoadingSantri ? "Memuat siswa..." : 
+                "Pilih Siswa"
+              } />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none" disabled>
+                {kodeKelas === "all" ? "Pilih kelas dulu" : "Pilih Siswa"}
+              </SelectItem>
+              {classSantris.map((item) => (
+                <SelectItem key={item.id} value={item.nomor_induk}>
+                  {item.nomor_induk} - {item.nama_lengkap}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-                const exact = santriResults.find((item) => item.nomor_induk.trim().toLowerCase() === query)
-                applySelectedSantri(exact ?? santriResults[0])
-              }}
-              onChange={(e) => {
-                const value = e.target.value
-                setSearchInput(value)
-                onNomorIndukChange("")
-                setSelectedNama("")
-                setSelectedSantriId(null)
-                setOpenSantriPopover(true)
-              }}
-              onFocus={() => setOpenSantriPopover(true)}
-              onBlur={() => setTimeout(() => setOpenSantriPopover(false), 120)}
-            />
-
-            {openSantriPopover && (searchInput.trim() || isLoadingSantri || santriResults.length > 0) && (
-              <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-popover p-1 shadow-md">
-                {isLoadingSantri && (
-                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">Mencari santri...</div>
-                )}
-
-                {!isLoadingSantri && santriSearchError && (
-                  <div className="px-2 py-4 text-center text-sm text-destructive">{santriSearchError}</div>
-                )}
-
-                {!isLoadingSantri && !santriSearchError && santriResults.length === 0 && searchInput.trim() && (
-                  <div className="px-2 py-4 text-center text-sm text-muted-foreground">Tidak ada santri ditemukan</div>
-                )}
-
-                {!isLoadingSantri && santriResults.length > 0 && (
-                  <div className="max-h-60 overflow-auto">
-                    {santriResults.map((santri) => (
-                      <button
-                        key={santri.id}
-                        type="button"
-                        className="flex w-full items-start gap-2 rounded-sm px-2 py-2 text-left hover:bg-accent"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => applySelectedSantri(santri)}
-                      >
-                        <Check
-                          className={`mt-0.5 h-4 w-4 ${
-                            nomorInduk === santri.nomor_induk ? "opacity-100" : "opacity-0"
-                          }`}
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">{santri.nomor_induk} - {santri.nama_lengkap}</div>
-                          {(santri.kode_kelas ?? santri.kelas) && (
-                            <div className="text-xs text-muted-foreground">{santri.kode_kelas ?? santri.kelas}</div>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <Input
-            value={kodeMapel}
-            onChange={(e) => onKodeMapelChange(e.target.value)}
-            placeholder="Filter kode mapel"
-          />
-
-          <Input
-            value={kodeKelas}
-            onChange={(e) => onKodeKelasChange(e.target.value)}
-            placeholder="Filter kode kelas"
-          />
+          <Select value={kodeMapel} onValueChange={onKodeMapelChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Semua Mapel" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Mapel</SelectItem>
+              {displayedMapelOptions.map((item) => (
+                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
           <Select value={semester} onValueChange={onSemesterChange}>
             <SelectTrigger>
@@ -218,10 +205,10 @@ export function NilaiMapelFilters({
               <SelectItem value="50">50</SelectItem>
             </SelectContent>
           </Select>
-
-          <div className="xl:col-span-2 flex justify-end">
-            <Button onClick={onApply}>Tampilkan Data</Button>
-          </div>
+        </div>
+        
+        <div className="flex justify-end mt-4">
+          <Button onClick={onApply}>Tampilkan Data</Button>
         </div>
       </CardContent>
     </Card>
