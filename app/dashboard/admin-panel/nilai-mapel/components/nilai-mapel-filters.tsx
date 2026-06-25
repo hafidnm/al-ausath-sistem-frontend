@@ -64,7 +64,7 @@ export function NilaiMapelFilters({
       }))))
       .catch(console.error)
 
-    mataPelajaranService.getAll({ status: "AKTIF", per_page: 200 })
+    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
       .then(res => {
         setRawMapelOptions(res.map(m => ({
           value: m.kode_mapel ?? "",

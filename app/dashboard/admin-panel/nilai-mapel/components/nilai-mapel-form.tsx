@@ -124,7 +124,7 @@ export function NilaiMapelForm() {
     kelasService.getAll({ status: "AKTIF", per_page: "200" })
       .then(res => setRawKelasOptions(res.map(k => ({ value: k.kode_kelas ?? "", label: k.nama_kelas ?? k.kode_kelas ?? "", kode_unit: k.kode_unit }))))
       .catch(console.error)
-    mataPelajaranService.getAll({ status: "AKTIF", per_page: 200 })
+    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
       .then(res => setRawMapelOptions(res.map(m => ({ value: m.kode_mapel ?? "", label: m.nama_mapel ?? m.kode_mapel ?? "", kode_unit: m.kode_unit ?? undefined }))))
       .catch(console.error)
   }, [])
