@@ -46,6 +46,7 @@ export interface DataKelasMapelListParams {
   id_petugas?: number
   tahun_ajaran?: string
   semester?: number
+  include_wali?: boolean
   status?: BackendStatus
   per_page?: number
   page?: number

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useToast } from "@/hooks/use-toast"
 import { useClassStatistics, useSubjectRecap, useScoreDistribution } from "@/hooks/use-analytics-pengajar"
 import { AnalyticsQuery } from "@/lib/services/analytics-pengajar.service"
 import { getCachedUser } from "@/lib/auth-cache"
@@ -12,30 +11,33 @@ import { SubjectRecapSection } from "./components/subject-recap-section"
 import { ScoreDistributionSection } from "./components/score-distribution-section"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 
 export default function AnalitikPengajarPage() {
-  const { toast } = useToast()
   const [mounted, setMounted] = useState(false)
-  const [query, setQuery] = useState<AnalyticsQuery>({})
   const [userRole, setUserRole] = useState<unknown>("")
+  const [kodeKelas, setKodeKelas] = useState<string>("")
+  const [semester, setSemester] = useState<number>(1)
+
+  const { selectedKodeTahun } = useTahunAjaran()
 
   const {
     data: classStats,
     loading: classStatsLoading,
     fetchClassStatistics,
-  } = useClassStatistics(query)
+  } = useClassStatistics()
 
   const {
     data: subjectRecap,
     loading: subjectRecapLoading,
     fetchSubjectRecap,
-  } = useSubjectRecap(query)
+  } = useSubjectRecap()
 
   const {
     data: scoreDistribution,
     loading: scoreDistributionLoading,
     fetchScoreDistribution,
-  } = useScoreDistribution(query)
+  } = useScoreDistribution()
 
   // Check user role on mount
   useEffect(() => {
@@ -53,21 +55,30 @@ export default function AnalitikPengajarPage() {
         window.location.replace("/login")
       }
     }
-
     checkUserRole()
   }, [])
 
-  // Fetch data on component mount
+  // Auto-fetch whenever header filters change
   useEffect(() => {
-    if (mounted) {
-      fetchClassStatistics(query)
-      fetchSubjectRecap(query)
-      fetchScoreDistribution(query)
-    }
-  }, [mounted, query])
+    if (!mounted || !selectedKodeTahun) return
 
-  const handleFilterChange = (newQuery: AnalyticsQuery) => {
-    setQuery(newQuery)
+    const query: AnalyticsQuery = {
+      tahun_ajaran: selectedKodeTahun,
+      semester,
+      ...(kodeKelas ? { kode_kelas: kodeKelas } : {}),
+    }
+
+    fetchClassStatistics(query)
+    fetchSubjectRecap(query)
+    fetchScoreDistribution(query)
+  }, [mounted, selectedKodeTahun, semester, kodeKelas])
+
+  const handleKodeKelasChange = (kelas: string) => {
+    setKodeKelas(kelas)
+  }
+
+  const handleReset = () => {
+    setKodeKelas("")
   }
 
   // Only render for pengajar/guru role
@@ -75,14 +86,11 @@ export default function AnalitikPengajarPage() {
 
   const normalizeRoles = (role: unknown): string[] => {
     if (!role) return []
-
     if (Array.isArray(role)) {
       return role.flat(Infinity).map(String).map((value) => value.toLowerCase())
     }
-
     if (typeof role === "string") {
       const trimmed = role.trim()
-
       if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
         try {
           const parsed = JSON.parse(trimmed)
@@ -90,13 +98,11 @@ export default function AnalitikPengajarPage() {
             return parsed.flat(Infinity).map(String).map((value) => value.toLowerCase())
           }
         } catch {
-          // ignore parse errors and fall back to raw string
+          // ignore parse errors
         }
       }
-
       return [trimmed.toLowerCase()]
     }
-
     return [String(role).toLowerCase()]
   }
 
@@ -123,7 +129,14 @@ export default function AnalitikPengajarPage() {
     <div className="space-y-6">
       <AnalitikPengajarHeader />
 
-      <AnalitikPengajarFilters onFilterChange={handleFilterChange} loading={isLoading} />
+      <AnalitikPengajarFilters
+        kodeKelas={kodeKelas}
+        onKodeKelasChange={handleKodeKelasChange}
+        semester={semester}
+        onSemesterChange={setSemester}
+        onReset={handleReset}
+        loading={isLoading}
+      />
 
       {/* Data Sections */}
       <div className="space-y-6">
