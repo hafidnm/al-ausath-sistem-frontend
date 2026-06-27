@@ -7,8 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from "recharts"
 import { authService } from "@/lib/services/auth.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
@@ -92,6 +94,8 @@ export default function SantriPanelPage() {
   /* Filter riwayat */
   const [filterStatus, setFilterStatus] = useState("all")
   const [filterPeriode, setFilterPeriode] = useState("all")
+  const [filterTanggal, setFilterTanggal] = useState("")
+  const [mapelStats, setMapelStats] = useState<any[]>([])
   const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
   const [selectedTahunAjaran, setSelectedTahunAjaran] = useState<string>("ALL")
 
@@ -102,52 +106,57 @@ export default function SantriPanelPage() {
     }
   }, [selectedKodeTahun])
 
+  const buildDateParams = (periode: string, tanggal: string) => {
+    const params: any = {}
+    const now = new Date()
+    if (periode === "7hari") {
+      const d = new Date(); d.setDate(d.getDate() - 7); params.tanggal_mulai = d.toISOString().split('T')[0]
+    } else if (periode === "30hari") {
+      const d = new Date(); d.setDate(d.getDate() - 30); params.tanggal_mulai = d.toISOString().split('T')[0]
+    } else if (periode === "bulan-ini") {
+      const y = now.getFullYear(); const m = String(now.getMonth() + 1).padStart(2, '0'); params.tanggal_mulai = `${y}-${m}-01`
+    } else if (periode === "harian" && tanggal) {
+      params.tanggal_mulai = tanggal; params.tanggal_selesai = tanggal
+    }
+    return params
+  }
+
   /* ─── Fetch rekap ─────────────────────────────────────── */
-  const fetchRekap = async (nomorInduk: string, tahunAjaran?: string) => {
+  const fetchRekap = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
     try {
-      const params: any = { nomor_induk: nomorInduk, per_page: 1 }
+      const params: any = { nomor_induk: nomorInduk, per_page: 1, ...buildDateParams(periode, tanggal) }
       const activeTahun = tahunAjaran ?? selectedTahunAjaran
-      if (activeTahun && activeTahun !== "ALL") {
-        params.tahun_ajaran = activeTahun
-      }
+      if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
       const res = await api.get("/akademik/sesi-absensi/rekap/santri", { params })
-      const data = res.data?.data?.[0] ?? null
-      setRekap(data)
+      setRekap(res.data?.data?.[0] ?? null)
     } catch {
       toast({ title: "Gagal memuat rekap", description: "Data rekap kehadiran tidak dapat dimuat.", variant: "destructive" })
     }
   }
 
-  const fetchRiwayat = async (nomorInduk: string, periode: string, tahunAjaran?: string) => {
+  const fetchRiwayat = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
     setIsAbsensiLoading(true)
     try {
-      const params: any = { nomor_induk: nomorInduk, per_page: 100 }
-      const now = new Date()
-      
-      if (periode === "7hari") {
-        const d = new Date()
-        d.setDate(d.getDate() - 7)
-        params.tanggal_mulai = d.toISOString().split('T')[0]
-      } else if (periode === "30hari") {
-        const d = new Date()
-        d.setDate(d.getDate() - 30)
-        params.tanggal_mulai = d.toISOString().split('T')[0]
-      } else if (periode === "bulan-ini") {
-        const y = now.getFullYear()
-        const m = String(now.getMonth() + 1).padStart(2, '0')
-        params.tanggal_mulai = `${y}-${m}-01`
-      }
-
+      const params: any = { nomor_induk: nomorInduk, per_page: 100, ...buildDateParams(periode, tanggal) }
       const activeTahun = tahunAjaran ?? selectedTahunAjaran
-      if (activeTahun && activeTahun !== "ALL") {
-        params.tahun_ajaran = activeTahun
-      }
+      if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
 
       const riwayatRes = await api.get("/akademik/sesi-absensi/riwayat-santri", { params })
       setAbsensiList(riwayatRes.data?.data ?? [])
     } catch { /* ignore */ } finally {
       setIsAbsensiLoading(false)
     }
+  }
+
+  const fetchMapelStats = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
+    try {
+      const params: any = { nomor_induk: nomorInduk, ...buildDateParams(periode, tanggal) }
+      const activeTahun = tahunAjaran ?? selectedTahunAjaran
+      if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
+
+      const res = await api.get("/akademik/sesi-absensi/rekap/santri/mapel", { params })
+      setMapelStats(res.data?.data ?? [])
+    } catch { /* ignore */ }
   }
 
   /* ─── Load user + rekap ────────────────────────────────────── */
@@ -191,10 +200,13 @@ export default function SantriPanelPage() {
   useEffect(() => {
     if (!isInitDone) return
     if (user?.nomor_induk) {
-      void fetchRiwayat(user.nomor_induk, filterPeriode)
-      void fetchRekap(user.nomor_induk)
+      if (filterPeriode === "harian" && !filterTanggal) return // tunggu tanggal diisi
+
+      void fetchRiwayat(user.nomor_induk, filterPeriode, filterTanggal)
+      void fetchRekap(user.nomor_induk, filterPeriode, filterTanggal)
+      void fetchMapelStats(user.nomor_induk, filterPeriode, filterTanggal)
     }
-  }, [isInitDone, filterPeriode, selectedTahunAjaran, user?.nomor_induk])
+  }, [isInitDone, filterPeriode, filterTanggal, selectedTahunAjaran, user?.nomor_induk])
 
   /* ─── Computed ─────────────────────────────────────────────── */
   const hadir = Number(rekap?.jumlah_hadir ?? 0)
@@ -350,8 +362,17 @@ export default function SantriPanelPage() {
                       <SelectItem value="7hari">7 Hari Terakhir</SelectItem>
                       <SelectItem value="30hari">30 Hari Terakhir</SelectItem>
                       <SelectItem value="bulan-ini">Bulan Ini</SelectItem>
+                      <SelectItem value="harian">Harian</SelectItem>
                     </SelectContent>
                   </Select>
+                  {filterPeriode === "harian" && (
+                    <Input 
+                      type="date" 
+                      className="w-[140px]" 
+                      value={filterTanggal} 
+                      onChange={(e) => setFilterTanggal(e.target.value)} 
+                    />
+                  )}
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
                     <SelectTrigger className="w-[140px]">
                       <SelectValue />
@@ -407,8 +428,9 @@ export default function SantriPanelPage() {
             </CardContent>
           </Card>
 
-          {/* Rekap Ringkasan */}
-          <Card className="border-border/50">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Rekap Ringkasan */}
+            <Card className="col-span-1 border-border/50 h-full">
             <CardHeader className="pb-2">
               <CardTitle className="text-base flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-primary" />
@@ -416,7 +438,7 @@ export default function SantriPanelPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 {[
                   ["Total Pertemuan", total],
                   ["Hadir", hadir],
@@ -432,7 +454,57 @@ export default function SantriPanelPage() {
                 ))}
               </div>
             </CardContent>
-          </Card>
+            </Card>
+
+            {/* Bar Chart Kehadiran Mapel */}
+            <Card className="col-span-1 lg:col-span-2 border-border/50 h-full">
+            <CardHeader className="pb-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-primary" />
+                Statistik Kehadiran per Mata Pelajaran
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 pb-4">
+              {mapelStats.length > 0 ? (
+                <div className="w-full h-[280px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={mapelStats.sort((a, b) => b.persentase_kehadiran - a.persentase_kehadiran)}
+                      margin={{ top: 5, right: 10, left: -25, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis dataKey="nama_mapel" axisLine={{ stroke: "#cbd5e1" }} tickLine={false} tick={{ fontSize: 11 }} tickMargin={10} />
+                      <YAxis axisLine={{ stroke: "#cbd5e1" }} tickLine={false} tick={{ fontSize: 11 }} domain={[0, 100]} />
+                      <Tooltip
+                        cursor={false}
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null;
+                          const d = payload[0]?.payload;
+                          return (
+                            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 14px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", fontSize: 13, minWidth: 170 }}>
+                              <p style={{ fontWeight: 700, marginBottom: 6, color: "#1e293b" }}>{label}</p>
+                              <p style={{ color: "#10b981", margin: "2px 0" }}>✔ Hadir: <b>{d.jumlah_hadir ?? "-"}</b></p>
+                              <p style={{ color: "#eab308", margin: "2px 0" }}>🤒 Sakit: <b>{d.jumlah_sakit ?? "-"}</b></p>
+                              <p style={{ color: "#3b82f6", margin: "2px 0" }}>📋 Izin: <b>{d.jumlah_izin ?? "-"}</b></p>
+                              <p style={{ color: "#ef4444", margin: "2px 0" }}>✘ Alfa: <b>{d.jumlah_alfa ?? "-"}</b></p>
+                              <p style={{ color: "#64748b", marginTop: 6, paddingTop: 6, borderTop: "1px solid #f1f5f9" }}>Kehadiran: <b>{d.persentase_kehadiran}%</b></p>
+                            </div>
+                          );
+                        }}
+                      />
+                      <Bar dataKey="persentase_kehadiran" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="py-12 text-center flex flex-col items-center justify-center h-[280px]">
+                  <Award className="h-12 w-12 text-muted-foreground/30 mb-3" />
+                  <p className="text-muted-foreground text-sm">Belum ada statistik per mapel.</p>
+                </div>
+              )}
+            </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Tab Nilai Mapel */}

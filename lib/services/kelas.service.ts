@@ -150,7 +150,7 @@ export interface DataKelasImportApiResponse {
 }
 
 export interface KelasItem {
-  jenjang: any
+  jenjang?: string
   id: number
   kode_kelas: string
   nama_kelas?: string
@@ -355,6 +355,7 @@ const normalizeKelasItem = (raw: any): KelasItem => ({
     ?? raw?.tahun_ajaran_relasi?.tahun_ajaran,
   ),
   kode_unit: toText(raw?.kode_unit ?? raw?.kelas?.kode_unit),
+  jenjang: toText(raw?.jenjang ?? raw?.kelas?.jenjang),
   status: toText(raw?.status ?? raw?.kelas?.status),
 })
 
