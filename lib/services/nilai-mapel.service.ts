@@ -14,6 +14,7 @@ export interface NilaiMapelUlanganItem {
 }
 
 export interface NilaiMapelItem {
+  nilai_akhir_mapel?: number
   id: number
   nomor_induk: string
   nama_santri?: string
