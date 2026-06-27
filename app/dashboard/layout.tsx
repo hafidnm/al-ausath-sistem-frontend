@@ -12,6 +12,7 @@ import { authService } from "@/lib/services/auth.service"
 import { getCachedUser } from "@/lib/auth-cache"
 import { TahunAjaranProvider, useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { UnitProvider, useUnit } from "@/contexts/unit-context"
+import { SemesterProvider, useSemester } from "@/contexts/semester-context"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -104,6 +105,40 @@ function TahunAjaranSelector() {
             </DropdownMenuItem>
           )
         })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function SemesterSelector() {
+  const { semester, setSemester } = useSemester()
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-medium hidden sm:flex">
+          <Calendar className="w-3.5 h-3.5 text-primary" />
+          <span>Semester {semester === 1 ? "Ganjil" : "Genap"}</span>
+          <ChevronDown className="w-3 h-3 text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Pilih Semester</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className={cn("cursor-pointer text-sm", semester === 1 && "font-semibold text-primary")}
+          onClick={() => setSemester(1)}
+        >
+          Ganjil (1)
+          {semester === 1 && <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Aktif</span>}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className={cn("cursor-pointer text-sm", semester === 2 && "font-semibold text-primary")}
+          onClick={() => setSemester(2)}
+        >
+          Genap (2)
+          {semester === 2 && <span className="ml-auto text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full">Aktif</span>}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -409,6 +444,7 @@ export default function DashboardLayout({
   return (
     <UnitProvider>
     <TahunAjaranProvider>
+    <SemesterProvider>
     <div className="min-h-screen bg-background">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
@@ -598,6 +634,8 @@ export default function DashboardLayout({
               </div>
               {/* Tahun Ajaran Global Selector */}
               <TahunAjaranSelector />
+              {/* Semester Global Selector — hanya untuk santri */}
+              {role === "santri" && <SemesterSelector />}
               {/* Unit / Jenjang Global Selector */}
               <UnitSelector role={role} />
             </div>
@@ -652,6 +690,7 @@ export default function DashboardLayout({
         <main className="p-4 lg:p-6">{children}</main>
       </div>
     </div>
+    </SemesterProvider>
     </TahunAjaranProvider>
     </UnitProvider>
   )
