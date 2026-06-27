@@ -71,9 +71,33 @@ export default function PpdbPembayaranPage() {
   useEffect(() => {
     if (!data) return;
 
-    if (data.step !== 'pembayaran-ppdb' && data.step !== 'siap-menjadi-santri') {
+    // Redirect mundur jika step awal belum selesai
+    if (!data.formCompleted) {
       router.replace('/ppdb/dashboard');
+      return;
     }
+    const hasSelectedInfaq =
+      (data.pilihanUangGedung === 1 || data.pilihanUangGedung === 2) &&
+      (data.pilihanInfaqBulanan === 1 || data.pilihanInfaqBulanan === 2);
+    if (!hasSelectedInfaq) {
+      router.replace('/ppdb/dashboard/infaq');
+      return;
+    }
+
+    // Redirect maju jika pembayaran sudah diverifikasi
+    const ppdbAdminPaid = [
+      'menunggu_verifikasi', 'menunggu_konfirmasi', 'terverifikasi', 'lunas', 'dp',
+    ].includes(data.pembayaranPpdb?.status || '');
+
+    if (ppdbAdminPaid) {
+      const statusVerifikasi = (data.statusVerifikasi || data.status || '').toLowerCase();
+      if (statusVerifikasi === 'diterima' || statusVerifikasi === 'accepted' || statusVerifikasi === 'lulus' || data.step === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/siap-menjadi-santri');
+      } else {
+        router.replace('/ppdb/dashboard/pengumuman');
+      }
+    }
+    // Jangan redirect ke /ppdb/tes dari halaman pembayaran — mencegah loop!
   }, [data, router]);
 
   useEffect(() => {

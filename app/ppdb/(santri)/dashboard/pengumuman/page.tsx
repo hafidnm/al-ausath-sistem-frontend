@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
-import { formatAnnouncementDate } from '@/lib/ppdb/santri/dashboard';
+import { formatAnnouncementDate, getCorrectFrontendStep } from '@/lib/ppdb/santri/dashboard';
 
 // POIN 18: Alur baru — halaman pengumuman menampilkan DITERIMA atau DITOLAK
 // berdasarkan status verifikasi backend.
@@ -35,19 +35,19 @@ export default function PpdbPengumumanPage() {
   useEffect(() => {
     if (!data) return;
 
-    const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
-
-    if (data.step === 'tes' && !hasSubmittedTesAnswer) {
-      router.replace('/ppdb/tes');
-      return;
-    }
-
-    if (
-      data.step !== 'menunggu-pengumuman' &&
-      data.step !== 'pengumuman' &&
-      data.step !== 'siap-menjadi-santri'
-    ) {
-      router.replace('/ppdb/dashboard');
+    const correctStep = getCorrectFrontendStep(data);
+    if (correctStep !== 'pengumuman' && correctStep !== 'menunggu-pengumuman') {
+      if (correctStep === 'lengkapi-form') {
+        router.replace('/ppdb/dashboard');
+      } else if (correctStep === 'infaq') {
+        router.replace('/ppdb/dashboard/infaq');
+      } else if (correctStep === 'tes') {
+        router.replace('/ppdb/tes');
+      } else if (correctStep === 'pembayaran-ppdb') {
+        router.replace('/ppdb/dashboard/pembayaran');
+      } else if (correctStep === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/siap-menjadi-santri');
+      }
       return;
     }
   }, [data, router]);

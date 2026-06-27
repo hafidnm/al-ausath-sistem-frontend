@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Sparkles, CheckCircle2, User, Landmark, GraduationCap, ArrowRight, BookOpen, Loader2 } from 'lucide-react';
+import { Sparkles, CheckCircle2, User, Landmark, GraduationCap, ArrowRight, BookOpen, Loader2, LogIn } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
+import { getCorrectFrontendStep } from '@/lib/ppdb/santri/dashboard';
 
 export default function SiapMenjadiSantriPage() {
   const router = useRouter();
@@ -27,9 +28,20 @@ export default function SiapMenjadiSantriPage() {
   useEffect(() => {
     if (!data) return;
 
-    // Redirect if they shouldn't be here
-    if (data.step !== 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard');
+    // Redirect jika tidak seharusnya berada di halaman ini
+    const correctStep = getCorrectFrontendStep(data);
+    if (correctStep !== 'siap-menjadi-santri') {
+      if (correctStep === 'lengkapi-form') {
+        router.replace('/ppdb/dashboard');
+      } else if (correctStep === 'infaq') {
+        router.replace('/ppdb/dashboard/infaq');
+      } else if (correctStep === 'tes') {
+        router.replace('/ppdb/tes');
+      } else if (correctStep === 'pembayaran-ppdb') {
+        router.replace('/ppdb/dashboard/pembayaran');
+      } else if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
+        router.replace('/ppdb/dashboard/pengumuman');
+      }
     }
   }, [data, router]);
 
@@ -56,7 +68,7 @@ export default function SiapMenjadiSantriPage() {
           Selamat, Anda Resmi Diterima!
         </h1>
         <p className="text-lg text-muted-foreground max-w-lg mx-auto">
-          Seluruh rangkaian administrasi PPDB, Uang Pangkal, dan SPP telah diverifikasi secara lengkap. Selamat bergabung dengan keluarga besar pondok pesantren kami!
+          Seluruh rangkaian pendaftaran dan administrasi PPDB telah berhasil diverifikasi. Selamat bergabung dengan keluarga besar pondok pesantren kami!
         </p>
 
         <Card className="border-emerald-200/50 shadow-lg text-left overflow-hidden">
@@ -117,8 +129,9 @@ export default function SiapMenjadiSantriPage() {
           </CardContent>
           <CardFooter className="bg-muted/30 border-t py-4 flex flex-col sm:flex-row gap-3 justify-between">
             <Button variant="outline" asChild className="w-full sm:w-auto">
-              <Link href="/ppdb/dashboard">
-                Kembali ke Dashboard
+              <Link href="/login" className="inline-flex items-center gap-1.5">
+                <LogIn className="w-4 h-4" />
+                Login ke Portal Santri
               </Link>
             </Button>
             <Button asChild className="w-full sm:w-auto">

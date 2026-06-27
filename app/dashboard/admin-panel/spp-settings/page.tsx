@@ -55,7 +55,7 @@ import { sppService } from "@/lib/services/spp.service"
 export default function SppSettingsPage() {
   const { toast } = useToast()
   const { data: settings, loading, fetchSettings } = useSppSettings()
-  const { units, kelas, tahunAjaran, categories, loading: masterLoading } = useMasterData()
+  const { units, kelas, tahunAjaran, categories, loading: masterLoading } = useMasterData(isDialogOpen)
   const { createSetting, loading: creating } = useCreateSppSetting()
   const { updateSetting, loading: updating } = useUpdateSppSetting()
   const { deleteSetting } = useDeleteSppSetting()
