@@ -1030,7 +1030,13 @@ export default function AkunSantriPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Semua Kelas Tanpa Akun</SelectItem>
-                    {syncKelasOptions.map((item) => {
+                    {syncKelasOptions
+                      .filter((item) => {
+                        if (selectedKodeTahun && item.tahun_ajaran !== selectedKodeTahun) return false
+                        if (selectedKodeUnit && item.kode_unit !== selectedKodeUnit) return false
+                        return true
+                      })
+                      .map((item) => {
                       const kode = toText(item.kode_kelas)
                       const nama = toText(item.nama_kelas)
                       const jumlah = toNumber(item.jumlah_santri_belum_akun)
