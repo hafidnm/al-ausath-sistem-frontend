@@ -42,6 +42,14 @@ export default function PpdbPengumumanPage() {
       return;
     }
 
+    if (
+      data.step !== 'menunggu-pengumuman' &&
+      data.step !== 'pengumuman' &&
+      data.step !== 'siap-menjadi-santri'
+    ) {
+      router.replace('/ppdb/dashboard');
+      return;
+    }
   }, [data, router]);
 
   if (loading && !data) {
@@ -130,7 +138,7 @@ export default function PpdbPengumumanPage() {
             </CardContent>
             <CardFooter className="pt-4 pb-6 flex flex-col gap-2">
               <Button className="w-full bg-emerald-600 hover:bg-emerald-700" asChild>
-                <Link href="/ppdb/login">
+                <Link href="/login">
                   <LogIn className="w-4 h-4 mr-2" />
                   Login ke Portal Santri
                 </Link>
