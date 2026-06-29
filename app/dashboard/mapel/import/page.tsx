@@ -16,7 +16,6 @@ type PreviewRow = {
   nama_mapel: string
   kode_unit: string
   kelompok_mapel: string
-  urutan: string
   keterangan: string
   status: string
 }
@@ -64,7 +63,6 @@ const parseCsvText = (content: string): PreviewRow[] => {
       nama_mapel: rowObj.nama_mapel || "",
       kode_unit: rowObj.kode_unit || "",
       kelompok_mapel: rowObj.kelompok_mapel || "",
-      urutan: rowObj.urutan || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
     }
@@ -102,7 +100,6 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       nama_mapel: rowObj.nama_mapel || "",
       kode_unit: rowObj.kode_unit || "",
       kelompok_mapel: rowObj.kelompok_mapel || "",
-      urutan: rowObj.urutan || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
     }
@@ -326,7 +323,6 @@ export default function MapelImportPage() {
                 <TableHead>NAMA MAPEL</TableHead>
                 <TableHead>KODE UNIT</TableHead>
                 <TableHead>KELOMPOK MAPEL</TableHead>
-                <TableHead>URUTAN</TableHead>
                 <TableHead>KETERANGAN</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>AKSI IMPOR</TableHead>
@@ -335,13 +331,13 @@ export default function MapelImportPage() {
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -353,7 +349,6 @@ export default function MapelImportPage() {
                     <TableCell>{row.nama_mapel || "-"}</TableCell>
                     <TableCell>{row.kode_unit || "-"}</TableCell>
                     <TableCell>{row.kelompok_mapel || "-"}</TableCell>
-                    <TableCell>{row.urutan || "-"}</TableCell>
                     <TableCell>{row.keterangan || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
                     <TableCell>

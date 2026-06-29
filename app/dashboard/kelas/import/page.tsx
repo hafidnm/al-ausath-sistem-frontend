@@ -17,7 +17,7 @@ type PreviewRow = {
   nama_jurusan: string
   tahun_ajaran: string
   status: string
-  id_wali_kelas: string
+  wali_kelas: string
 }
 
 const SUPPORTED_IMPORT_EXTENSIONS = ["csv", "txt", "xlsx", "xls"] as const
@@ -60,7 +60,7 @@ const parseCsvText = (content: string): PreviewRow[] => {
       nama_jurusan: rowObj.nama_jurusan || "",
       tahun_ajaran: rowObj.tahun_ajaran || "",
       status: rowObj.status || "",
-      id_wali_kelas: rowObj.id_wali_kelas || "",
+      wali_kelas: rowObj.wali_kelas || "",
     }
   })
 }
@@ -98,7 +98,7 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       nama_jurusan: rowObj.nama_jurusan || "",
       tahun_ajaran: rowObj.tahun_ajaran || "",
       status: rowObj.status || "",
-      id_wali_kelas: rowObj.id_wali_kelas || "",
+      wali_kelas: rowObj.wali_kelas || "",
     }
   })
 }
@@ -293,7 +293,7 @@ export default function KelasImportPage() {
                 <TableHead>NAMA JURUSAN</TableHead>
                 <TableHead>TAHUN AJARAN</TableHead>
                 <TableHead>STATUS</TableHead>
-                <TableHead>ID WALI KELAS</TableHead>
+                <TableHead>WALI KELAS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -319,7 +319,7 @@ export default function KelasImportPage() {
                     <TableCell>{row.nama_jurusan || "-"}</TableCell>
                     <TableCell>{row.tahun_ajaran || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
-                    <TableCell>{row.id_wali_kelas || "-"}</TableCell>
+                    <TableCell>{row.wali_kelas || "-"}</TableCell>
                   </TableRow>
                 ))
               )}

@@ -23,7 +23,7 @@ import {
   DataKelasDependencySummary,
   dataKelasService,
 } from "@/lib/services/kelas.service"
-import { dataUnitService } from "@/lib/services/unit.service"
+import { useUnit } from "@/contexts/unit-context"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
 import { ArrowLeft, RotateCcw, Trash2 } from "lucide-react"
 
@@ -37,10 +37,7 @@ interface TrashRow {
   deletedAt: string
 }
 
-interface UnitOption {
-  value: string
-  label: string
-}
+
 
 interface TahunAjaranOption {
   value: string
@@ -124,7 +121,8 @@ export default function KelasTrashPage() {
   const [rows, setRows] = useState<TrashRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
+  const { selectedKodeUnit } = useUnit()
+
   const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
@@ -133,11 +131,9 @@ export default function KelasTrashPage() {
   const [totalPages, setTotalPages] = useState(1)
 
   const [draftKeyword, setDraftKeyword] = useState("")
-  const [draftUnit, setDraftUnit] = useState("all")
   const [draftTahun, setDraftTahun] = useState("all")
 
   const [keyword, setKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState("all")
   const [tahunFilter, setTahunFilter] = useState("all")
 
   const [isForceDialogOpen, setIsForceDialogOpen] = useState(false)
@@ -166,7 +162,7 @@ export default function KelasTrashPage() {
         page: currentPage,
         per_page: rowsLimit,
         q: keyword.trim() || undefined,
-        kode_unit: unitFilter === "all" ? undefined : unitFilter,
+        kode_unit: selectedKodeUnit || undefined,
         tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
       })
 
@@ -189,17 +185,7 @@ export default function KelasTrashPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [unitResult, tahunResult] = await Promise.all([
-          dataUnitService.getAll({ page: 1, per_page: 200 }),
-          tahunAjaranService.getAll({ page: 1, per_page: 200 }),
-        ])
-
-        const units: UnitOption[] = []
-        for (const item of unitResult.data) {
-          const code = toText(item.kode_unit).trim()
-          if (!code) continue
-          units.push({ value: code, label: toText(item.nama_unit).trim() || code })
-        }
+        const tahunResult = await tahunAjaranService.getAll({ page: 1, per_page: 200 })
 
         const years: TahunAjaranOption[] = []
         for (const item of tahunResult.data) {
@@ -208,10 +194,8 @@ export default function KelasTrashPage() {
           years.push({ value: code, label: toText(item.nama_tahun).trim() || code })
         }
 
-        setUnitOptions(units)
         setTahunOptions(years)
       } catch {
-        setUnitOptions([])
         setTahunOptions([])
       }
     }
@@ -221,22 +205,19 @@ export default function KelasTrashPage() {
 
   useEffect(() => {
     void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, unitFilter, tahunFilter])
+  }, [currentPage, rowsPerPage, keyword, selectedKodeUnit, tahunFilter])
 
   const applyFilter = () => {
     setKeyword(draftKeyword)
-    setUnitFilter(draftUnit)
     setTahunFilter(draftTahun)
     setCurrentPage(1)
   }
 
   const resetFilter = () => {
     setDraftKeyword("")
-    setDraftUnit("all")
     setDraftTahun("all")
 
     setKeyword("")
-    setUnitFilter("all")
     setTahunFilter("all")
     setCurrentPage(1)
   }
@@ -354,22 +335,7 @@ export default function KelasTrashPage() {
                 onChange={(event) => setDraftKeyword(event.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Pilih Unit</Label>
-              <Select value={draftUnit} onValueChange={setDraftUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Unit</SelectItem>
-                  {unitOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
             <div className="space-y-2">
               <Label>Tahun Ajaran</Label>
               <Select value={draftTahun} onValueChange={setDraftTahun}>

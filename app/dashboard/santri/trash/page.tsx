@@ -25,7 +25,7 @@ import {
   dataSantriService,
 } from "@/lib/services/santri.service"
 import { tahunAjaranService } from "@/lib/services/tahun-ajaran.service"
-import { dataUnitService } from "@/lib/services/unit.service"
+import { useUnit } from "@/contexts/unit-context"
 import { ArrowLeft, RotateCcw, Trash2 } from "lucide-react"
 
 interface TrashRow {
@@ -41,10 +41,7 @@ interface TrashRow {
   deletedAt: string
 }
 
-interface UnitOption {
-  value: string
-  label: string
-}
+
 
 interface KelasOption {
   value: string
@@ -145,7 +142,8 @@ export default function SantriTrashPage() {
   const [rows, setRows] = useState<TrashRow[]>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([])
+  const { selectedKodeUnit } = useUnit()
+
   const [kelasOptions, setKelasOptions] = useState<KelasOption[]>([])
   const [tahunOptions, setTahunOptions] = useState<TahunAjaranOption[]>([])
 
@@ -155,13 +153,11 @@ export default function SantriTrashPage() {
   const [totalPages, setTotalPages] = useState(1)
 
   const [draftKeyword, setDraftKeyword] = useState("")
-  const [draftUnit, setDraftUnit] = useState("all")
   const [draftKelas, setDraftKelas] = useState("all")
   const [draftTahun, setDraftTahun] = useState("all")
   const [draftStatus, setDraftStatus] = useState("all")
 
   const [keyword, setKeyword] = useState("")
-  const [unitFilter, setUnitFilter] = useState("all")
   const [kelasFilter, setKelasFilter] = useState("all")
   const [tahunFilter, setTahunFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
@@ -173,9 +169,9 @@ export default function SantriTrashPage() {
   const rowsLimit = Number(rowsPerPage)
 
   const filteredKelasOptions = useMemo(() => {
-    if (draftUnit === "all") return kelasOptions
-    return kelasOptions.filter((option) => option.kodeUnit === draftUnit)
-  }, [draftUnit, kelasOptions])
+    if (!selectedKodeUnit) return kelasOptions
+    return kelasOptions.filter((option) => option.kodeUnit === selectedKodeUnit)
+  }, [selectedKodeUnit, kelasOptions])
 
   const dependencyItems = useMemo(() => {
     const dep = dependencySummary || {}
@@ -198,7 +194,7 @@ export default function SantriTrashPage() {
         per_page: rowsLimit,
         q: keyword.trim() || undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
-        kode_unit: unitFilter === "all" ? undefined : unitFilter,
+        kode_unit: selectedKodeUnit || undefined,
         kode_kelas: kelasFilter === "all" ? undefined : kelasFilter,
         tahun_ajaran: tahunFilter === "all" ? undefined : tahunFilter,
       })
@@ -222,18 +218,10 @@ export default function SantriTrashPage() {
   useEffect(() => {
     const loadOptions = async () => {
       try {
-        const [unitResult, tahunResult, kelasResult] = await Promise.all([
-          dataUnitService.getAll({ page: 1, per_page: 200 }),
+        const [tahunResult, kelasResult] = await Promise.all([
           tahunAjaranService.getAll({ page: 1, per_page: 200 }),
           dataKelasService.getAll({ page: 1, per_page: 300 }),
         ])
-
-        const units: UnitOption[] = []
-        for (const item of unitResult.data) {
-          const code = toText(item.kode_unit).trim()
-          if (!code) continue
-          units.push({ value: code, label: toText(item.nama_unit).trim() || code })
-        }
 
         const years: TahunAjaranOption[] = []
         for (const item of tahunResult.data) {
@@ -255,11 +243,9 @@ export default function SantriTrashPage() {
           })
         }
 
-        setUnitOptions(units)
         setTahunOptions(years)
         setKelasOptions(kelas)
       } catch {
-        setUnitOptions([])
         setTahunOptions([])
         setKelasOptions([])
       }
@@ -276,11 +262,10 @@ export default function SantriTrashPage() {
 
   useEffect(() => {
     void fetchRows()
-  }, [currentPage, rowsPerPage, keyword, unitFilter, kelasFilter, tahunFilter, statusFilter])
+  }, [currentPage, rowsPerPage, keyword, selectedKodeUnit, kelasFilter, tahunFilter, statusFilter])
 
   const applyFilter = () => {
     setKeyword(draftKeyword)
-    setUnitFilter(draftUnit)
     setKelasFilter(draftKelas)
     setTahunFilter(draftTahun)
     setStatusFilter(draftStatus)
@@ -289,13 +274,11 @@ export default function SantriTrashPage() {
 
   const resetFilter = () => {
     setDraftKeyword("")
-    setDraftUnit("all")
     setDraftKelas("all")
     setDraftTahun("all")
     setDraftStatus("all")
 
     setKeyword("")
-    setUnitFilter("all")
     setKelasFilter("all")
     setTahunFilter("all")
     setStatusFilter("all")
@@ -416,22 +399,7 @@ export default function SantriTrashPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Pilih Unit</Label>
-              <Select value={draftUnit} onValueChange={setDraftUnit}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Semua Unit</SelectItem>
-                  {unitOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+
 
             <div className="space-y-2">
               <Label>Pilih Kelas</Label>
