@@ -69,6 +69,20 @@ const formatDate = (value: string | null) => {
   return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+const resolveStorageUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  const storageIndex = url.indexOf('/storage/');
+  let cleanUrl = url;
+  if (storageIndex !== -1) {
+    cleanUrl = url.substring(storageIndex);
+  }
+  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) return cleanUrl;
+  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
+  if (cleanUrl.startsWith("/storage/")) return `${base}${cleanUrl}`;
+  if (cleanUrl.startsWith("storage/")) return `${base}/${cleanUrl}`;
+  return `${base}/storage/${cleanUrl.replace(/^\//, "")}`;
+}
+
 type InvoiceRow = {
   id_pembayaran: number
   nomor_invoice: string
@@ -745,19 +759,7 @@ export default function SppTagihanDetailPage() {
                 <div className="mt-4 p-4 rounded-lg border bg-muted/40 space-y-2">
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">Bukti Transfer / Bayar</span>
                   {(() => {
-                    const resolvedUrl = (() => {
-                      let url = selectedInvoice.bukti_bayar_url;
-                      if (!url) return "";
-                      const storageIndex = url.indexOf('/storage/');
-                      if (storageIndex !== -1) {
-                        url = url.substring(storageIndex);
-                      }
-                      if (url.startsWith("http://") || url.startsWith("https://")) return url;
-                      const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
-                      if (url.startsWith("/storage/")) return `${base}${url}`;
-                      if (url.startsWith("storage/")) return `${base}/${url}`;
-                      return `${base}/storage/${url.replace(/^\//, "")}`;
-                    })();
+                    const resolvedUrl = resolveStorageUrl(selectedInvoice.bukti_bayar_url);
 
                     return resolvedUrl.toLowerCase().endsWith('.pdf') ? (
                       <Button variant="outline" size="sm" className="w-full flex items-center justify-center gap-1.5" asChild>
@@ -793,7 +795,7 @@ export default function SppTagihanDetailPage() {
                   </div>
                   {selectedInvoice.kwitansi_url && (
                     <Button variant="ghost" size="sm" className="text-emerald-700 hover:text-emerald-800" asChild>
-                      <a href={selectedInvoice.kwitansi_url} target="_blank" rel="noreferrer">
+                      <a href={resolveStorageUrl(selectedInvoice.kwitansi_url)} target="_blank" rel="noreferrer">
                         <Download className="w-4 h-4 mr-1" /> Kwitansi
                       </a>
                     </Button>
