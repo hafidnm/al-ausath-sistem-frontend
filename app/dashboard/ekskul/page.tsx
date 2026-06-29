@@ -114,6 +114,8 @@ export default function EkskulPage() {
 
   const [filterStatus, setFilterStatus] = useState("all")
   const [draftStatus, setDraftStatus] = useState("all")
+  const [filterPendaftaran, setFilterPendaftaran] = useState("all")
+  const [draftPendaftaran, setDraftPendaftaran] = useState("all")
 
   const fetchRows = async () => {
     setIsLoading(true)
@@ -121,6 +123,7 @@ export default function EkskulPage() {
       const params: Record<string, unknown> = { all: true }
       if (selectedKodeUnit) params.kode_unit = selectedKodeUnit
       if (filterStatus !== "all") params.status = filterStatus
+      if (filterPendaftaran !== "all") params.status_pendaftaran = filterPendaftaran
       const result = await ekskulService.getAll(params)
       setRows(result.data ?? result)
     } catch {
@@ -155,7 +158,7 @@ export default function EkskulPage() {
   useEffect(() => {
     if (!initDoneRef.current) return
     void fetchRows()
-  }, [selectedKodeUnit, filterStatus])
+  }, [selectedKodeUnit, filterStatus, filterPendaftaran])
 
   const handleCreate = async () => {
     if (!formData.nama_ekskul.trim()) {
@@ -257,9 +260,23 @@ export default function EkskulPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground">Pendaftaran</Label>
+            <Select value={draftPendaftaran} onValueChange={setDraftPendaftaran}>
+              <SelectTrigger className="w-40 h-9"><SelectValue placeholder="Semua Pendaftaran" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Pendaftaran</SelectItem>
+                <SelectItem value="BUKA">Buka</SelectItem>
+                <SelectItem value="TUTUP">Tutup</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button 
             className="h-9" 
-            onClick={() => setFilterStatus(draftStatus)}
+            onClick={() => {
+              setFilterStatus(draftStatus)
+              setFilterPendaftaran(draftPendaftaran)
+            }}
           >
             Terapkan
           </Button>

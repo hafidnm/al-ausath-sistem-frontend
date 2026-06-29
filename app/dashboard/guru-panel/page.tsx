@@ -16,6 +16,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command"
 import { useToast } from "@/hooks/use-toast"
 import { authService } from "@/lib/services/auth.service"
 import { sesiAbsensiService } from "@/lib/services/sesiabsensi.service"
@@ -54,6 +67,7 @@ import {
   Check,
   UserX,
   Eye,
+  ChevronsUpDown,
 } from "lucide-react"
 
 type GuruStatus = "hadir" | "izin" | "sakit"
@@ -72,6 +86,7 @@ type JadwalItem = {
   waktu_mulai?: string | null
   waktu_selesai?: string | null
   status_sesi?: string | null
+  status_kehadiran_guru?: string | null
   keterangan?: string | null
   mapel: string
   kelas: string
@@ -129,6 +144,7 @@ type RekapPetugasRow = {
   jumlah_hadir: number
   jumlah_izin: number
   jumlah_sakit: number
+  jumlah_alfa: number
   total_menit_terlambat: number
   rata_menit_terlambat_hadir: number
   persentase_kehadiran: number
@@ -169,6 +185,8 @@ const getGuruStatusBadge = (status: GuruStatus | string) => {
       return <Badge className="bg-chart-3/20 text-chart-4 border-0">Sakit</Badge>
     case "izin":
       return <Badge className="bg-accent/20 text-accent border-0">Izin</Badge>
+    case "alfa":
+      return <Badge className="bg-rose-500/15 text-rose-700 border-0">Alfa</Badge>
     default:
       return <Badge variant="outline">-</Badge>
   }
@@ -230,6 +248,7 @@ const mapSesiToJadwal = (item: any): JadwalItem => {
     waktu_mulai: item?.waktu_mulai ?? null,
     waktu_selesai: item?.waktu_selesai ?? null,
     status_sesi: item?.status_sesi ?? null,
+    status_kehadiran_guru: item?.absensi_pengajar?.[0]?.status_kehadiran ?? item?.absensiPengajar?.[0]?.status_kehadiran ?? null,
     keterangan: item?.keterangan ?? null,
     mapel: mapel?.nama_mapel ?? mapel?.kode_mapel ?? "-",
     kelas: kelas?.nama_kelas ?? kelas?.kode_kelas ?? kelasMapel?.kode_kelas ?? "-",
@@ -323,17 +342,8 @@ export default function GuruPanelPage() {
 
   const [rekapLoading, setRekapLoading] = useState(false)
   const [rekapPetugasRows, setRekapPetugasRows] = useState<RekapPetugasRow[]>([])
-  const [tahunAjaranOptions, setTahunAjaranOptions] = useState<TahunAjaranApiItem[]>([])
-  const [selectedTahunAjaranRekap, setSelectedTahunAjaranRekap] = useState<string>("ALL")
   const [activeTab, setActiveTab] = useState("jadwal")
   const [riwayatLoaded, setRiwayatLoaded] = useState(false)
-
-  // Sync from global header tahun ajaran
-  useEffect(() => {
-    if (selectedKodeTahun) {
-      setSelectedTahunAjaranRekap(selectedKodeTahun)
-    }
-  }, [selectedKodeTahun])
 
   const [step, setStep] = useState(1)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -346,6 +356,7 @@ export default function GuruPanelPage() {
   const [guruHadir, setGuruHadir] = useState<GuruStatus>("hadir")
   const [guruPenggantiId, setGuruPenggantiId] = useState("")
   const [alasanTidakHadir, setAlasanTidakHadir] = useState("")
+  const [openPetugasCombobox, setOpenPetugasCombobox] = useState(false)
   const [isGuruTidakHadirFlow, setIsGuruTidakHadirFlow] = useState(false)
   const [petugasOptions, setPetugasOptions] = useState<PetugasOption[]>([])
   const [isLoadingPetugas, setIsLoadingPetugas] = useState(false)
@@ -490,8 +501,8 @@ export default function GuruPanelPage() {
         )
       : aktivitasSesi
 
-    if (selectedTahunAjaranRekap && selectedTahunAjaranRekap !== "ALL") {
-      filtered = filtered.filter((item) => item.tahun_ajaran === selectedTahunAjaranRekap)
+    if (selectedKodeTahun && selectedKodeTahun !== "ALL") {
+      filtered = filtered.filter((item) => item.tahun_ajaran === selectedKodeTahun)
     }
 
     if (selectedKodeUnit) {
@@ -499,7 +510,7 @@ export default function GuruPanelPage() {
     }
 
     return [...filtered].sort((a, b) => (b.tanggal || "").localeCompare(a.tanggal || ""))
-  }, [aktivitasSesi, currentPetugasId, selectedTahunAjaranRekap, selectedKodeUnit])
+  }, [aktivitasSesi, currentPetugasId, selectedKodeTahun, selectedKodeUnit])
 
   // Set id_jadwal yang sudah SELESAI hari ini → untuk highlight & sembunyikan tombol input
 
@@ -519,13 +530,14 @@ export default function GuruPanelPage() {
 
   const completedCount = Object.keys(attendanceData).length
   const progressPercentage = santriList.length > 0 ? (completedCount / santriList.length) * 100 : 0
-  const summaryStep = isGuruTidakHadirFlow ? 2 : 3
-  const isGuruTidakHadirStatus = guruHadir === "sakit" || guruHadir === "izin"
+  // Flow tidak hadir: step 1 (pilih izin/sakit + pengganti) → step 2 (summary kirim)
+  // Flow hadir: step 1 (input santri) → step 2 (summary kirim)
+  const summaryStep = isGuruTidakHadirFlow ? 2 : 2
   const isPenggantiSamaPengajar =
-    isGuruTidakHadirStatus &&
+    isGuruTidakHadirFlow &&
     !!selectedJadwal?.id_petugas_hadir &&
     Number(guruPenggantiId) === Number(selectedJadwal.id_petugas_hadir)
-  const isGuruStepValid = !isGuruTidakHadirStatus || (guruPenggantiId.trim().length > 0 && !isPenggantiSamaPengajar)
+  const isGuruStepValid = guruPenggantiId.trim().length > 0 && !isPenggantiSamaPengajar
   const isSantriStepValid = santriList.length > 0 && santriList.every((s) => !!attendanceData[s.nomor_induk])
   const selectedPetugasPenggantiLabel =
     petugasOptions.find((option) => String(option.id) === guruPenggantiId)?.label || "-"
@@ -576,10 +588,8 @@ export default function GuruPanelPage() {
       setJadwalMengajar(jadwalMapped)
 
       // --- Tahun Ajaran ---
-      const tahunList = toArray(initRes.tahun_ajaran) as TahunAjaranApiItem[]
-      setTahunAjaranOptions(tahunList)
-      const activeTahun = tahunList.find((t) => t.status === "AKTIF")
-      if (activeTahun?.kode_tahun && !selectedKodeTahun) setSelectedTahunAjaranRekap(activeTahun.kode_tahun)
+      // const tahunList = toArray(initRes.tahun_ajaran) as TahunAjaranApiItem[]
+      // (tahunAjaranOptions not needed anymore as we rely on global context)
 
       // --- Petugas ---
       const petugasMapped = toArray(initRes.petugas)
@@ -587,7 +597,7 @@ export default function GuruPanelPage() {
           const id = normalizeNumber(item.id_petugas ?? item.id ?? 0)
           if (id <= 0) return null
           const nama = String(item.nama_lengkap || "").trim() || `Pengajar #${id}`
-          return { id, label: `${nama} (ID: ${id})` }
+          return { id, label: nama }
         })
         .filter((item): item is PetugasOption => item !== null)
       setPetugasOptions(petugasMapped)
@@ -655,7 +665,7 @@ export default function GuruPanelPage() {
       const activePetugas = idPetugas !== undefined ? idPetugas : currentPetugasId
       if (activePetugas) params.id_petugas = activePetugas
 
-      const activeTahun = tahunOverride !== undefined ? tahunOverride : selectedTahunAjaranRekap
+      const activeTahun = tahunOverride !== undefined ? tahunOverride : selectedKodeTahun
       if (activeTahun && activeTahun !== "ALL") {
         params.tahun_ajaran = activeTahun
       }
@@ -694,26 +704,26 @@ export default function GuruPanelPage() {
     if (activeTab === "riwayat" && !riwayatLoaded && currentPetugasId !== undefined) {
       setRiwayatLoaded(true)
       void Promise.all([
-        loadAktivitasSesi(selectedTahunAjaranRekap),
-        loadRekap(currentPetugasId, selectedTahunAjaranRekap),
+        loadAktivitasSesi(selectedKodeTahun || undefined),
+        loadRekap(currentPetugasId, selectedKodeTahun || undefined),
       ])
     }
-  }, [activeTab, riwayatLoaded, currentPetugasId])
+  }, [activeTab, riwayatLoaded, currentPetugasId, selectedKodeTahun])
 
   // Re-fetch rekap & riwayat sesi saat filter tahun ajaran berubah (hanya jika tab Riwayat sudah pernah dibuka)
   useEffect(() => {
     if (riwayatLoaded && currentPetugasId) {
       void Promise.all([
-        loadAktivitasSesi(selectedTahunAjaranRekap),
-        loadRekap(currentPetugasId, selectedTahunAjaranRekap),
+        loadAktivitasSesi(selectedKodeTahun || undefined),
+        loadRekap(currentPetugasId, selectedKodeTahun || undefined),
       ])
     }
-  }, [selectedTahunAjaranRekap])
+  }, [selectedKodeTahun])
 
   // Re-fetch rekap saat filter unit header berubah (hanya jika tab Riwayat sudah pernah dibuka)
   useEffect(() => {
     if (riwayatLoaded && currentPetugasId) {
-      void loadRekap(currentPetugasId, selectedTahunAjaranRekap)
+      void loadRekap(currentPetugasId, selectedKodeTahun || undefined)
     }
   }, [selectedKodeUnit])
 
@@ -739,12 +749,35 @@ export default function GuruPanelPage() {
     setIsSubmitSuccess(false)
   }
 
-  const handleOpenInput = (jadwal: JadwalItem) => {
+  const handleOpenInput = async (jadwal: JadwalItem) => {
     setSelectedJadwal(jadwal)
     resetDialogState()
     setGuruHadir("hadir")
     setIsGuruTidakHadirFlow(false)
     setIsDialogOpen(true)
+    // Langsung mulai sesi dengan status HADIR dan muat daftar santri
+    setIsSubmitting(true)
+    try {
+      const mulai = await sesiAbsensiService.mulai({
+        id_jadwal: jadwal.id_jadwal,
+        tanggal: jadwal.tanggal,
+        status_kehadiran: "HADIR",
+      })
+      const idSesi = Number((mulai as any)?.data?.id_sesi)
+      if (!idSesi) throw new Error("ID sesi tidak ditemukan dari response mulai sesi.")
+      setSesiAktifId(idSesi)
+      await loadDaftarSantri(idSesi)
+      setStep(1)
+    } catch (error: any) {
+      toast({
+        title: "Gagal membuka sesi",
+        description: extractApiErrorMessage(error, "Periksa jadwal lalu coba lagi."),
+        variant: "destructive",
+      })
+      setIsDialogOpen(false)
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const handleOpenGuruTidakHadir = (jadwal: JadwalItem) => {
@@ -779,15 +812,20 @@ export default function GuruPanelPage() {
     setAttendanceData(initial)
   }
 
+  // handleStartSesi hanya dipakai untuk flow guru tidak hadir (izin/sakit)
   const handleStartSesi = async () => {
     if (!selectedJadwal?.id_jadwal) {
       toast({ title: "Gagal", description: "ID jadwal tidak ditemukan.", variant: "destructive" })
       return
     }
+    if (isPenggantiSamaPengajar) {
+      toast({ title: "Gagal", description: "Guru pengganti tidak boleh sama dengan pengajar utama.", variant: "destructive" })
+      return
+    }
 
     setIsSubmitting(true)
     try {
-      const statusApi = mapGuruStatusToApi(guruHadir)
+      const statusApi = mapGuruStatusToApi(guruHadir) as "IZIN" | "SAKIT"
       const mulai = await sesiAbsensiService.mulai({
         id_jadwal: selectedJadwal.id_jadwal,
         tanggal: selectedJadwal.tanggal,
@@ -802,27 +840,17 @@ export default function GuruPanelPage() {
 
       setSesiAktifId(idSesi)
 
-      if (isGuruTidakHadirFlow) {
-        if (isPenggantiSamaPengajar) {
-          throw new Error("Guru pengganti tidak boleh sama dengan pengajar utama.")
-        }
-
-        await sesiAbsensiService.setPengganti(idSesi, {
-          id_petugas_pengganti: Number(guruPenggantiId),
-          status_kehadiran: statusApi === "HADIR" ? undefined : statusApi,
-          keterangan: alasanTidakHadir || undefined,
-        })
-        setStep(summaryStep)
-        toast({ title: "Berhasil", description: "Pengganti berhasil diatur. Lanjut kirim laporan sesi." })
-        return
-      }
-
-      await loadDaftarSantri(idSesi)
-      setStep(2)
+      await sesiAbsensiService.setPengganti(idSesi, {
+        id_petugas_pengganti: Number(guruPenggantiId),
+        status_kehadiran: statusApi,
+        keterangan: alasanTidakHadir || undefined,
+      })
+      setStep(summaryStep)
+      toast({ title: "Berhasil", description: "Pengganti berhasil diatur. Lanjut kirim laporan sesi." })
     } catch (error: any) {
       toast({
         title: "Gagal memulai sesi",
-        description: extractApiErrorMessage(error, "Periksa data input guru lalu coba lagi."),
+        description: extractApiErrorMessage(error, "Periksa data input lalu coba lagi."),
         variant: "destructive",
       })
     } finally {
@@ -880,13 +908,15 @@ export default function GuruPanelPage() {
   }
 
   const handlePrimaryAction = async () => {
-    if (step === 1) {
+    // Flow tidak hadir: step 1 = pilih status + pengganti, lanjut → summary + kirim
+    if (isGuruTidakHadirFlow && step === 1) {
       await handleStartSesi()
       return
     }
 
-    if (step < summaryStep) {
-      setStep((prev) => Math.min(prev + 1, summaryStep))
+    // Flow hadir: step 1 = input santri, lanjut → summary, step 2 = kirim
+    if (!isGuruTidakHadirFlow && step === 1) {
+      setStep(2)
       return
     }
 
@@ -895,27 +925,11 @@ export default function GuruPanelPage() {
 
   const handleBackButton = async () => {
     if (step === 1) {
-      // At first step, close dialog (which will trigger cancel)
+      // Step pertama: tutup dialog (trigger cancel sesi jika ada)
       await closePresensiDialog(false)
-    } else if (step === 2) {
-      // Kembali dari step 2 ke step 1 → cancel sesi agar bisa input ulang dari awal
-      if (sesiAktifId) {
-        try {
-          await sesiAbsensiService.cancel(sesiAktifId, {
-            keterangan: "Dibatalkan untuk mengedit kehadiran guru",
-          })
-        } catch {
-          // Tetap lanjut kembali ke step 1 meski cancel gagal
-        }
-        setSesiAktifId(null)
-        setSantriList([])
-        setAttendanceData({})
-        setCurrentStudentIndex(0)
-      }
-      setStep(1)
     } else {
-      // step 3+ → kembali satu step tanpa cancel, sesi tetap aktif
-      setStep(step - 1)
+      // Step 2 (summary): kembali ke step 1
+      setStep(1)
     }
   }
 
@@ -984,8 +998,10 @@ export default function GuruPanelPage() {
 
   const disabledNext =
     isSubmitting ||
-    (step === 1 && !isGuruStepValid) ||
-    (step === 2 && !isGuruTidakHadirFlow && !isSantriStepValid)
+    // Flow tidak hadir step 1: wajib pilih pengganti
+    (isGuruTidakHadirFlow && step === 1 && !isGuruStepValid) ||
+    // Flow hadir step 1: wajib semua santri sudah diisi
+    (!isGuruTidakHadirFlow && step === 1 && !isSantriStepValid)
 
   return (
     <div className="space-y-6">
@@ -1354,28 +1370,12 @@ export default function GuruPanelPage() {
                     </CardTitle>
                     <CardDescription>Rekapitulasi kehadiran mengajar Anda secara keseluruhan</CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider shrink-0">Tahun Ajaran:</span>
-                    <Select value={selectedTahunAjaranRekap} onValueChange={setSelectedTahunAjaranRekap}>
-                      <SelectTrigger className="w-44 h-9">
-                        <SelectValue placeholder="Tahun Ajaran" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="ALL">Semua Tahun Ajaran</SelectItem>
-                        {tahunAjaranOptions.map((t) => (
-                          <SelectItem key={t.kode_tahun} value={t.kode_tahun!}>
-                            {t.nama_tahun} {t.status === "AKTIF" ? "(Aktif)" : ""}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 </CardHeader>
                 <CardContent>
                   {rekapLoading ? (
                     <p className="text-sm text-muted-foreground">Memuat rekap...</p>
                   ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
                       <div className="rounded-lg border bg-muted/20 p-3 text-center">
                         <p className="text-xs text-muted-foreground">Total Pertemuan</p>
                         <p className="text-2xl font-bold text-foreground">{rekap.total_pertemuan}</p>
@@ -1391,6 +1391,10 @@ export default function GuruPanelPage() {
                       <div className="rounded-lg border bg-amber-500/8 p-3 text-center">
                         <p className="text-xs text-muted-foreground">Sakit</p>
                         <p className="text-2xl font-bold text-amber-500">{rekap.jumlah_sakit}</p>
+                      </div>
+                      <div className="rounded-lg border bg-rose-500/8 p-3 text-center">
+                        <p className="text-xs text-muted-foreground">Alfa</p>
+                        <p className="text-2xl font-bold text-rose-500">{rekap.jumlah_alfa || 0}</p>
                       </div>
                       <div className="rounded-lg border bg-muted/20 p-3 text-center">
                         <p className="text-xs text-muted-foreground">Total Terlambat</p>
@@ -1429,7 +1433,7 @@ export default function GuruPanelPage() {
                       <TableHead>Hari</TableHead>
                       <TableHead>Mapel</TableHead>
                       <TableHead>Kelas</TableHead>
-                      <TableHead>Status Sesi</TableHead>
+                      <TableHead>Status Kehadiran</TableHead>
                       <TableHead>Peran</TableHead>
                       <TableHead className="text-right">Detail</TableHead>
                     </TableRow>
@@ -1449,7 +1453,7 @@ export default function GuruPanelPage() {
                           <TableCell>{item.mapel}</TableCell>
                           <TableCell>{item.kelas}</TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="bg-transparent">{item.status_sesi || "-"}</Badge>
+                            {getGuruStatusBadge(item.status_kehadiran_guru || item.status_sesi || "-")}
                           </TableCell>
                           <TableCell>
                             {Number(item.id_petugas_pengganti) === Number(currentPetugasId)
@@ -1486,54 +1490,42 @@ export default function GuruPanelPage() {
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle className="text-foreground">Input Presensi - {selectedJadwal?.mapel}</DialogTitle>
+                <DialogTitle className="text-foreground">
+                  {isGuruTidakHadirFlow
+                    ? `Absen Tidak Hadir - ${selectedJadwal?.mapel}`
+                    : `Input Presensi Santri - ${selectedJadwal?.mapel}`}
+                </DialogTitle>
                 <DialogDescription>
                   {selectedJadwal?.kelas} ({selectedJadwal?.jenjang}) - {selectedJadwal?.tanggal || "-"}, {selectedJadwal?.jam}
                 </DialogDescription>
               </DialogHeader>
 
+              {/* Step indicator */}
               <div className="flex items-center justify-center gap-2 py-2">
                 <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${step === 1 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                   <span className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xs">1</span>
-                  Presensi Guru
+                  {isGuruTidakHadirFlow ? "Status & Pengganti" : "Presensi Santri"}
                 </div>
-                {!isGuruTidakHadirFlow && (
-                  <>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                      <span className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xs">2</span>
-                      Presensi Santri
-                    </div>
-                  </>
-                )}
                 <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${step === summaryStep ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                  <span className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xs">{summaryStep}</span>
-                  Kirim
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${step === 2 ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                  <span className="w-6 h-6 rounded-full bg-primary-foreground/20 flex items-center justify-center text-xs">2</span>
+                  Konfirmasi & Kirim
                 </div>
               </div>
 
-              {step === 1 && (
+              {/* STEP 1 - Flow Guru Tidak Hadir: pilih Izin/Sakit + pengganti */}
+              {isGuruTidakHadirFlow && step === 1 && (
                 <Card className="border-border/50">
                   <CardHeader>
-                    <CardTitle className="text-base text-foreground">Kehadiran Guru</CardTitle>
+                    <CardTitle className="text-base text-foreground">Alasan Tidak Hadir</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <RadioGroup value={guruHadir} onValueChange={(v) => setGuruHadir(v as GuruStatus)} className="space-y-3">
-                      <Label htmlFor="guru-hadir" className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${guruHadir === "hadir" ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>
-                        <RadioGroupItem value="hadir" id="guru-hadir" />
-                        <div>
-                          <p className="font-medium text-foreground">Hadir Mengajar</p>
-                          <p className="text-sm text-muted-foreground">Status kehadiran: HADIR</p>
-                        </div>
-                        <Check className={`w-5 h-5 ml-auto ${guruHadir === "hadir" ? "text-primary" : "text-transparent"}`} />
-                      </Label>
-
                       <Label htmlFor="guru-sakit" className={`flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${guruHadir === "sakit" ? "border-chart-3 bg-chart-3/10" : "border-border hover:border-chart-3/50"}`}>
                         <RadioGroupItem value="sakit" id="guru-sakit" />
                         <div>
                           <p className="font-medium text-foreground">Sakit</p>
-                          <p className="text-sm text-muted-foreground">Status kehadiran: SAKIT</p>
+                          <p className="text-sm text-muted-foreground">Guru berhalangan hadir karena sakit, perlu guru pengganti</p>
                         </div>
                         <Check className={`w-5 h-5 ml-auto ${guruHadir === "sakit" ? "text-chart-4" : "text-transparent"}`} />
                       </Label>
@@ -1542,131 +1534,161 @@ export default function GuruPanelPage() {
                         <RadioGroupItem value="izin" id="guru-izin" />
                         <div>
                           <p className="font-medium text-foreground">Izin</p>
-                          <p className="text-sm text-muted-foreground">Status kehadiran: IZIN</p>
+                          <p className="text-sm text-muted-foreground">Guru berhalangan hadir karena izin, perlu guru pengganti</p>
                         </div>
                         <Check className={`w-5 h-5 ml-auto ${guruHadir === "izin" ? "text-accent" : "text-transparent"}`} />
                       </Label>
                     </RadioGroup>
 
-                    {isGuruTidakHadirStatus && (
-                      <div className="grid md:grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="guru-pengganti-id">Guru Pengganti</Label>
-                          <Select value={guruPenggantiId || undefined} onValueChange={setGuruPenggantiId}>
-                            <SelectTrigger id="guru-pengganti-id">
-                              <SelectValue
-                                placeholder={isLoadingPetugas ? "Memuat pengajar..." : "Pilih guru pengganti"}
-                              />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {petugasOptions.map((option) => (
-                                <SelectItem key={option.id} value={String(option.id)}>
-                                  {option.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {isPenggantiSamaPengajar ? (
-                            <p className="text-xs text-destructive">
-                              Guru pengganti tidak boleh sama dengan pengajar utama sesi.
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="md:col-span-1 space-y-2">
-                          <Label>Pengajar Utama</Label>
-                          <Input value={selectedJadwal?.id_petugas_hadir ? `ID: ${selectedJadwal.id_petugas_hadir}` : "-"} readOnly />
-                        </div>
-                        <div className="md:col-span-2 space-y-2">
-                          <Label htmlFor="keterangan">Keterangan</Label>
-                          <Input
-                            id="keterangan"
-                            placeholder="Masukkan keterangan tambahan"
-                            value={alasanTidakHadir}
-                            onChange={(e) => setAlasanTidakHadir(e.target.value)}
-                          />
-                        </div>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="guru-pengganti-id">Guru Pengganti <span className="text-destructive">*</span></Label>
+                        <Popover open={openPetugasCombobox} onOpenChange={setOpenPetugasCombobox} modal={true}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={openPetugasCombobox}
+                              className="w-full justify-between font-normal"
+                              id="guru-pengganti-id"
+                            >
+                              {guruPenggantiId
+                                ? petugasOptions.find((option) => String(option.id) === guruPenggantiId)?.label
+                                : isLoadingPetugas ? "Memuat pengajar..." : "Cari guru pengganti..."}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full min-w-[300px] p-0" align="start">
+                            <Command>
+                              <CommandInput placeholder="Cari nama pengajar..." />
+                              <CommandList>
+                                <CommandEmpty>Pengajar tidak ditemukan.</CommandEmpty>
+                                <CommandGroup>
+                                  {petugasOptions.map((option) => (
+                                    <CommandItem
+                                      key={option.id}
+                                      value={option.label}
+                                      onSelect={() => {
+                                        setGuruPenggantiId(String(option.id))
+                                        setOpenPetugasCombobox(false)
+                                      }}
+                                    >
+                                      <Check
+                                        className={`mr-2 h-4 w-4 ${
+                                          guruPenggantiId === String(option.id) ? "opacity-100" : "opacity-0"
+                                        }`}
+                                      />
+                                      {option.label}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                        {isPenggantiSamaPengajar ? (
+                          <p className="text-xs text-destructive mt-1">
+                            Guru pengganti tidak boleh sama dengan pengajar utama sesi.
+                          </p>
+                        ) : null}
                       </div>
-                    )}
+                      <div className="md:col-span-2 space-y-2">
+                        <Label htmlFor="keterangan">Keterangan</Label>
+                        <Input
+                          id="keterangan"
+                          placeholder="Masukkan keterangan tambahan"
+                          value={alasanTidakHadir}
+                          onChange={(e) => setAlasanTidakHadir(e.target.value)}
+                        />
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               )}
 
-              {!isGuruTidakHadirFlow && step === 2 && (
+              {/* STEP 1 - Flow Guru Hadir: input presensi santri */}
+              {!isGuruTidakHadirFlow && step === 1 && (
                 <div className="space-y-4">
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Progress Input</span>
-                      <span className="font-medium text-foreground">{completedCount}/{santriList.length} santri</span>
+                  {isSubmitting || santriList.length === 0 ? (
+                    <div className="text-center py-10 text-muted-foreground">
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                      <p className="text-sm">Membuka sesi dan memuat daftar santri...</p>
                     </div>
-                    <Progress value={progressPercentage} className="h-2" />
-                  </div>
-
-                  {santriList.length > 0 && (
-                    <Card className="border-primary/30 bg-primary/5">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-4 mb-4">
-                          <Avatar className="w-14 h-14">
-                            <AvatarFallback className="bg-primary text-primary-foreground text-lg">
-                              {getInitials(santriList[currentStudentIndex].nama_lengkap_santri)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="font-semibold text-lg text-foreground">{santriList[currentStudentIndex].nama_lengkap_santri}</p>
-                            <p className="text-sm text-muted-foreground">NIS: {santriList[currentStudentIndex].nomor_induk}</p>
-                            <p className="text-xs text-primary">Santri ke-{currentStudentIndex + 1} dari {santriList.length}</p>
-                          </div>
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Progress Input</span>
+                          <span className="font-medium text-foreground">{completedCount}/{santriList.length} santri</span>
                         </div>
+                        <Progress value={progressPercentage} className="h-2" />
+                      </div>
 
-                        <RadioGroup
-                          value={attendanceData[santriList[currentStudentIndex].nomor_induk] || ""}
-                          onValueChange={(value) => handleSetAttendance(santriList[currentStudentIndex].nomor_induk, value as SantriStatus)}
-                          className="grid grid-cols-2 gap-3"
-                        >
-                          <Label htmlFor="santri-hadir" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "hadir" ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>
-                            <RadioGroupItem value="hadir" id="santri-hadir" />
-                            <p className="font-medium text-foreground">Hadir</p>
-                          </Label>
-                          <Label htmlFor="santri-sakit" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "sakit" ? "border-chart-3 bg-chart-3/10" : "border-border hover:border-chart-3/50"}`}>
-                            <RadioGroupItem value="sakit" id="santri-sakit" />
-                            <p className="font-medium text-foreground">Sakit</p>
-                          </Label>
-                          <Label htmlFor="santri-izin" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "izin" ? "border-accent bg-accent/10" : "border-border hover:border-accent/50"}`}>
-                            <RadioGroupItem value="izin" id="santri-izin" />
-                            <p className="font-medium text-foreground">Izin</p>
-                          </Label>
-                          <Label htmlFor="santri-alfa" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "alfa" ? "border-destructive bg-destructive/10" : "border-border hover:border-destructive/50"}`}>
-                            <RadioGroupItem value="alfa" id="santri-alfa" />
-                            <p className="font-medium text-foreground">Alfa</p>
-                          </Label>
-                        </RadioGroup>
-                      </CardContent>
-                    </Card>
+                      <Card className="border-primary/30 bg-primary/5">
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-4 mb-4">
+                            <Avatar className="w-14 h-14">
+                              <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                                {getInitials(santriList[currentStudentIndex].nama_lengkap_santri)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg text-foreground">{santriList[currentStudentIndex].nama_lengkap_santri}</p>
+                              <p className="text-sm text-muted-foreground">NIS: {santriList[currentStudentIndex].nomor_induk}</p>
+                              <p className="text-xs text-primary">Santri ke-{currentStudentIndex + 1} dari {santriList.length}</p>
+                            </div>
+                          </div>
+                          <RadioGroup
+                            value={attendanceData[santriList[currentStudentIndex].nomor_induk] || ""}
+                            onValueChange={(value) => handleSetAttendance(santriList[currentStudentIndex].nomor_induk, value as SantriStatus)}
+                            className="grid grid-cols-2 gap-3"
+                          >
+                            <Label htmlFor="santri-hadir" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "hadir" ? "border-primary bg-primary/10" : "border-border hover:border-primary/50"}`}>
+                              <RadioGroupItem value="hadir" id="santri-hadir" />
+                              <p className="font-medium text-foreground">Hadir</p>
+                            </Label>
+                            <Label htmlFor="santri-sakit" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "sakit" ? "border-chart-3 bg-chart-3/10" : "border-border hover:border-chart-3/50"}`}>
+                              <RadioGroupItem value="sakit" id="santri-sakit" />
+                              <p className="font-medium text-foreground">Sakit</p>
+                            </Label>
+                            <Label htmlFor="santri-izin" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "izin" ? "border-accent bg-accent/10" : "border-border hover:border-accent/50"}`}>
+                              <RadioGroupItem value="izin" id="santri-izin" />
+                              <p className="font-medium text-foreground">Izin</p>
+                            </Label>
+                            <Label htmlFor="santri-alfa" className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${attendanceData[santriList[currentStudentIndex].nomor_induk] === "alfa" ? "border-destructive bg-destructive/10" : "border-border hover:border-destructive/50"}`}>
+                              <RadioGroupItem value="alfa" id="santri-alfa" />
+                              <p className="font-medium text-foreground">Alfa</p>
+                            </Label>
+                          </RadioGroup>
+                        </CardContent>
+                      </Card>
+
+                      <div className="border rounded-lg overflow-hidden">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-muted/50">
+                              <TableHead>No</TableHead>
+                              <TableHead>Nama Santri</TableHead>
+                              <TableHead>NIS</TableHead>
+                              <TableHead className="text-center">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {santriList.map((santri, idx) => (
+                              <TableRow key={santri.nomor_induk} onClick={() => setCurrentStudentIndex(idx)} className="hover:bg-muted/30 cursor-pointer">
+                                <TableCell>{idx + 1}</TableCell>
+                                <TableCell>{santri.nama_lengkap_santri}</TableCell>
+                                <TableCell>{santri.nomor_induk}</TableCell>
+                                <TableCell className="text-center">
+                                  {attendanceData[santri.nomor_induk] ? getGuruStatusBadge(attendanceData[santri.nomor_induk]) : <span className="text-sm text-muted-foreground">Belum diisi</span>}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </>
                   )}
-
-                  <div className="border rounded-lg overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead>No</TableHead>
-                          <TableHead>Nama Santri</TableHead>
-                          <TableHead>NIS</TableHead>
-                          <TableHead className="text-center">Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {santriList.map((santri, idx) => (
-                          <TableRow key={santri.nomor_induk} onClick={() => setCurrentStudentIndex(idx)} className="hover:bg-muted/30 cursor-pointer">
-                            <TableCell>{idx + 1}</TableCell>
-                            <TableCell>{santri.nama_lengkap_santri}</TableCell>
-                            <TableCell>{santri.nomor_induk}</TableCell>
-                            <TableCell className="text-center">
-                              {attendanceData[santri.nomor_induk] ? getGuruStatusBadge(attendanceData[santri.nomor_induk]) : <span className="text-sm text-muted-foreground">Belum diisi</span>}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
                 </div>
               )}
 

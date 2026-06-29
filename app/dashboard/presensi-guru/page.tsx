@@ -10,9 +10,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { toast } from "@/components/ui/use-toast"
-import { Search, FileSpreadsheet, FileIcon as FilePdf, History, CheckCircle, Clock, Check, Plus, RefreshCw } from "lucide-react"
+import { Search, FileSpreadsheet, FileIcon as FilePdf, History, CheckCircle, Clock, Check, Plus, RefreshCw, ChevronsUpDown } from "lucide-react"
 
 import { sesiAbsensiService, SesiAbsensiApiItem } from "@/lib/services/sesiabsensi.service"
 import { dataJadwalPembelajaranService } from "@/lib/services/jadwal-pembelajaran.service"
@@ -38,7 +40,7 @@ interface RekapPetugasRow {
 }
 
 type PetugasOption = { id: number; label: string }
-type JadwalOption = { id: number; label: string; mapel: string; kelas: string; hari: string }
+type JadwalOption = { id: number; label: string; mapel: string; kelas: string; hari: string; tahun_ajaran?: string; kode_unit?: string }
 
 export default function PresensiGuruPage() {
   const [activeTab, setActiveTab] = useState("rekap")
@@ -90,6 +92,13 @@ export default function PresensiGuruPage() {
     )
   }, [allKelas, selectedKodeUnit, selectedKodeTahun])
 
+  const filteredJadwalOptions = useMemo(() => {
+    return jadwalOptions.filter(j => 
+      (!selectedKodeUnit || j.kode_unit === selectedKodeUnit) &&
+      (!selectedKodeTahun || j.tahun_ajaran === selectedKodeTahun)
+    )
+  }, [jadwalOptions, selectedKodeUnit, selectedKodeTahun])
+
   // States for Edit Absensi Guru (Admin)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedSesi, setSelectedSesi] = useState<SesiAbsensiApiItem | null>(null)
@@ -111,6 +120,9 @@ export default function PresensiGuruPage() {
     menit_terlambat: 0,
     keterangan: "",
   })
+  const [openBukaSesiJadwalCombobox, setOpenBukaSesiJadwalCombobox] = useState(false)
+  const [openBukaSesiPengajarCombobox, setOpenBukaSesiPengajarCombobox] = useState(false)
+  const [openEditPengajarCombobox, setOpenEditPengajarCombobox] = useState(false)
 
   // States for Log Aktivitas
   const [logs, setLogs] = useState<any[]>([])
@@ -191,7 +203,7 @@ export default function PresensiGuruPage() {
       
       const mappedPetugas = (initData.petugas || []).map((item: any) => ({
         id: item.id_petugas || item.id,
-        label: `${item.nama_lengkap} (ID: ${item.id_petugas || item.id})`
+        label: item.nama_lengkap || `Pengajar #${item.id_petugas || item.id}`
       })).filter((i: any) => i.id)
       setPetugasOptions(mappedPetugas)
 
@@ -201,12 +213,16 @@ export default function PresensiGuruPage() {
         const kelas = item.kelas_mapel?.kelas?.nama_kelas || item.kelasMapel?.kelas?.nama_kelas || "-"
         const hari = item.hari || "-"
         const guru = item.kelas_mapel?.petugas?.nama_lengkap || item.kelasMapel?.petugas?.nama_lengkap || "Tanpa Guru"
+        const tahun_ajaran = item.tahun_ajaran || item.kelas_mapel?.kelas?.tahun_ajaran || item.kelasMapel?.kelas?.tahun_ajaran
+        const kode_unit = item.kode_unit || item.kelas_mapel?.kelas?.kode_unit || item.kelasMapel?.kelas?.kode_unit
         return {
           id,
           label: `${mapel} (${kelas}) - ${hari} - ${guru}`,
           mapel,
           kelas,
           hari,
+          tahun_ajaran,
+          kode_unit,
         }
       }).filter((i: any) => i.id)
       setJadwalOptions(mappedJadwal)
@@ -409,6 +425,33 @@ export default function PresensiGuruPage() {
     }
   }
 
+  const formatRolesBadge = (rolesStr: string) => {
+    if (!rolesStr) return <span className="text-muted-foreground">-</span>
+    
+    let roles: string[] = []
+    try {
+      if (rolesStr.trim().startsWith('[') && rolesStr.trim().endsWith(']')) {
+        roles = JSON.parse(rolesStr)
+      } else {
+        roles = rolesStr.split(',').map(r => r.trim())
+      }
+    } catch (e) {
+      roles = [rolesStr]
+    }
+    
+    if (!Array.isArray(roles)) roles = [roles]
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {roles.map((role, idx) => (
+          <Badge key={idx} variant="secondary" className="font-medium text-xs bg-muted/60 hover:bg-muted/80">
+            {String(role).replace(/["\[\]]/g, '').toUpperCase()}
+          </Badge>
+        ))}
+      </div>
+    )
+  }
+
   const getStatusBadge = (status: string) => {
     const s = status?.toUpperCase()
     if (s === "HADIR") return <Badge className="bg-primary/10 text-primary border-0">Hadir</Badge>
@@ -521,7 +564,7 @@ export default function PresensiGuruPage() {
                       rekapRows.map((row) => (
                         <TableRow key={row.id_petugas} className="hover:bg-muted/30">
                           <TableCell className="font-medium">{row.nama_lengkap}</TableCell>
-                          <TableCell>{row.peran_akun}</TableCell>
+                          <TableCell>{formatRolesBadge(row.peran_akun)}</TableCell>
                           <TableCell className="text-center">{row.total_pertemuan}</TableCell>
                           <TableCell className="text-center text-emerald-600 font-medium">{row.jumlah_hadir}</TableCell>
                           <TableCell className="text-center">{row.jumlah_izin}</TableCell>
@@ -977,18 +1020,50 @@ export default function PresensiGuruPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label>Pilih Pengajar</Label>
-              <Select value={String(editData.id_petugas)} onValueChange={(v) => setEditData({...editData, id_petugas: Number(v)})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih pengajar" />
-                </SelectTrigger>
-                <SelectContent>
-                  {petugasOptions.map(p => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openEditPengajarCombobox} onOpenChange={setOpenEditPengajarCombobox} modal={true}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openEditPengajarCombobox}
+                    className="w-full justify-between font-normal"
+                  >
+                    {editData.id_petugas
+                      ? petugasOptions.find((option) => option.id === editData.id_petugas)?.label
+                      : "Cari pengajar..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full min-w-[300px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama pengajar..." />
+                    <CommandList>
+                      <CommandEmpty>Pengajar tidak ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {petugasOptions.map((option) => (
+                          <CommandItem
+                            key={option.id}
+                            value={option.label}
+                            onSelect={() => {
+                              setEditData({ ...editData, id_petugas: option.id })
+                              setOpenEditPengajarCombobox(false)
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                editData.id_petugas === option.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {option.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="space-y-3">
@@ -1057,18 +1132,50 @@ export default function PresensiGuruPage() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
+            <div className="space-y-2 flex flex-col">
               <Label>Pilih Jadwal Pembelajaran</Label>
-              <Select value={String(bukaSesiData.id_jadwal)} onValueChange={(v) => setBukaSesiData({...bukaSesiData, id_jadwal: Number(v)})}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih jadwal" />
-                </SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {jadwalOptions.map(j => (
-                    <SelectItem key={j.id} value={String(j.id)}>{j.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={openBukaSesiJadwalCombobox} onOpenChange={setOpenBukaSesiJadwalCombobox} modal={true}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openBukaSesiJadwalCombobox}
+                    className="w-full justify-between font-normal"
+                  >
+                    {bukaSesiData.id_jadwal
+                      ? filteredJadwalOptions.find((option) => option.id === bukaSesiData.id_jadwal)?.label
+                      : "Cari jadwal pembelajaran..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[500px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Cari nama mapel, kelas, atau guru..." />
+                    <CommandList>
+                      <CommandEmpty>Jadwal tidak ditemukan.</CommandEmpty>
+                      <CommandGroup>
+                        {filteredJadwalOptions.map((option) => (
+                          <CommandItem
+                            key={option.id}
+                            value={option.label}
+                            onSelect={() => {
+                              setBukaSesiData({ ...bukaSesiData, id_jadwal: option.id })
+                              setOpenBukaSesiJadwalCombobox(false)
+                            }}
+                          >
+                            <Check
+                              className={`mr-2 h-4 w-4 ${
+                                bukaSesiData.id_jadwal === option.id ? "opacity-100" : "opacity-0"
+                              }`}
+                            />
+                            {option.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1080,18 +1187,50 @@ export default function PresensiGuruPage() {
                   onChange={(e) => setBukaSesiData({...bukaSesiData, tanggal: e.target.value})} 
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label>Pengajar Hadir</Label>
-                <Select value={String(bukaSesiData.id_petugas_hadir)} onValueChange={(v) => setBukaSesiData({...bukaSesiData, id_petugas_hadir: Number(v)})}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Pilih pengajar" />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {petugasOptions.map(p => (
-                      <SelectItem key={p.id} value={String(p.id)}>{p.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={openBukaSesiPengajarCombobox} onOpenChange={setOpenBukaSesiPengajarCombobox} modal={true}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openBukaSesiPengajarCombobox}
+                      className="w-full justify-between font-normal"
+                    >
+                      {bukaSesiData.id_petugas_hadir
+                        ? petugasOptions.find((option) => option.id === bukaSesiData.id_petugas_hadir)?.label
+                        : "Cari pengajar..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Cari nama pengajar..." />
+                      <CommandList>
+                        <CommandEmpty>Pengajar tidak ditemukan.</CommandEmpty>
+                        <CommandGroup>
+                          {petugasOptions.map((option) => (
+                            <CommandItem
+                              key={option.id}
+                              value={option.label}
+                              onSelect={() => {
+                                setBukaSesiData({ ...bukaSesiData, id_petugas_hadir: option.id })
+                                setOpenBukaSesiPengajarCombobox(false)
+                              }}
+                            >
+                              <Check
+                                className={`mr-2 h-4 w-4 ${
+                                  bukaSesiData.id_petugas_hadir === option.id ? "opacity-100" : "opacity-0"
+                                }`}
+                              />
+                              {option.label}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
