@@ -138,6 +138,7 @@ export function NilaiMapelForm() {
   const [petugasInputId, setPetugasInputId] = useState<number | undefined>(undefined)
 
   const [isLoading, setIsLoading] = useState(false)
+  const [isOptionsLoading, setIsOptionsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [error, setError] = useState("")
@@ -163,6 +164,7 @@ export function NilaiMapelForm() {
       }
 
       if (idPetugas || isAdmin) {
+        setIsOptionsLoading(true)
         try {
           const params: any = {
             status: "AKTIF",
@@ -213,7 +215,10 @@ export function NilaiMapelForm() {
           setRawKelasOptions([])
           setRawMapelOptions([])
           return
+        } finally {
+          setIsOptionsLoading(false)
         }
+
       }
 
       setRawKelasOptions([])
@@ -557,16 +562,25 @@ export function NilaiMapelForm() {
                 disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Kelas" : "Pilih Tahun Ajaran + Unit dulu"} />
+                  <div className="flex items-center justify-between">
+                    <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Kelas" : "Pilih Tahun Ajaran + Unit dulu"} />
+                    {isOptionsLoading && (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary ml-2" />
+                    )}
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {kelasOptions.length > 0 ? (
+                  {isOptionsLoading ? (
+                    <SelectItem key="loading" value="loading-kelas" disabled>
+                      <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat...</div>
+                    </SelectItem>
+                  ) : (kelasOptions.length > 0 ? (
                     kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)
                   ) : (
                     <SelectItem key="empty" value="no-kelas" disabled>
                       {selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Tidak ada kelas" : "Pilih header terlebih dahulu"}
                     </SelectItem>
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -578,16 +592,25 @@ export function NilaiMapelForm() {
                 disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Mapel" : "Pilih Tahun Ajaran + Unit dulu"} />
+                  <div className="flex items-center justify-between">
+                    <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Mapel" : "Pilih Tahun Ajaran + Unit dulu"} />
+                    {isOptionsLoading && (
+                      <Loader2 className="w-4 h-4 animate-spin text-primary ml-2" />
+                    )}
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
-                  {mapelOptions.length > 0 ? (
+                  {isOptionsLoading ? (
+                    <SelectItem key="loading-mapel" value="loading-mapel" disabled>
+                      <div className="flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Memuat...</div>
+                    </SelectItem>
+                  ) : (mapelOptions.length > 0 ? (
                     mapelOptions.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)
                   ) : (
                     <SelectItem key="empty" value="no-mapel" disabled>
                       {selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Tidak ada mapel" : "Pilih header terlebih dahulu"}
                     </SelectItem>
-                  )}
+                  ))}
                 </SelectContent>
               </Select>
             </div>
