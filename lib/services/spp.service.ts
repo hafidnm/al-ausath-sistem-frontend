@@ -237,13 +237,17 @@ const normalizePayment = (item: ApiRecord): SppPayment => {
 
 const normalizeSetting = (item: ApiRecord): SppSetting => {
   const id = toStr(item.id ?? item.id_setting ?? item.uuid);
+  const idUnitRaw = toStr(item.id_unit ?? item.idUnit ?? '');
+  const kodeKelasRaw = toStr(item.kode_kelas ?? item.kodeKelas ?? item.kelas ?? '');
+  const idGolonganRaw = toStr(item.id_golongan_spp ?? item.idGolonganSpp ?? '');
+  const idKategoriRaw = toStr(item.kategori_tagihan_id ?? item.idKategoriTagihan ?? '');
   return {
     id,
-    idUnit: toStr(item.id_unit ?? item.idUnit ?? ''),
-    kodeKelas: toStr(item.kode_kelas ?? item.kodeKelas ?? item.kelas ?? ''),
-    jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? ''),
-    idGolonganSpp: toStr(item.id_golongan_spp ?? item.idGolonganSpp ?? ''),
-    idKategoriTagihan: toStr(item.kategori_tagihan_id ?? item.idKategoriTagihan ?? ''),
+    idUnit: idUnitRaw || null,
+    kodeKelas: kodeKelasRaw || null,
+    jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? '') || null,
+    idGolonganSpp: idGolonganRaw || null,
+    idKategoriTagihan: idKategoriRaw || null,
     nominal: toNum(item.nominal ?? item.nominal_spp ?? item.biaya ?? item.jumlah ?? 0),
     // Display helpers
     nama:

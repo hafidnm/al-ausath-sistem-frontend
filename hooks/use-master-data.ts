@@ -3,6 +3,7 @@ import { dataUnitService } from '@/lib/services/unit.service';
 import { dataKelasService } from '@/lib/services/kelas.service';
 import { tahunAjaranService } from '@/lib/services/tahun-ajaran.service';
 import api from '@/lib/axios';
+import { sppService } from '@/lib/services/spp.service';
 
 export interface MasterOption {
   value: string | number;
@@ -61,20 +62,36 @@ export function useMasterData(enabled = true) {
           : [];
       }),
     enabled,
-    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const golonganSppQuery = useQuery({
+    queryKey: ['master', 'golonganSpp'],
+    queryFn: () =>
+      sppService.getGolongan().then((r) =>
+        r.data.map((g) => ({
+          value: Number(g.id),
+          label: g.namaGolongan,
+          jenjang: g.jenjang ?? '',
+        }))
+      ),
+    enabled,
+    staleTime: 10 * 60 * 1000,
   });
 
   const loading =
     unitsQuery.isLoading ||
     kelasQuery.isLoading ||
     tahunAjaranQuery.isLoading ||
-    categoriesQuery.isLoading;
+    categoriesQuery.isLoading ||
+    golonganSppQuery.isLoading;
 
   return {
     units: unitsQuery.data || [],
     kelas: kelasQuery.data || [],
     tahunAjaran: tahunAjaranQuery.data || [],
     categories: categoriesQuery.data || [],
+    golonganSpp: golonganSppQuery.data || [],
     loading,
   };
 }

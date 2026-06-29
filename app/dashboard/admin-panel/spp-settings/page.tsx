@@ -54,14 +54,13 @@ import { sppService } from "@/lib/services/spp.service"
 
 export default function SppSettingsPage() {
   const { toast } = useToast()
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const { data: settings, loading, fetchSettings } = useSppSettings()
-  const { units, kelas, tahunAjaran, categories, loading: masterLoading } = useMasterData(isDialogOpen)
+  const { units, kelas, tahunAjaran, categories, golonganSpp, loading: masterLoading } = useMasterData(isDialogOpen)
   const { createSetting, loading: creating } = useCreateSppSetting()
   const { updateSetting, loading: updating } = useUpdateSppSetting()
   const { deleteSetting } = useDeleteSppSetting()
   const [provisionLoading, setProvisionLoading] = useState(false)
-
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -80,6 +79,7 @@ export default function SppSettingsPage() {
     id_unit: null,
     jenjang: null,
     kode_kelas: null,
+    id_golongan_spp: null,
     kategori_tagihan_id: null,
     jumlah: 0,
     periode: null,
@@ -96,6 +96,7 @@ export default function SppSettingsPage() {
       id_unit: null,
       jenjang: null,
       kode_kelas: null,
+      id_golongan_spp: null,
       kategori_tagihan_id: null,
       jumlah: 0,
       periode: null,
@@ -110,6 +111,7 @@ export default function SppSettingsPage() {
       id_unit: item.idUnit ? Number(item.idUnit) : null,
       jenjang: item.jenjang || null,
       kode_kelas: item.kodeKelas || null,
+      id_golongan_spp: item.idGolonganSpp ? Number(item.idGolonganSpp) : null,
       kategori_tagihan_id: item.idKategoriTagihan ? Number(item.idKategoriTagihan) : null,
       jumlah: item.nominal || 0,
       periode: item.tahunAjaran || null,
@@ -252,48 +254,88 @@ export default function SppSettingsPage() {
                       <Building2 className="w-4 h-4 text-primary" /> Unit Kerja
                     </Label>
                     <Select
-                      value={formData.id_unit?.toString()}
-                      onValueChange={(v) => setFormData({ ...formData, id_unit: v === "null" ? null : Number(v) })}
+                      value={formData.id_unit?.toString() ?? "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, id_unit: v === "__none__" ? null : Number(v) })}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Unit" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="null">Semua Unit</SelectItem>
+                        <SelectItem value="__none__">Semua Unit</SelectItem>
                         {units.map(u => <SelectItem key={u.value} value={u.value.toString()}>{u.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
                     <p className="text-[10px] text-muted-foreground">Unit Kerja: Cabang/Lembaga (MI, MTS, MA, dsb)</p>
                   </div>
+                  {/* Jenjang dropdown — filter unit yg punya kode_unit valid */}
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <GraduationCap className="w-4 h-4 text-primary" /> Jenjang
                     </Label>
                     <Select
-                      value={formData.jenjang || "null"}
-                      onValueChange={(v) => setFormData({ ...formData, jenjang: v === "null" ? null : v })}
+                      value={formData.jenjang || "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, jenjang: v === "__none__" ? null : v })}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Jenjang" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="null">Semua Jenjang</SelectItem>
-                        {units.map(u => (
-                          <SelectItem key={u.code} value={u.code || ""}>{u.label}</SelectItem>
-                        ))}
+                        <SelectItem value="__none__">Semua Jenjang</SelectItem>
+                        {units
+                          .filter(u => u.code && u.code.trim() !== "")
+                          .map(u => (
+                            <SelectItem key={u.code} value={u.code!}>{u.label} ({u.code})</SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
+                {/* Baris 2: Golongan SPP + Kode Kelas */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Users className="w-4 h-4 text-primary" /> Golongan SPP
+                    </Label>
+                    <Select
+                      value={formData.id_golongan_spp?.toString() ?? "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, id_golongan_spp: v === "__none__" ? null : Number(v) })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Pilih Golongan" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Tanpa Golongan</SelectItem>
+                        {golonganSpp.map(g => <SelectItem key={g.value} value={g.value.toString()}>{g.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">Opsional: filter berdasar golongan santri</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-primary" /> Kode Kelas
+                    </Label>
+                    <Select
+                      value={formData.kode_kelas || "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, kode_kelas: v === "__none__" ? null : v })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Pilih Kelas" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Semua Kelas</SelectItem>
+                        {kelas.map(k => <SelectItem key={k.value} value={k.value.toString()}>{k.label} ({k.value})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">Opsional: spesifik ke kelas tertentu</p>
+                  </div>
+                </div>
+
+                {/* Baris 3: Kategori + Periode */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="flex items-center gap-2">
                       <Tag className="w-4 h-4 text-primary" /> Kategori Tagihan
                     </Label>
                     <Select
-                      value={formData.kategori_tagihan_id?.toString()}
-                      onValueChange={(v) => setFormData({ ...formData, kategori_tagihan_id: v === "null" ? null : Number(v) })}
+                      value={formData.kategori_tagihan_id?.toString() ?? "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, kategori_tagihan_id: v === "__none__" ? null : Number(v) })}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Kategori" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="null">Tanpa Kategori</SelectItem>
+                        <SelectItem value="__none__">Tanpa Kategori</SelectItem>
                         {categories.map(c => <SelectItem key={c.value} value={c.value.toString()}>{c.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -303,12 +345,12 @@ export default function SppSettingsPage() {
                       <CalendarDays className="w-4 h-4 text-primary" /> Tahun Ajaran / Periode
                     </Label>
                     <Select
-                      value={formData.periode || "null"}
-                      onValueChange={(v) => setFormData({ ...formData, periode: v === "null" ? null : v })}
+                      value={formData.periode || "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, periode: v === "__none__" ? null : v })}
                     >
                       <SelectTrigger><SelectValue placeholder="Pilih Periode" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="null">Semua Periode</SelectItem>
+                        <SelectItem value="__none__">Semua Periode</SelectItem>
                         {tahunAjaran.map(t => <SelectItem key={t.value} value={t.value.toString()}>{t.label}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -415,8 +457,12 @@ export default function SppSettingsPage() {
                   settings.map((item) => (
                     <TableRow key={item.id} className="hover:bg-primary/5 transition-colors group">
                       <TableCell>
-                        <div className="font-medium">{item.unit?.nama_unit || "Semua Unit"}</div>
-                        <div className="text-xs text-muted-foreground">{item.jenjang || "Semua Jenjang"}</div>
+                        <div className="font-medium">{item.unit?.nama_unit || item.jenjang || "Semua Unit"}</div>
+                        <div className="text-xs text-muted-foreground space-y-0.5">
+                          {item.jenjang && <span className="mr-2">Jenjang: <b>{item.jenjang}</b></span>}
+                          {item.kodeKelas && <span>Kelas: <b>{item.kodeKelas}</b></span>}
+                          {item.golonganSpp && <span className="block">Golongan: {item.golonganSpp.nama_golongan}</span>}
+                        </div>
                       </TableCell>
                       <TableCell>{item.tahunAjaran || "-"}</TableCell>
                       <TableCell>
