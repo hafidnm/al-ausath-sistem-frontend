@@ -27,15 +27,15 @@ const formatMultipleChoiceAnswer = (answerValue: string, options?: string[]) => 
   return `${optionLabel}. ${optionText}`.trim();
 };
 
-// Issue 2: Construct full image URL from backend path
+// Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
   if (!path) return null;
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
-  
+
   // Get base URL from API_URL (e.g., http://localhost:8000/api → http://localhost:8000)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
   const base = apiUrl.replace(/\/api\/?$/, '');
-  
+
   // Handle both relative paths (ppdb/tes_soal/img.jpg) and /storage/ prefixes
   const cleanPath = path.replace(/^\/storage\/?/, '').replace(/^\//, '');
   return `${base}/storage/${cleanPath}`;
@@ -53,19 +53,29 @@ export default function PpdbTesPage() {
     void fetchTesStatus()
       .then((response) => {
         if (!response) return;
+
+        // Jika tes sudah selesai dikerjakan, langsung ke halaman pembayaran
+        if (response.tesSubmitted) {
+          router.replace('/ppdb/dashboard/pembayaran');
+          return;
+        }
+
+        // Jika tidak bisa akses tes, arahkan berdasarkan step backend
         if (!response.canAccessTes) {
           toast({
             title: 'Tes belum tersedia',
             description: response.message || 'Silakan menunggu pengumuman berikutnya.',
           });
 
-          // Hanya redirect ke pengumuman jika step backend memang di sana.
-          // Jangan gunakan tesSubmitted karena bisa membypass step infaq.
-          const shouldGoPengumuman =
-            response.step === 'menunggu-pengumuman' ||
-            response.step === 'pengumuman';
-
-          router.replace(shouldGoPengumuman ? '/ppdb/dashboard/pengumuman' : '/ppdb/dashboard');
+          if (response.step === 'menunggu-pengumuman' || response.step === 'pengumuman') {
+            router.replace('/ppdb/dashboard/pengumuman');
+          } else if (response.step === 'pembayaran-ppdb') {
+            router.replace('/ppdb/dashboard/pembayaran');
+          } else if (response.step === 'infaq') {
+            router.replace('/ppdb/dashboard/infaq');
+          } else {
+            router.replace('/ppdb/dashboard');
+          }
         }
       })
       .catch((error) => {
@@ -81,7 +91,7 @@ export default function PpdbTesPage() {
 
   const handleSubmit = async () => {
     let finalAnswer = soalJawab.trim();
-    
+
     // Jika menggunakan formSchema dinamis, format jawabannya menjadi plain text
     if (data?.formSchema && data.formSchema.length > 0) {
       const answeredCount = Object.keys(answersMap).filter(k => answersMap[k].trim()).length;
@@ -93,7 +103,7 @@ export default function PpdbTesPage() {
         });
         return;
       }
-      
+
       const formattedLines = data.formSchema.map((q, idx) => {
         const rawAnswer = answersMap[q.id] || '';
         const ans = rawAnswer
@@ -123,12 +133,11 @@ export default function PpdbTesPage() {
 
       toast({
         title: 'Jawaban tersimpan',
-        description: 'Jawaban tes berhasil dikirim ke sistem.',
+        description: 'Jawaban tes berhasil dikirim. Mengarahkan ke halaman pembayaran...',
       });
 
-      // Redirect ke dashboard agar step logic menentukan halaman berikutnya
-      // (infaq → pembayaran-ppdb), bukan langsung ke pengumuman.
-      router.replace('/ppdb/dashboard');
+      // Setelah submit tes, langsung ke pembayaran (sesuai flow)
+      router.replace('/ppdb/dashboard/pembayaran');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan jawaban tes';
       toast({
@@ -214,7 +223,6 @@ export default function PpdbTesPage() {
                             dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}>
                             <span>{idx + 1}.</span> <span>{q.question}</span>
                           </Label>
-                          {/* Issue 2: Gambar pendukung soal */}
                           {q.image_url && getImageUrl(q.image_url) && (
                             <div className={q.bahasa === 'ar' ? 'flex justify-end' : ''}>
                               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -228,7 +236,6 @@ export default function PpdbTesPage() {
                           )}
                           <div className="pl-6">
                             {q.type === 'multiple_choice' && q.options ? (
-                              /* POIN 16: Setiap opsi memiliki box container tersendiri */
                               <RadioGroup
                                 disabled={submitLoading || data.tesSubmitted}
                                 value={answersMap[q.id] || ''}
@@ -237,15 +244,15 @@ export default function PpdbTesPage() {
                                 dir={q.bahasa === 'ar' ? 'rtl' : 'ltr'}
                               >
                                 {q.options.map((opt, i) => {
-                                  const optLabel = String.fromCharCode(65 + i) // A, B, C, ...
-                                  const optionValue = getMultipleChoiceValue(i)
-                                  const isSelected = answersMap[q.id] === optionValue
+                                  const optLabel = String.fromCharCode(65 + i);
+                                  const optionValue = getMultipleChoiceValue(i);
+                                  const isSelected = answersMap[q.id] === optionValue;
                                   return (
                                     <div
                                       key={i}
                                       onClick={() => {
                                         if (!submitLoading && !data.tesSubmitted) {
-                                          setAnswersMap(prev => ({ ...prev, [q.id]: optionValue }))
+                                          setAnswersMap(prev => ({ ...prev, [q.id]: optionValue }));
                                         }
                                       }}
                                       className={`flex items-center gap-3 rounded-lg border-2 px-4 py-3 cursor-pointer transition-all select-none
@@ -278,7 +285,7 @@ export default function PpdbTesPage() {
                                         {opt}
                                       </Label>
                                     </div>
-                                  )
+                                  );
                                 })}
                               </RadioGroup>
                             ) : (

@@ -397,6 +397,12 @@ const normalizePpdbDetail = (item: Rec): PpdbDetail => {
       const v = pickValue(records, ['pilihan_infaq_bulanan', 'pilihanInfaqBulanan']);
       return v !== null && v !== undefined ? Number(v) : null;
     })(),
+    buktiOrtuGuruPath: pickText(records, ['bukti_ortu_guru_path', 'buktiOrtuGuruPath']) || undefined,
+    buktiOrtuGuruUrl: pickText(records, ['bukti_ortu_guru_url', 'buktiOrtuGuruUrl', 'bukti_ortu_guru_path', 'buktiOrtuGuruPath']) || undefined,
+    buktiOrtuGuruVerified: (() => {
+      const v = pickValue(records, ['bukti_ortu_guru_verified', 'buktiOrtuGuruVerified']);
+      return v !== null && v !== undefined ? toBool(v) : null;
+    })(),
   };
 };
 

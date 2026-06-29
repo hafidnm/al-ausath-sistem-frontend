@@ -81,10 +81,13 @@ const getRaportDirect = async (params: any): Promise<RaportData | null> => {
     console.log('Raport status_raport:', data.status_raport)
     
     return data
-  } catch (error) {
-    console.error('Error fetching raport:', error)
-    if ((error as any)?.response?.data) {
-      console.error('Error response data:', (error as any).response.data)
+  } catch (error: any) {
+    // 404 is expected if raport hasn't been generated yet, so don't log it as an error
+    if (error?.response?.status !== 404) {
+      console.error('Error fetching raport:', error)
+      if (error?.response?.data) {
+        console.error('Error response data:', error.response.data)
+      }
     }
     return null
   }

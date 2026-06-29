@@ -45,6 +45,7 @@ import {
   mapDashboardToForm,
   SURAT_PERNYATAAN_TEMPLATE_URL,
   wait,
+  getCorrectFrontendStep,
 } from '@/lib/ppdb/santri/dashboard';
 import {
   initialPpdbDashboardFiles,
@@ -223,33 +224,25 @@ export default function PpdbDashboardPage() {
     }
 
     // Auto-redirect ke halaman sesuai flow
-    const hasSubmittedTesAnswer = Boolean((data.soalJawab || '').trim());
-    const shouldGoTes = data.step === 'tes' && !hasSubmittedTesAnswer;
+    const correctStep = getCorrectFrontendStep(data);
 
-    if (shouldGoTes) {
+    if (correctStep === 'infaq') {
+      router.replace('/ppdb/dashboard/infaq');
+      return;
+    }
+    if (correctStep === 'tes') {
       router.replace('/ppdb/tes');
       return;
     }
-
-    const statusVerifikasi = (data.statusVerifikasi || data.status || '').toLowerCase();
-    const isDecided = ['diterima', 'lulus', 'accepted', 'ditolak', 'rejected', 'tidak_diterima', 'tidak diterima'].includes(statusVerifikasi);
-
-    const shouldGoPengumuman = Boolean(
-      !shouldGoTes
-      && (
-        isDecided
-        || data.step === 'menunggu-pengumuman'
-        || data.step === 'pengumuman'
-        || data.step === 'pembayaran-uang-pangkal'
-        || data.step === 'gagal-bayar-uang-pangkal'
-        || data.step === 'pembayaran-spp'
-        || data.step === 'gagal-bayar-spp'
-        || data.step === 'siap-menjadi-santri'
-        || data.step === 'pembayaran-ppdb'
-      )
-    );
-
-    if (shouldGoPengumuman) {
+    if (correctStep === 'pembayaran-ppdb') {
+      router.replace('/ppdb/dashboard/pembayaran');
+      return;
+    }
+    if (correctStep === 'siap-menjadi-santri') {
+      router.replace('/ppdb/dashboard/siap-menjadi-santri');
+      return;
+    }
+    if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
       router.replace('/ppdb/dashboard/pengumuman');
       return;
     }
@@ -404,62 +397,27 @@ export default function PpdbDashboardPage() {
         description: 'Data pendaftar sudah diperbarui.',
       });
 
-      const hasSubmittedTesAnswer = Boolean((refreshedDashboard?.soalJawab || '').trim());
-      const shouldGoTes = Boolean(
-        refreshedDashboard?.step === 'tes' && !hasSubmittedTesAnswer,
-      );
+      const correctStep = getCorrectFrontendStep(refreshedDashboard);
 
-      if (shouldGoTes) {
+      if (correctStep === 'infaq') {
+        router.replace('/ppdb/dashboard/infaq');
+        return;
+      }
+      if (correctStep === 'tes') {
         router.replace('/ppdb/tes');
         return;
       }
-
-      if (refreshedDashboard?.step === 'pembayaran-uang-pangkal' || refreshedDashboard?.step === 'gagal-bayar-uang-pangkal') {
-        router.replace('/ppdb/dashboard/uang-pangkal');
+      if (correctStep === 'pembayaran-ppdb') {
+        router.replace('/ppdb/dashboard/pembayaran');
         return;
       }
-
-      if (refreshedDashboard?.step === 'pembayaran-spp' || refreshedDashboard?.step === 'gagal-bayar-spp') {
-        router.replace('/ppdb/dashboard/spp');
-        return;
-      }
-
-
-      if (refreshedDashboard?.step === 'siap-menjadi-santri') {
+      if (correctStep === 'siap-menjadi-santri') {
         router.replace('/ppdb/dashboard/siap-menjadi-santri');
         return;
       }
-
-      // Cek semua dokumen wajib sudah terupload
-      const allDocsUploaded = Boolean(
-        refreshedDashboard?.berkasAktaUrl &&
-        refreshedDashboard?.berkasKkUrl &&
-        refreshedDashboard?.berkasRekomendasiUstadzUrl &&
-        refreshedDashboard?.berkasSuratPernyataanUrl
-      );
-
-      const statusVerifikasi = (refreshedDashboard?.statusVerifikasi || refreshedDashboard?.status || '').toLowerCase();
-      const isDecided = ['diterima', 'lulus', 'accepted', 'ditolak', 'rejected', 'tidak_diterima', 'tidak diterima'].includes(statusVerifikasi);
-
-      const shouldGoPengumuman = Boolean(
-        !shouldGoTes
-        && (
-          isDecided
-          || refreshedDashboard?.step === 'menunggu-pengumuman'
-          || refreshedDashboard?.step === 'pengumuman'
-          || refreshedDashboard?.step === 'pembayaran-uang-pangkal'
-          || refreshedDashboard?.step === 'gagal-bayar-uang-pangkal'
-          || refreshedDashboard?.step === 'pembayaran-spp'
-          || refreshedDashboard?.step === 'gagal-bayar-spp'
-          || refreshedDashboard?.step === 'siap-menjadi-santri'
-          || refreshedDashboard?.step === 'pembayaran-ppdb'
-          || refreshedDashboard?.pendaftaranSelesai
-          || (refreshedDashboard?.formCompleted && allDocsUploaded)
-        ),
-      );
-
-      if (shouldGoPengumuman) {
+      if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
         router.replace('/ppdb/dashboard/pengumuman');
+        return;
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gagal menyimpan form PPDB';
@@ -560,7 +518,7 @@ export default function PpdbDashboardPage() {
                     <SelectContent>
                       {data.daftarPendaftaran.map((pendaftar) => (
                         <SelectItem key={pendaftar.id_pendaftaran} value={String(pendaftar.id_pendaftaran)}>
-                          {pendaftar.nama_calon || pendaftar.namaCalon || 'Calon Santri'}
+                          {pendaftar.nama_calon || 'Calon Santri'}
                         </SelectItem>
                       ))}
                     </SelectContent>

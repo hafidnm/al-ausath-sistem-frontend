@@ -12,12 +12,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getCachedUser } from "@/lib/auth-cache"
-import { useTagihan, useTagihanDetail } from "@/hooks/use-pembayaran"
+import { useTagihanDetail } from "@/hooks/use-pembayaran"
 import type { StatusPembayaran } from "@/lib/services/pembayaran.service"
 import { AlertCircle, Megaphone, Receipt, Wallet, ArrowLeft, CreditCard, UploadCloud, CheckCircle2, Loader2, Info, Download, Percent, Landmark } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/lib/axios"
-import { sppService } from "@/lib/services/spp.service"
 
 interface RekeningBank {
   id_rekening: number
@@ -42,6 +41,20 @@ const formatCurrency = (value: number): string =>
     currency: "IDR",
     maximumFractionDigits: 0,
   }).format(value)
+
+const resolveStorageUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  const storageIndex = url.indexOf('/storage/');
+  let cleanUrl = url;
+  if (storageIndex !== -1) {
+    cleanUrl = url.substring(storageIndex);
+  }
+  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) return cleanUrl;
+  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
+  if (cleanUrl.startsWith("/storage/")) return `${base}${cleanUrl}`;
+  if (cleanUrl.startsWith("storage/")) return `${base}/${cleanUrl}`;
+  return `${base}/storage/${cleanUrl.replace(/^\//, "")}`;
+}
 
 const statusLabelMap: Record<StatusPembayaran, string> = {
   menunggu_pembayaran: "Menunggu Pembayaran",
@@ -96,14 +109,11 @@ type SppSettingSummary = {
 
 export default function SantriAdministrasiPage() {
   const { toast } = useToast()
-  const { data: allTagihan, loading: loadingAll, fetchTagihan } = useTagihan()
   const { data: detailData, loading: loadingDetail, fetchTagihanDetail } = useTagihanDetail()
   
   const [nomorInduk, setNomorInduk] = useState("")
   const [rekeningList, setRekeningList] = useState<RekeningBank[]>([])
   const [selectedRekeningId, setSelectedRekeningId] = useState("")
-  const [sppSettings, setSppSettings] = useState<SppSettingSummary[]>([])
-  const [loadingSppSettings, setLoadingSppSettings] = useState(false)
 
   // Payment upload states
   const [payDialogOpen, setPayDialogOpen] = useState(false)
@@ -126,30 +136,13 @@ export default function SantriAdministrasiPage() {
       const nis = toText(authData?.user?.nomor_induk).trim()
       const sid = authData?.user?.id_santri ?? authData?.santri?.id_santri ?? null
       setNomorInduk(nis)
-      if (sid) setSantriId(Number(sid))
-      if (nis) {
-        void fetchTagihan({ nomor_induk: nis })
-      } else {
-        void fetchTagihan()
+      if (sid) {
+        const numericSid = Number(sid)
+        setSantriId(numericSid)
+        void fetchTagihanDetail(String(numericSid))
       }
     }
     void loadAuth()
-
-    setLoadingSppSettings(true)
-    sppService.getSettings({ per_page: 100 })
-      .then((res) => {
-        setSppSettings((res.data || []).map((item) => ({
-          id_setting: Number(item.id),
-          nama_setting: item.nama,
-          periode: item.tahunAjaran || null,
-          jenjang: item.jenjang || null,
-          kode_kelas: item.kodeKelas || null,
-          jumlah: item.nominal,
-          aktif: item.aktif,
-        })))
-      })
-      .catch(() => {/* non-critical */})
-      .finally(() => setLoadingSppSettings(false))
 
     // Load rekening bank aktif
     api.get("/administrasi/rekening?status=AKTIF")
@@ -161,24 +154,7 @@ export default function SantriAdministrasiPage() {
         }
       })
       .catch(() => {/* silently fail - rekening not critical */})
-  }, [fetchTagihan])
-
-  const myTagihanRow = useMemo(() => {
-    if (!nomorInduk) return null
-    return allTagihan.find((item) => toText(item.nomorInduk).trim() === nomorInduk)
-  }, [allTagihan, nomorInduk])
-
-  // Fetch detail: prefer myTagihanRow.id, fallback to santriId direct lookup
-  useEffect(() => {
-    if (myTagihanRow?.id) {
-      void fetchTagihanDetail(myTagihanRow.id)
-    } else if (santriId) {
-      // Fallback: if no matching tagihan row was found in the bill list,
-      // still try fetching detail by santri id because PPDB infaq bills may
-      // exist under the linked santri / pendaftar entity.
-      void fetchTagihanDetail(String(santriId))
-    }
-  }, [myTagihanRow?.id, santriId, fetchTagihanDetail])
+  }, [fetchTagihanDetail])
 
   useEffect(() => {
     return () => {
@@ -248,13 +224,8 @@ export default function SantriAdministrasiPage() {
       setPreviewUrl(null)
       
       // Re-fetch bills
-      if (myTagihanRow?.id) {
-        await fetchTagihanDetail(myTagihanRow.id)
-      }
-      if (nomorInduk) {
-        await fetchTagihan({ nomor_induk: nomorInduk })
-      } else {
-        await fetchTagihan()
+      if (santriId) {
+        await fetchTagihanDetail(String(santriId))
       }
     } catch (error: any) {
       toast({
@@ -338,12 +309,11 @@ export default function SantriAdministrasiPage() {
   const isPpdbProfile = detailData?.profil?.sumber === 'ppdb'
   const isPpdbAccepted = isPpdbAcceptedStatus(detailData?.profil?.status)
   const hasPpdbBilling = isPpdbProfile || ppdbInvoices.length > 0
-  const activeSppSettings = useMemo(() => sppSettings.filter((item) => item.aktif), [sppSettings])
   const belumLunasEmptyMessage = hasPpdbBilling && !isPpdbAccepted
     ? 'Tagihan PPDB akan muncul setelah pendaftaran Anda diterima. Silakan periksa status PPDB di dashboard PPDB.'
     : 'Alhamdulillah! Tidak ada tagihan yang belum lunas.'
 
-  const isLoading = loadingAll || loadingDetail
+  const isLoading = loadingDetail || !detailData
 
   return (
     <div className="space-y-6">
@@ -470,19 +440,13 @@ export default function SantriAdministrasiPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3 text-[11px]">
-                  <div className="rounded border bg-white p-2">
-                    <p className="text-slate-500 uppercase tracking-wide">Setting SPP Aktif</p>
-                    <p className="font-semibold">{activeSppSettings.length} data</p>
-                  </div>
-                  <div className="rounded border bg-white p-2">
-                    <p className="text-slate-500 uppercase tracking-wide">Setting Terkait</p>
-                    <p className="font-semibold">{linkedSppSettings.length} data</p>
-                  </div>
-                </div>
-
                 {linkedSppSettings.length > 0 && (
                   <div className="space-y-1.5">
+                    <div className="rounded border bg-white p-2">
+                      <p className="text-slate-500 uppercase tracking-wide text-[10px]">Tarif SPP Terkait</p>
+                      <p className="font-semibold text-xs">{linkedSppSettings.length} jenis tagihan</p>
+                    </div>
+                    
                     {linkedSppSettings.slice(0, 3).map((setting) => (
                       <div key={setting.id_setting} className="rounded border bg-white px-3 py-2 flex items-center justify-between gap-3">
                         <div>
@@ -495,10 +459,6 @@ export default function SantriAdministrasiPage() {
                       </div>
                     ))}
                   </div>
-                )}
-
-                {loadingSppSettings && (
-                  <p className="text-[10px] text-slate-500">Memuat setting SPP aktif...</p>
                 )}
               </div>
             )}
@@ -620,7 +580,7 @@ export default function SantriAdministrasiPage() {
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
                               {row.bukti_bayar_url && (
                                 <p className="text-xs text-emerald-700 mt-1">
-                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                  Bukti: <a href={resolveStorageUrl(row.bukti_bayar_url)} target="_blank" rel="noreferrer" className="underline">Lihat</a>
                                 </p>
                               )}
                               {row.catatan_bayar && (
@@ -693,7 +653,7 @@ export default function SantriAdministrasiPage() {
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
                               {row.bukti_bayar_url && (
                                 <p className="text-xs text-emerald-700 mt-1">
-                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                  Bukti: <a href={resolveStorageUrl(row.bukti_bayar_url)} target="_blank" rel="noreferrer" className="underline">Lihat</a>
                                 </p>
                               )}
                               {row.catatan_bayar && (

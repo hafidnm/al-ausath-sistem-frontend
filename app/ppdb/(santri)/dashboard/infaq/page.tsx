@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
-import { buildPpdbUpdatePayload, mapDashboardToForm } from '@/lib/ppdb/santri/dashboard';
+import { buildPpdbUpdatePayload, mapDashboardToForm, getCorrectFrontendStep } from '@/lib/ppdb/santri/dashboard';
 import { initialPpdbDashboardFiles } from '@/types/ppdb/santri/dashboard';
 import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
@@ -78,18 +78,19 @@ export default function PpdbInfoInfaqPage() {
     if (submitting) return;
 
     // Redirect guards: halaman ini hanya untuk step 'infaq'
-    if (data.step === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/siap-menjadi-santri');
-      return;
-    }
-    if (data.step === 'pembayaran-ppdb') {
-      // Infaq sudah diisi, lanjut ke pembayaran
-      router.replace('/ppdb/dashboard/pembayaran');
-      return;
-    }
-    if (data.step !== 'infaq') {
-      // Step lain: kembalikan ke dashboard agar diarahkan dengan benar
-      router.replace('/ppdb/dashboard');
+    const correctStep = getCorrectFrontendStep(data);
+    if (correctStep !== 'infaq') {
+      if (correctStep === 'lengkapi-form') {
+        router.replace('/ppdb/dashboard');
+      } else if (correctStep === 'tes') {
+        router.replace('/ppdb/tes');
+      } else if (correctStep === 'pembayaran-ppdb') {
+        router.replace('/ppdb/dashboard/pembayaran');
+      } else if (correctStep === 'siap-menjadi-santri') {
+        router.replace('/ppdb/dashboard/siap-menjadi-santri');
+      } else if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
+        router.replace('/ppdb/dashboard/pengumuman');
+      }
       return;
     }
 
@@ -158,13 +159,15 @@ export default function PpdbInfoInfaqPage() {
         if (isAnakGuru) sessionStorage.setItem('ppdb_is_anak_guru', '1');
       }
       
+      const shouldGoTes = data?.fiturSoalAktif && !Boolean((data?.soalJawab || '').trim());
+
       toast({
         title: 'Pilihan infaq berhasil disimpan',
-        description: 'Mengarahkan ke halaman pembayaran...',
+        description: shouldGoTes ? 'Mengarahkan ke halaman tes...' : 'Mengarahkan ke halaman pembayaran...',
       });
       
       setTimeout(() => {
-        router.push('/ppdb/dashboard/pembayaran');
+        router.push(shouldGoTes ? '/ppdb/tes' : '/ppdb/dashboard/pembayaran');
       }, 100);
     } catch (err) {
       toast({

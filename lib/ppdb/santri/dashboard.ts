@@ -1,4 +1,4 @@
-import type { PpdbPortalDashboard, PpdbPortalFormRequest } from '@/types/ppdb/portal';
+import type { PpdbPortalDashboard, PpdbPortalFormRequest, PpdbPortalStep } from '@/types/ppdb/portal';
 import { PpdbDashboardFileState, PpdbDashboardFormState } from '@/types/ppdb/santri/dashboard';
 
 export const ppdbStatusBadgeClass: Record<string, string> = {
@@ -207,4 +207,55 @@ export const buildPpdbUpdatePayload = (
     emailPpdb,
     email_ppdb: emailPpdb,
   };
+};
+
+export const getCorrectFrontendStep = (data: PpdbPortalDashboard | null): PpdbPortalStep => {
+  if (!data) return 'lengkapi-form';
+
+  const statusVerifikasi = (data.statusVerifikasi || data.status || '').toLowerCase();
+  const isDecided = ['diterima', 'lulus', 'accepted', 'ditolak', 'rejected', 'tidak_diterima', 'tidak diterima'].includes(statusVerifikasi);
+
+  // If candidate's status is decided, they should go to pengumuman (or siap-menjadi-santri if accepted)
+  if (isDecided || data.step === 'siap-menjadi-santri') {
+    if (statusVerifikasi === 'diterima' || statusVerifikasi === 'accepted' || statusVerifikasi === 'lulus' || data.step === 'siap-menjadi-santri') {
+      return 'siap-menjadi-santri';
+    }
+    return 'pengumuman';
+  }
+
+  // Step 1: Lengkapi Form
+  if (!data.formCompleted) {
+    return 'lengkapi-form';
+  }
+
+  // Step 2: Infaq
+  // Treat undefined/null/0 as "belum dipilih" — API may return undefined if never set
+  const hasSelectedInfaq =
+    (data.pilihanUangGedung === 1 || data.pilihanUangGedung === 2) &&
+    (data.pilihanInfaqBulanan === 1 || data.pilihanInfaqBulanan === 2);
+  if (!hasSelectedInfaq) {
+    return 'infaq';
+  }
+
+  // Step 3: Tes PPDB (Opsional)
+  // Only if test is active/enabled.
+  const hasSubmittedTes = Boolean((data.soalJawab || '').trim());
+  if (data.fiturSoalAktif && !hasSubmittedTes) {
+    return 'tes';
+  }
+
+  // Step 4: Pembayaran Biaya Pendaftaran
+  // Only if they haven't paid or payment is not verified/submitted
+  const ppdbAdminPaid = ['menunggu_verifikasi', 'menunggu_konfirmasi', 'terverifikasi', 'lunas', 'dp'].includes(
+    data.pembayaranPpdb?.status || ''
+  );
+  if (!ppdbAdminPaid) {
+    return 'pembayaran-ppdb';
+  }
+
+  // Step 5: Pengumuman
+  if (data.step === 'menunggu-pengumuman') {
+    return 'menunggu-pengumuman';
+  }
+  return 'pengumuman';
 };

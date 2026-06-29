@@ -8,11 +8,11 @@ import { SubjectScoresTable } from "./components/subject-scores-table"
 import { ScoresTrendChart } from "./components/scores-trend-chart"
 import { AcademicProgressCard } from "./components/academic-progress-card"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
-
-const SEMESTER = 1
+import { useSemester } from "@/contexts/semester-context"
 
 export default function AnalitikSantriPage() {
   const { selectedKodeTahun } = useTahunAjaran()
+  const { semester } = useSemester()
 
   const {
     data: subjectScores,
@@ -38,10 +38,10 @@ export default function AnalitikSantriPage() {
   useEffect(() => {
     if (!selectedKodeTahun) return
 
-    fetchScores({ tahun_ajaran: selectedKodeTahun, semester: SEMESTER })
+    fetchScores({ tahun_ajaran: selectedKodeTahun, semester })
     fetchTrend({ tahun_ajaran: selectedKodeTahun })
-    fetchProgress({ tahun_ajaran: selectedKodeTahun, semester: SEMESTER })
-  }, [selectedKodeTahun, fetchScores, fetchTrend, fetchProgress])
+    fetchProgress({ tahun_ajaran: selectedKodeTahun, semester })
+  }, [selectedKodeTahun, semester, fetchScores, fetchTrend, fetchProgress])
 
   return (
     <div className="space-y-6">
