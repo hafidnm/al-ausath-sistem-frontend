@@ -421,8 +421,13 @@ export const ppdbPortalApi = {
     return normalizeDashboard(response.data);
   },
 
-  async getBillingInfo(): Promise<PpdbPortalBillingInfo> {
-    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/billing`);
+  async getBillingInfo(program?: string): Promise<PpdbPortalBillingInfo> {
+    const params: Record<string, string> = {};
+    if (program) {
+      params.program = program;
+      params.jenjang = program;
+    }
+    const response = await api.get(`${PPDB_PORTAL_BASE_PATH}/billing`, { params });
     const data = resolveData(response.data);
     const selectedUangGedung = asRecord(data.selected_uang_gedung);
     const selectedInfaqBulanan = asRecord(data.selected_infaq_bulanan);
@@ -477,6 +482,8 @@ export const ppdbPortalApi = {
       uangGedungAmount: data.uang_gedung_amount != null ? Number(data.uang_gedung_amount) : null,
       infaqBulananLabel: asString(data.infaq_bulanan_label) || null,
       infaqBulananAmount: data.infaq_bulanan_amount != null ? Number(data.infaq_bulanan_amount) : null,
+      perlengkapanAmount: data.perlengkapan_amount != null ? Number(data.perlengkapan_amount) : 0,
+      uangModulAmount: data.uang_modul_amount != null ? Number(data.uang_modul_amount) : 0,
     };
   },
 

@@ -207,6 +207,8 @@ export interface PpdbPortalBillingInfo {
   uangGedungAmount: number | null;
   infaqBulananLabel: string | null;
   infaqBulananAmount: number | null;
+  perlengkapanAmount: number;
+  uangModulAmount: number;
 }
 
 export interface PpdbPortalTesStatus {

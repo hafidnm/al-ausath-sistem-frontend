@@ -157,7 +157,8 @@ export default function PpdbPage() {
   const [isTagihanLoading, setIsTagihanLoading] = useState(false)
   const [isTerimaOpen, setIsTerimaOpen] = useState(false)
   const [terimaPendaftar, setTerimaPendaftar] = useState<PpdbDetail | null>(null)
-  const [integrasikanSantri, setIntegrasikanSantri] = useState(false)
+  // integrasikanSantri selalu true — integrasi langsung wajib saat menerima santri
+  // agar NIS tidak pernah berada di status 'Sedang Diproses'
   const [kodeKelasDiterima, setKodeKelasDiterima] = useState("")
   const [kelasList, setKelasList] = useState<KelasItem[]>([])
   const [kelasLoading, setKelasLoading] = useState(false)
@@ -473,7 +474,9 @@ export default function PpdbPage() {
         updateVerification(id, { 
           status: "Diterima", 
           keterangan: "",
-          integrasikanLangsungKeSantri: integrasikanSantri,
+          // Selalu true — integrasi wajib agar NIS langsung digenerate
+          // dan santri tidak pernah berada di state 'Sedang Diproses'
+          integrasikanLangsungKeSantri: true,
           kodeKelasDiterima: kodeKelasDiterima
         }),
       )
@@ -486,14 +489,8 @@ export default function PpdbPage() {
       })
       setIsTerimaOpen(false)
       setTerimaPendaftar(null)
-      setIntegrasikanSantri(false)
       setKodeKelasDiterima("")
       void fetchList()
-      
-      // Auto-redirect ke halaman uang-pangkal setelah penerimaan berhasil
-      setTimeout(() => {
-        router.push("/ppdb/dashboard/uang-pangkal")
-      }, 800)
     } catch (err) { alert(getErrorMessage(err, "Gagal menerima pendaftar")) }
   }
 
@@ -589,6 +586,42 @@ export default function PpdbPage() {
     }
   }
 
+  /**
+   * Integrasi ulang santri yang sudah Diterima tapi NIS belum pernah digenerate.
+   * Terjadi karena admin sebelumnya tidak mencentang checkbox integrasi.
+   * Sekarang checkbox dihapus dan integrasi selalu wajib, tapi untuk data lama
+   * admin bisa trigger manual lewat menu ini.
+   */
+  const [integrasiLoading, setIntegrasiLoading] = useState(false)
+
+  const handleIntegrasikanSantri = async (p: PpdbDetail) => {
+    const kodeKelas = p.kodeKelasDiterima ||
+      prompt(`Masukkan kode kelas yang diterima untuk ${p.name} (contoh: 10-PI):`)
+    if (!kodeKelas?.trim()) {
+      alert("Kode kelas wajib diisi untuk generate NIS.")
+      return
+    }
+    if (!confirm(`Generate NIS dan integrasikan ${p.name} ke master santri dengan kelas ${kodeKelas}?`)) return
+
+    setIntegrasiLoading(true)
+    try {
+      await runActionWithIdFallback(p, (id) =>
+        updateVerification(id, {
+          status: "Diterima",
+          keterangan: "",
+          integrasikanLangsungKeSantri: true,
+          kodeKelasDiterima: kodeKelas.trim(),
+        })
+      )
+      alert(`NIS berhasil digenerate untuk ${p.name}. Refresh halaman untuk melihat perubahan.`)
+      void fetchList()
+    } catch (err) {
+      alert(getErrorMessage(err, "Gagal mengintegrasikan santri"))
+    } finally {
+      setIntegrasiLoading(false)
+    }
+  }
+
   // ── Stats ─────────────────────────────────────────────────────────────────
   // Note: For true global stats across all pages, consider updating backend to provide global counters.
   // For now, these represent counts from the overall paginator (total) and the current page items.
@@ -674,6 +707,8 @@ export default function PpdbPage() {
             onCreateTagihan={handleCreateTagihan}
             onCreateTagihanInfaq={handleCreateTagihanInfaq}
             tagihanLoading={isTagihanLoading}
+            onIntegrasikanSantri={handleIntegrasikanSantri}
+            integrasiLoading={integrasiLoading}
           />
 
           {/* Rekap Diterima & Ditolak */}
@@ -809,17 +844,11 @@ export default function PpdbPage() {
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 pt-2">
-              <input
-                type="checkbox"
-                id="integrasikanSantri"
-                checked={integrasikanSantri}
-                onChange={(e) => setIntegrasikanSantri(e.target.checked)}
-                className="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-4 w-4"
-              />
-              <Label htmlFor="integrasikanSantri" className="cursor-pointer font-normal">
-                Integrasikan Langsung Data ke Master Santri Sekarang
-              </Label>
+            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 flex items-start gap-2">
+              <svg className="w-4 h-4 mt-0.5 shrink-0 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20A10 10 0 0012 2z" /></svg>
+              <span>
+                Data santri akan <strong>langsung diintegrasikan</strong> ke master santri dan NIS akan digenerate otomatis saat klik Terima.
+              </span>
             </div>
           </div>
           <DialogFooter>

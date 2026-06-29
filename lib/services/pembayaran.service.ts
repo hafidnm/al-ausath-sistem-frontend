@@ -60,6 +60,8 @@ export interface TagihanDetailResponse {
     tahun_ajaran: string | null;
     status: string | null;
     isAnakGuru?: boolean;
+    is_pindah?: boolean;
+    tanggal_masuk?: string | null;
   };
   ringkasan: {
     jumlah_invoice: number;
