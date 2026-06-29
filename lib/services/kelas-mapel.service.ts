@@ -10,6 +10,7 @@ export interface DataKelasMapelApiItem {
   kode_mapel?: string
   nama_mapel?: string
   id_petugas?: number | null
+  kode_unit?: string
   tahun_ajaran?: string
   semester?: number | string
   buku_acuan?: string | null
@@ -19,6 +20,7 @@ export interface DataKelasMapelApiItem {
   kelas?: {
     kode_kelas?: string
     nama_kelas?: string
+    kode_unit?: string
   } | null
   mapel?: {
     kode_mapel?: string

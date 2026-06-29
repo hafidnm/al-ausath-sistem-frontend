@@ -38,9 +38,8 @@ import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, PlusCirc
 import { nilaiMapelService, BulkUpsertNilaiMapelPayload, NilaiMapelTugasItem } from "@/lib/services/nilai-mapel.service"
 import { kkmService } from "@/lib/services/kkm.service"
 import { bobotNilaiService } from "@/lib/services/bobot-nilai.service"
-import { kelasService } from "@/lib/services/kelas.service"
-import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
-import { authService } from "@/lib/services/auth.service"
+import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import { calculateRaporRaw, normalizeRaporDisplay, statusKkm } from "../utils/helpers"
 import { semesterOptions } from "../utils/constants"
 import { downloadNilaiTemplate, parseNilaiCsv, CsvParseResult, CsvSantriRow } from "../utils/csv-helpers"
@@ -62,10 +61,12 @@ interface SantriRow {
 const extractPetugasInputId = (me: any): number | undefined => {
   const candidates = [
     me?.user?.id_petugas,
+    me?.user?.petugas?.id_petugas,
     me?.user?.petugas_id,
     me?.user?.idDataPetugas,
     me?.user?.data_petugas?.id,
     me?.id_petugas,
+    me?.petugas?.id_petugas,
     me?.petugas_id,
     me?.idDataPetugas,
     me?.data_petugas?.id,
@@ -77,6 +78,33 @@ const extractPetugasInputId = (me: any): number | undefined => {
     if (Number.isFinite(id) && id > 0) return id
   }
   return undefined
+}
+
+const normalizeRoleValue = (value: unknown): string[] => {
+  if (value == null) return []
+  if (Array.isArray(value)) {
+    return value.flat(Infinity).filter(Boolean).map(String).map((v) => v.trim().toLowerCase())
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed.flat(Infinity).filter(Boolean).map(String).map((v) => v.trim().toLowerCase())
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
+    return [trimmed.toLowerCase()]
+  }
+  return [String(value).trim().toLowerCase()]
+}
+
+const hasRole = (me: any, targetRole: string): boolean => {
+  const roles = normalizeRoleValue(me?.user?.peran_akun ?? me?.peran_akun)
+  return roles.includes(targetRole.toLowerCase())
 }
 
 const parseNilai = (val: string): number => {
@@ -91,8 +119,8 @@ export function NilaiMapelForm() {
   const [rawMapelOptions, setRawMapelOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
   
   const { selectedUnit } = useUnit()
-  const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
-  
+  const selectedKodeUnit = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+
   const [kodeKelas, setKodeKelas] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
   const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
@@ -120,34 +148,106 @@ export function NilaiMapelForm() {
 
   // Load User, Kelas, Mapel
   useEffect(() => {
-    authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
-    kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setRawKelasOptions(res.map(k => ({ value: k.kode_kelas ?? "", label: k.nama_kelas ?? k.kode_kelas ?? "", kode_unit: k.kode_unit }))))
-      .catch(console.error)
-    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setRawMapelOptions(res.map(m => ({ value: m.kode_mapel ?? "", label: m.nama_mapel ?? m.kode_mapel ?? "", kode_unit: m.kode_unit ?? undefined }))))
-      .catch(console.error)
-  }, [])
+    const fetchOptions = async () => {
+      const me = await getCachedUser()
+      const idPetugas = extractPetugasInputId(me)
+      const isAdmin = hasRole(me, "Petugas Admin")
+      setPetugasInputId(idPetugas)
+
+      if (!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit) {
+        setRawKelasOptions([])
+        setRawMapelOptions([])
+        setKodeKelas("")
+        setKodeMapel("")
+        return
+      }
+
+      if (idPetugas || isAdmin) {
+        try {
+          const params: any = {
+            status: "AKTIF",
+            per_page: 200,
+          }
+
+          if (!isAdmin && idPetugas) {
+            params.id_petugas = idPetugas
+          }
+          params.tahun_ajaran = selectedTahunAjaran.nama_tahun
+          if (semester) params.semester = Number(semester)
+          params.kode_unit = selectedKodeUnit
+
+          const { data } = await dataKelasMapelService.getAll(params)
+
+          const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+          const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+
+          for (const item of data) {
+            const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
+            const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
+            const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
+            const namaMapel = item.nama_mapel ?? item.mapel?.nama_mapel ?? item.mata_pelajaran?.nama_mapel ?? item.mataPelajaran?.nama_mapel ?? kodeMapel
+            const kodeUnit = item.kode_unit ?? item.kelas?.kode_unit ?? undefined
+
+            if (kodeKelas && !kelasMap.has(kodeKelas)) {
+              kelasMap.set(kodeKelas, {
+                value: kodeKelas,
+                label: namaKelas ?? kodeKelas,
+                kode_unit: kodeUnit,
+              })
+            }
+
+            if (kodeMapel && !mapelMap.has(kodeMapel)) {
+              mapelMap.set(kodeMapel, {
+                value: kodeMapel,
+                label: namaMapel ?? kodeMapel,
+                kode_unit: kodeUnit,
+              })
+            }
+          }
+
+          setRawKelasOptions(Array.from(kelasMap.values()))
+          setRawMapelOptions(Array.from(mapelMap.values()))
+          return
+        } catch (error) {
+          console.error(error)
+          setRawKelasOptions([])
+          setRawMapelOptions([])
+          return
+        }
+      }
+
+      setRawKelasOptions([])
+      setRawMapelOptions([])
+      return
+    }
+
+    fetchOptions()
+  }, [selectedTahunAjaran?.nama_tahun, semester, selectedKodeUnit])
+
+  useEffect(() => {
+    setKodeKelas("")
+    setKodeMapel("")
+  }, [selectedTahunAjaran?.nama_tahun, selectedKodeUnit])
 
   const kelasOptions = useMemo(() => {
     let filtered = rawKelasOptions
-    if (kodeUnitFromContext) {
+    if (selectedKodeUnit) {
       filtered = filtered.filter(item => 
-        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+        !item.kode_unit || item.kode_unit.toUpperCase() === selectedKodeUnit
       )
     }
     return filtered
-  }, [rawKelasOptions, kodeUnitFromContext])
+  }, [rawKelasOptions, selectedKodeUnit])
 
   const mapelOptions = useMemo(() => {
     let filtered = rawMapelOptions
-    if (kodeUnitFromContext) {
+    if (selectedKodeUnit) {
       filtered = filtered.filter(item => 
-        !item.kode_unit || item.kode_unit.toUpperCase() === kodeUnitFromContext
+        !item.kode_unit || item.kode_unit.toUpperCase() === selectedKodeUnit
       )
     }
     return filtered
-  }, [rawMapelOptions, kodeUnitFromContext])
+  }, [rawMapelOptions, selectedKodeUnit])
 
   // Load KKM and Bobot when mapel/ta/semester change
   useEffect(() => {
@@ -451,19 +551,43 @@ export function NilaiMapelForm() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <Label>Kelas</Label>
-              <Select value={kodeKelas} onValueChange={setKodeKelas}>
-                <SelectTrigger><SelectValue placeholder="Pilih Kelas" /></SelectTrigger>
+              <Select
+                value={kodeKelas}
+                onValueChange={setKodeKelas}
+                disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Kelas" : "Pilih Tahun Ajaran + Unit dulu"} />
+                </SelectTrigger>
                 <SelectContent>
-                  {kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}
+                  {kelasOptions.length > 0 ? (
+                    kelasOptions.map(k => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)
+                  ) : (
+                    <SelectItem key="empty" value="no-kelas" disabled>
+                      {selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Tidak ada kelas" : "Pilih header terlebih dahulu"}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Mata Pelajaran</Label>
-              <Select value={kodeMapel} onValueChange={setKodeMapel}>
-                <SelectTrigger><SelectValue placeholder="Pilih Mapel" /></SelectTrigger>
+              <Select
+                value={kodeMapel}
+                onValueChange={setKodeMapel}
+                disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Mapel" : "Pilih Tahun Ajaran + Unit dulu"} />
+                </SelectTrigger>
                 <SelectContent>
-                  {mapelOptions.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                  {mapelOptions.length > 0 ? (
+                    mapelOptions.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)
+                  ) : (
+                    <SelectItem key="empty" value="no-mapel" disabled>
+                      {selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Tidak ada mapel" : "Pilih header terlebih dahulu"}
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
