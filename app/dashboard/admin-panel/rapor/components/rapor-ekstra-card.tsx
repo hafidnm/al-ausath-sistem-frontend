@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import type { RaporItem } from "@/lib/services/rapor.service"
-import { ekskulService, EkskulApiItem } from "@/lib/services/ekskul.service"
+import { ekskulService, EkskulApiItem, PendaftaranApiItem } from "@/lib/services/ekskul.service"
 import { useEffect, useState } from "react"
 
 const NILAI_EKSTRA_OPTIONS = [
@@ -49,10 +49,24 @@ export function RaporEkstraCard({
   const [ekskulOptions, setEkskulOptions] = useState<EkskulApiItem[]>([])
   
   useEffect(() => {
-    ekskulService.getAll().then((res) => {
-      setEkskulOptions(res.data)
-    }).catch(console.error)
-  }, [])
+    if (!selected?.nomor_induk) {
+      setEkskulOptions([])
+      return
+    }
+    
+    // Ambil rekap pendaftaran ekskul khusus santri ini
+    ekskulService.getRekap({ nomor_induk: selected.nomor_induk, per_page: 50 })
+      .then((res: any) => {
+        const data = res.data || res.items || res
+        if (Array.isArray(data)) {
+          const ekskulList = data
+            .map((item: PendaftaranApiItem) => item.ekskul)
+            .filter((ekskul): ekskul is EkskulApiItem => ekskul !== undefined)
+          setEkskulOptions(ekskulList)
+        }
+      })
+      .catch(console.error)
+  }, [selected?.nomor_induk])
 
   const handleAddRow = () => {
     onEkstraListChange((current) => [...current, { nama: "", nilai: "" }])

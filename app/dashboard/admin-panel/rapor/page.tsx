@@ -469,6 +469,14 @@ export default function AdminPanelRaporPage() {
         tahun_ajaran: catatanForm.tahun_ajaran.trim(),
         semester: Number(catatanForm.semester),
         catatan_wali: catatanForm.catatan_wali.trim() || "-",
+        id_wali_kelas: catatanForm.id_wali_kelas.trim() ? Number(catatanForm.id_wali_kelas) : undefined,
+        keseharian_kebersihan: catatanForm.keseharian_kebersihan.trim() || undefined,
+        keseharian_kerapian: catatanForm.keseharian_kerapian.trim() || undefined,
+        keseharian_keterampilan: catatanForm.keseharian_keterampilan.trim() || undefined,
+        keseharian_kelakuan: catatanForm.keseharian_kelakuan.trim() || undefined,
+        keseharian_kerajinan: catatanForm.keseharian_kerajinan.trim() || undefined,
+        keseharian_kedisiplinan: catatanForm.keseharian_kedisiplinan.trim() || undefined,
+        keseharian_ketaatan: catatanForm.keseharian_ketaatan.trim() || undefined,
         ekstrakurikuler: validList,
       })
 
