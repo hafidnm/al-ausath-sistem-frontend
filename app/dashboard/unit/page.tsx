@@ -69,7 +69,6 @@ import { useToast } from "@/hooks/use-toast"
 
 type UnitStatus = "Aktif" | "Nonaktif"
 type SortField =
-  | "urut"
   | "kode"
   | "nama"
   | "keterangan"
@@ -79,7 +78,6 @@ type SortField =
 
 interface UnitRow {
   id: number
-  urut: number
   kode: string
   nama: string
   keterangan: string
@@ -89,7 +87,6 @@ interface UnitRow {
 }
 
 interface UnitFormData {
-  urut: string
   kode: string
   nama: string
   keterangan: string
@@ -99,7 +96,6 @@ interface UnitFormData {
 }
 
 const defaultFormState: UnitFormData = {
-  urut: "",
   kode: "",
   nama: "",
   keterangan: "",
@@ -130,7 +126,6 @@ const fromBackendStatus = (status: unknown): UnitStatus => {
 
 const normalizeUnitRow = (raw: DataUnitApiItem): UnitRow => ({
   id: toNumber(raw.id_unit ?? raw.id, -1),
-  urut: toNumber(raw.nomor_urut, 0),
   kode: toText(raw.kode_unit),
   nama: toText(raw.nama_unit),
   keterangan: toText(raw.keterangan) || "-",
@@ -169,7 +164,7 @@ export default function UnitPage() {
 
   const [rowsPerPage, setRowsPerPage] = useState("25")
   const [currentPage, setCurrentPage] = useState(1)
-  const [sortField, setSortField] = useState<SortField>("urut")
+  const [sortField, setSortField] = useState<SortField>("kode")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -326,7 +321,6 @@ export default function UnitPage() {
   const openDetailDialog = (unit: UnitRow) => {
     setEditingId(unit.id)
     setEditingFormData({
-      urut: String(unit.urut),
       kode: unit.kode,
       nama: unit.nama,
       keterangan: unit.keterangan === "-" ? "" : unit.keterangan,
@@ -354,7 +348,6 @@ export default function UnitPage() {
         await dataUnitService.update(editingId, {
           kode_unit: editingFormData.kode,
           nama_unit: editingFormData.nama,
-          nomor_urut: editingFormData.urut ? Number(editingFormData.urut) : null,
           keterangan: editingFormData.keterangan || null,
           status: toBackendStatus(editingFormData.statusUnit),
         })
@@ -426,7 +419,6 @@ export default function UnitPage() {
         await dataUnitService.create({
           kode_unit: formData.kode,
           nama_unit: formData.nama,
-          nomor_urut: formData.urut ? Number(formData.urut) : null,
           keterangan: formData.keterangan || null,
           status: toBackendStatus(formData.statusUnit),
         })
@@ -485,18 +477,7 @@ export default function UnitPage() {
               </DialogHeader>
 
               <div className="grid gap-4 py-4">
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="unit-urut">No. Urut</Label>
-                    <Input
-                      id="unit-urut"
-                      type="number"
-                      min={1}
-                      value={formData.urut}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, urut: event.target.value }))}
-                    />
-                  </div>
-
+                <div className="grid gap-2 md:grid-cols-1">
                   <div className="space-y-2">
                     <Label htmlFor="unit-kode">Kode Unit</Label>
                     <Input
@@ -697,12 +678,6 @@ export default function UnitPage() {
                   </TableHead>
                   <TableHead className="w-12 text-xs font-semibold uppercase tracking-wide text-muted-foreground">#</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("urut")}>
-                      NO. URUT
-                      <ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "urut" && "text-foreground")} />
-                    </button>
-                  </TableHead>
-                  <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     <button type="button" className="inline-flex items-center gap-1" onClick={() => handleSort("kode")}>
                       KODE UNIT
                       <ArrowUpDown className={cn("h-3.5 w-3.5", sortField === "kode" && "text-foreground")} />
@@ -760,7 +735,6 @@ export default function UnitPage() {
                         />
                       </TableCell>
                       <TableCell className="font-medium">{(currentPage - 1) * rowsLimit + index + 1}</TableCell>
-                      <TableCell>{unit.urut}</TableCell>
                       <TableCell>{unit.kode}</TableCell>
                       <TableCell>{unit.nama}</TableCell>
                       <TableCell>{unit.keterangan}</TableCell>
@@ -848,18 +822,7 @@ export default function UnitPage() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="detail-urut">No. Urut</Label>
-                <Input
-                  id="detail-urut"
-                  type="number"
-                  min={1}
-                  value={editingFormData.urut}
-                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, urut: event.target.value }))}
-                />
-              </div>
-
+            <div className="grid gap-2 md:grid-cols-1">
               <div className="space-y-2">
                 <Label htmlFor="detail-kode">Kode Unit</Label>
                 <Input

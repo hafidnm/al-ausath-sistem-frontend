@@ -21,7 +21,6 @@ import { ArrowLeft, CircleCheck, Download, Upload } from "lucide-react"
 type PreviewRow = {
   kode_unit: string
   nama_unit: string
-  nomor_urut: string
   keterangan: string
   status: string
   jumlah_kelas: string
@@ -31,7 +30,6 @@ type PreviewRow = {
 const TEMPLATE_HEADERS = [
   "kode_unit",
   "nama_unit",
-  "nomor_urut",
   "keterangan",
   "status",
 ]
@@ -66,7 +64,6 @@ const mapAffectedUnitsToPreview = (units: DataUnitApiItem[]): PreviewRow[] => {
   return units.map((unit) => ({
     kode_unit: toText(unit.kode_unit),
     nama_unit: toText(unit.nama_unit),
-    nomor_urut: toText(unit.nomor_urut),
     keterangan: toText(unit.keterangan),
     status: toText(unit.status),
     jumlah_kelas: String(toNumber(unit.jumlah_kelas ?? unit.kelas_count)),
@@ -96,7 +93,6 @@ const parseCsvText = (content: string): PreviewRow[] => {
     return {
       kode_unit: rowObj.kode_unit || "",
       nama_unit: rowObj.nama_unit || "",
-      nomor_urut: rowObj.nomor_urut || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
       jumlah_kelas: "-",
@@ -134,7 +130,6 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
     return {
       kode_unit: rowObj.kode_unit || "",
       nama_unit: rowObj.nama_unit || "",
-      nomor_urut: rowObj.nomor_urut || "",
       keterangan: rowObj.keterangan || "",
       status: rowObj.status || "",
       jumlah_kelas: "-",
@@ -155,8 +150,8 @@ export default function UnitImportPage() {
   const handleDownloadTemplate = () => {
     const templateRows = [
       TEMPLATE_HEADERS.join(","),
-      "PAUD,PAUD,1,Jenjang PAUD,AKTIF",
-      "TK,TK,2,Jenjang TK,AKTIF",
+      "PAUD,PAUD,Jenjang PAUD,AKTIF",
+      "TK,TK,Jenjang TK,AKTIF",
     ]
 
     const blob = new Blob([templateRows.join("\n")], { type: "text/csv;charset=utf-8;" })
@@ -315,7 +310,6 @@ export default function UnitImportPage() {
                 <TableHead>#</TableHead>
                 <TableHead>KODE UNIT</TableHead>
                 <TableHead>NAMA UNIT</TableHead>
-                <TableHead>NOMOR URUT</TableHead>
                 <TableHead>KETERANGAN</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>JUMLAH KELAS</TableHead>
@@ -326,13 +320,13 @@ export default function UnitImportPage() {
             <TableBody>
               {!isPreviewAvailable ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Pratinjau tidak tersedia. Klik Proses Impor Data untuk melanjutkan.
                   </TableCell>
                 </TableRow>
               ) : previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -342,7 +336,6 @@ export default function UnitImportPage() {
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{row.kode_unit || "-"}</TableCell>
                     <TableCell>{row.nama_unit || "-"}</TableCell>
-                    <TableCell>{row.nomor_urut || "-"}</TableCell>
                     <TableCell>{row.keterangan || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
                     <TableCell>{row.jumlah_kelas || "0"}</TableCell>

@@ -42,6 +42,20 @@ const formatCurrency = (value: number): string =>
     maximumFractionDigits: 0,
   }).format(value)
 
+const resolveStorageUrl = (url: string | null | undefined): string => {
+  if (!url) return "";
+  const storageIndex = url.indexOf('/storage/');
+  let cleanUrl = url;
+  if (storageIndex !== -1) {
+    cleanUrl = url.substring(storageIndex);
+  }
+  if (cleanUrl.startsWith("http://") || cleanUrl.startsWith("https://")) return cleanUrl;
+  const base = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000").replace(/\/api\/?$/, "");
+  if (cleanUrl.startsWith("/storage/")) return `${base}${cleanUrl}`;
+  if (cleanUrl.startsWith("storage/")) return `${base}/${cleanUrl}`;
+  return `${base}/storage/${cleanUrl.replace(/^\//, "")}`;
+}
+
 const statusLabelMap: Record<StatusPembayaran, string> = {
   menunggu_pembayaran: "Menunggu Pembayaran",
   menunggu_konfirmasi: "Menunggu Verifikasi",
@@ -566,7 +580,7 @@ export default function SantriAdministrasiPage() {
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
                               {row.bukti_bayar_url && (
                                 <p className="text-xs text-emerald-700 mt-1">
-                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                  Bukti: <a href={resolveStorageUrl(row.bukti_bayar_url)} target="_blank" rel="noreferrer" className="underline">Lihat</a>
                                 </p>
                               )}
                               {row.catatan_bayar && (
@@ -639,7 +653,7 @@ export default function SantriAdministrasiPage() {
                               <p className="text-xs text-muted-foreground">Tahun Ajaran: {row.periode_tagihan || "-"}</p>
                               {row.bukti_bayar_url && (
                                 <p className="text-xs text-emerald-700 mt-1">
-                                  Bukti: <a href={row.bukti_bayar_url} target="_blank" rel="noreferrer" className="underline">Lihat</a>
+                                  Bukti: <a href={resolveStorageUrl(row.bukti_bayar_url)} target="_blank" rel="noreferrer" className="underline">Lihat</a>
                                 </p>
                               )}
                               {row.catatan_bayar && (

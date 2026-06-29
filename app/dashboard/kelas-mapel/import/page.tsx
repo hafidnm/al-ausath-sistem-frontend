@@ -14,9 +14,10 @@ import { ArrowLeft, CircleCheck, Download, Upload } from "lucide-react"
 type PreviewRow = {
   kode_kelas: string
   kode_mapel: string
-  nama_mapel: string
+  nama_petugas: string
   tahun_ajaran: string
   semester: string
+  buku_acuan: string
   status: string
 }
 
@@ -56,9 +57,10 @@ const parseCsvText = (content: string): PreviewRow[] => {
     return {
       kode_kelas: rowObj.kode_kelas || "",
       kode_mapel: rowObj.kode_mapel || "",
-      nama_mapel: rowObj.nama_mapel || "",
+      nama_petugas: rowObj.nama_petugas || "",
       tahun_ajaran: rowObj.tahun_ajaran || "",
       semester: rowObj.semester || "",
+      buku_acuan: rowObj.buku_acuan || "",
       status: rowObj.status || "",
     }
   })
@@ -245,9 +247,10 @@ export default function MapelImportPage() {
                 <TableHead>#</TableHead>
                 <TableHead>KODE KELAS</TableHead>
                 <TableHead>KODE MAPEL</TableHead>
-                <TableHead>NAMA MAPEL</TableHead>
+                <TableHead>NAMA PETUGAS</TableHead>
                 <TableHead>TAHUN AJARAN</TableHead>
                 <TableHead>SEMESTER</TableHead>
+                <TableHead>BUKU ACUAN</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>AKSI IMPOR</TableHead>
               </TableRow>
@@ -255,7 +258,7 @@ export default function MapelImportPage() {
             <TableBody>
               {previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
@@ -265,9 +268,10 @@ export default function MapelImportPage() {
                     <TableCell>{index + 1}</TableCell>
                     <TableCell>{row.kode_kelas || "-"}</TableCell>
                     <TableCell>{row.kode_mapel || "-"}</TableCell>
-                    <TableCell>{row.nama_mapel || "-"}</TableCell>
+                    <TableCell>{row.nama_petugas || "-"}</TableCell>
                     <TableCell>{row.tahun_ajaran || "-"}</TableCell>
                     <TableCell>{row.semester || "-"}</TableCell>
+                    <TableCell>{row.buku_acuan || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-primary/15 text-primary">

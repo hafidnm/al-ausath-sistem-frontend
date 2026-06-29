@@ -15,7 +15,8 @@ import {
 import { ArrowLeft, CircleCheck, Download, Upload } from "lucide-react"
 
 type PreviewRow = {
-  id_kelas_mapel: string
+  kode_kelas: string
+  kode_mapel: string
   hari: string
   jam_mulai: string
   jam_selesai: string
@@ -58,7 +59,8 @@ const parseCsvText = (content: string): PreviewRow[] => {
     })
 
     return {
-      id_kelas_mapel: rowObj.id_kelas_mapel || "",
+      kode_kelas: rowObj.kode_kelas || "",
+      kode_mapel: rowObj.kode_mapel || "",
       hari: rowObj.hari || "",
       jam_mulai: rowObj.jam_mulai || "",
       jam_selesai: rowObj.jam_selesai || "",
@@ -248,7 +250,8 @@ export default function JadwalPembelajaranImportPage() {
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
                 <TableHead>#</TableHead>
-                <TableHead>ID KELAS MAPEL</TableHead>
+                <TableHead>KODE KELAS</TableHead>
+                <TableHead>KODE MAPEL</TableHead>
                 <TableHead>HARI</TableHead>
                 <TableHead>JAM MULAI</TableHead>
                 <TableHead>JAM SELESAI</TableHead>
@@ -261,15 +264,16 @@ export default function JadwalPembelajaranImportPage() {
             <TableBody>
               {previewRows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="py-10 text-center text-muted-foreground">
                     Belum ada data untuk dipratinjau.
                   </TableCell>
                 </TableRow>
               ) : (
                 previewRows.map((row, index) => (
-                  <TableRow key={`${row.id_kelas_mapel}-${index}`}>
+                  <TableRow key={`${row.kode_kelas}-${row.kode_mapel}-${index}`}>
                     <TableCell>{index + 1}</TableCell>
-                    <TableCell>{row.id_kelas_mapel || "-"}</TableCell>
+                    <TableCell>{row.kode_kelas || "-"}</TableCell>
+                    <TableCell>{row.kode_mapel || "-"}</TableCell>
                     <TableCell>{row.hari || "-"}</TableCell>
                     <TableCell>{row.jam_mulai || "-"}</TableCell>
                     <TableCell>{row.jam_selesai || "-"}</TableCell>

@@ -47,7 +47,6 @@ interface MapelRow {
   namaMapel: string
   kodeUnit: string | null
   kelompokMapel: string | null
-  urutan: number | null
   keterangan: string | null
   status: UiStatus
 }
@@ -57,7 +56,6 @@ interface MapelFormData {
   namaMapel: string
   kodeUnit: string | null
   kelompokMapel: string | null
-  urutan: string
   keterangan: string | null
   status: UiStatus
 }
@@ -72,7 +70,6 @@ const defaultFormState: MapelFormData = {
   namaMapel: "",
   kodeUnit: null,
   kelompokMapel: null,
-  urutan: "",
   keterangan: null,
   status: "Aktif",
 }
@@ -98,7 +95,6 @@ const normalizeRow = (raw: DataMataPelajaranApiItem): MapelRow => ({
   namaMapel: toText(raw.nama_mapel),
   kodeUnit: raw.kode_unit ?? null,
   kelompokMapel: raw.kelompok_mapel ?? null,
-  urutan: toNumber(raw.urutan, 0) || null,
   keterangan: raw.keterangan ?? null,
   status: fromBackendStatus(raw.status),
 })
@@ -311,7 +307,6 @@ export default function MapelPage() {
       namaMapel: target.namaMapel,
       kodeUnit: target.kodeUnit || null,
       kelompokMapel: target.kelompokMapel || null,
-      urutan: target.urutan ? String(target.urutan) : "",
       keterangan: target.keterangan || null,
       status: target.status,
     })
@@ -331,14 +326,11 @@ export default function MapelPage() {
 
       setIsLoading(true)
       try {
-        const urutan = formData.urutan ? parseInt(formData.urutan, 10) : null
-
         await dataMataPelajaranService.create({
           kode_mapel: formData.kodeMapel,
           nama_mapel: formData.namaMapel,
           kode_unit: formData.kodeUnit || null,
           kelompok_mapel: formData.kelompokMapel || null,
-          urutan,
           keterangan: formData.keterangan || null,
           status: toBackendStatus(formData.status),
         })
@@ -380,14 +372,11 @@ export default function MapelPage() {
 
       setIsLoading(true)
       try {
-        const urutan = editingFormData.urutan ? parseInt(editingFormData.urutan, 10) : null
-
         await dataMataPelajaranService.update(editingId, {
           kode_mapel: editingFormData.kodeMapel,
           nama_mapel: editingFormData.namaMapel,
           kode_unit: editingFormData.kodeUnit || null,
           kelompok_mapel: editingFormData.kelompokMapel || null,
-          urutan,
           keterangan: editingFormData.keterangan || null,
           status: toBackendStatus(editingFormData.status),
         })
@@ -568,7 +557,7 @@ export default function MapelPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label>
                       Kode Unit <span className="text-destructive">*</span>
@@ -598,16 +587,6 @@ export default function MapelPage() {
                       value={formData.kelompokMapel || ""}
                       onChange={(event) => setFormData((prev) => ({ ...prev, kelompokMapel: event.target.value || null }))}
                       placeholder="Contoh: Matematika"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="create-urutan">Urutan</Label>
-                    <Input
-                      id="create-urutan"
-                      type="number"
-                      value={formData.urutan}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, urutan: event.target.value }))}
-                      placeholder="Contoh: 1"
                     />
                   </div>
                 </div>
@@ -799,7 +778,6 @@ export default function MapelPage() {
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NAMA MAPEL</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KODE UNIT</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KELOMPOK</TableHead>
-                  <TableHead className="w-24 text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">URUTAN</TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">STATUS</TableHead>
                   <TableHead className="text-right text-xs font-semibold uppercase tracking-wide text-muted-foreground">AKSI</TableHead>
                 </TableRow>
@@ -808,7 +786,7 @@ export default function MapelPage() {
               <TableBody>
                 {rows.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="py-10 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
                       {isLoading ? "Memuat data mata pelajaran..." : "Data mata pelajaran tidak ditemukan."}
                     </TableCell>
                   </TableRow>
@@ -828,7 +806,6 @@ export default function MapelPage() {
                       <TableCell>{row.namaMapel || "-"}</TableCell>
                       <TableCell className="text-sm">{row.kodeUnit || "-"}</TableCell>
                       <TableCell className="text-sm">{row.kelompokMapel || "-"}</TableCell>
-                      <TableCell className="text-center font-mono text-sm tabular-nums">{row.urutan ?? "-"}</TableCell>
                       <TableCell>
                         <Badge variant="secondary" className={row.status === "Aktif" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}>
                           {row.status}
@@ -945,7 +922,7 @@ export default function MapelPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>
                   Kode Unit <span className="text-destructive">*</span>
@@ -977,15 +954,6 @@ export default function MapelPage() {
                   id="edit-kelompok-mapel"
                   value={editingFormData.kelompokMapel || ""}
                   onChange={(event) => setEditingFormData((prev) => ({ ...prev, kelompokMapel: event.target.value || null }))}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-urutan">Urutan</Label>
-                <Input
-                  id="edit-urutan"
-                  type="number"
-                  value={editingFormData.urutan}
-                  onChange={(event) => setEditingFormData((prev) => ({ ...prev, urutan: event.target.value }))}
                 />
               </div>
             </div>
@@ -1053,10 +1021,6 @@ export default function MapelPage() {
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">Kelompok Mapel</p>
                 <p className="font-medium">{detailData.kelompokMapel || "-"}</p>
-              </div>
-              <div className="rounded-lg border p-3">
-                <p className="text-xs text-muted-foreground">Urutan</p>
-                <p className="font-medium tabular-nums">{detailData.urutan ?? "-"}</p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">Keterangan</p>
