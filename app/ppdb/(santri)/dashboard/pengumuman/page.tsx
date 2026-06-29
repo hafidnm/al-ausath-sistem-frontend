@@ -36,6 +36,20 @@ export default function PpdbPengumumanPage() {
     if (!data) return;
 
     const correctStep = getCorrectFrontendStep(data);
+
+    // Jika step seharusnya adalah 'pembayaran-ppdb', cek lebih lanjut:
+    // Jika pembayaran sudah diupload (menunggu_verifikasi/menunggu_konfirmasi),
+    // biarkan di halaman pengumuman (tampilkan state "menunggu") — JANGAN redirect balik ke pembayaran.
+    // Redirect balik ke pembayaran hanya jika belum ada bukti sama sekali.
+    if (correctStep === 'pembayaran-ppdb') {
+      const paymentStatus = data.pembayaranPpdb?.status || '';
+      const isWaitingReview = ['menunggu_verifikasi', 'menunggu_konfirmasi'].includes(paymentStatus);
+      if (!isWaitingReview) {
+        router.replace('/ppdb/dashboard/pembayaran');
+      }
+      return;
+    }
+
     if (correctStep !== 'pengumuman' && correctStep !== 'menunggu-pengumuman') {
       if (correctStep === 'lengkapi-form') {
         router.replace('/ppdb/dashboard');
@@ -43,8 +57,6 @@ export default function PpdbPengumumanPage() {
         router.replace('/ppdb/dashboard/infaq');
       } else if (correctStep === 'tes') {
         router.replace('/ppdb/tes');
-      } else if (correctStep === 'pembayaran-ppdb') {
-        router.replace('/ppdb/dashboard/pembayaran');
       } else if (correctStep === 'siap-menjadi-santri') {
         router.replace('/ppdb/dashboard/siap-menjadi-santri');
       }

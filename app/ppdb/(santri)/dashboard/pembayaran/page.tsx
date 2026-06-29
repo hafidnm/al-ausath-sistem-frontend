@@ -84,12 +84,14 @@ export default function PpdbPembayaranPage() {
       return;
     }
 
-    // Redirect maju jika pembayaran sudah diverifikasi
-    const ppdbAdminPaid = [
-      'menunggu_verifikasi', 'menunggu_konfirmasi', 'terverifikasi', 'lunas', 'dp',
-    ].includes(data.pembayaranPpdb?.status || '');
+    // Redirect maju HANYA jika pembayaran sudah benar-benar diverifikasi admin,
+    // BUKAN hanya karena sedang menunggu verifikasi (menunggu_verifikasi / menunggu_konfirmasi).
+    // Ini mencegah loop: upload bukti → langsung redirect ke pengumuman → pengumuman
+    // redirect balik ke pembayaran karena status masih "menunggu".
+    const paymentStatus = data.pembayaranPpdb?.status || '';
+    const isPaymentVerified = ['terverifikasi', 'lunas'].includes(paymentStatus);
 
-    if (ppdbAdminPaid) {
+    if (isPaymentVerified) {
       const statusVerifikasi = (data.statusVerifikasi || data.status || '').toLowerCase();
       if (statusVerifikasi === 'diterima' || statusVerifikasi === 'accepted' || statusVerifikasi === 'lulus' || data.step === 'siap-menjadi-santri') {
         router.replace('/ppdb/dashboard/siap-menjadi-santri');
@@ -97,7 +99,8 @@ export default function PpdbPembayaranPage() {
         router.replace('/ppdb/dashboard/pengumuman');
       }
     }
-    // Jangan redirect ke /ppdb/tes dari halaman pembayaran — mencegah loop!
+    // Jika status 'menunggu_verifikasi' atau 'menunggu_konfirmasi', tetap di halaman ini
+    // agar user bisa melihat pesan bahwa bukti sedang direview.
   }, [data, router]);
 
   useEffect(() => {
@@ -282,42 +285,64 @@ export default function PpdbPembayaranPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-2 border-t pt-3">
-                    <span className="text-muted-foreground font-semibold flex items-center gap-1.5 text-xs uppercase tracking-wider">
-                      <Landmark className="w-3.5 h-3.5 text-primary" />
-                      Rekening Tujuan Transfer:
-                    </span>
-                    {rekeningList.length > 0 ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
-                        {rekeningList.map((rek) => (
-                          <div key={rek.id_rekening} className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm">
-                            <p className="font-bold text-foreground">{rek.nama_bank}{rek.cabang_bank ? ` - ${rek.cabang_bank}` : ""}</p>
-                            <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">{rek.nomor_rekening}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">a.n. {rek.nama_pemilik}</p>
-                            {rek.peruntukan && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{rek.peruntukan}</p>}
+                  {/* Tampilkan info rekening & instruksi HANYA ketika belum upload bukti */}
+                  {!isPendingVerification && !isVerified && (
+                    <>
+                      <div className="space-y-2 border-t pt-3">
+                        <span className="text-muted-foreground font-semibold flex items-center gap-1.5 text-xs uppercase tracking-wider">
+                          <Landmark className="w-3.5 h-3.5 text-primary" />
+                          Rekening Tujuan Transfer:
+                        </span>
+                        {rekeningList.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                            {rekeningList.map((rek) => (
+                              <div key={rek.id_rekening} className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm">
+                                <p className="font-bold text-foreground">{rek.nama_bank}{rek.cabang_bank ? ` - ${rek.cabang_bank}` : ""}</p>
+                                <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">{rek.nomor_rekening}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5">a.n. {rek.nama_pemilik}</p>
+                                {rek.peruntukan && <p className="text-xs text-muted-foreground/70 italic mt-0.5">{rek.peruntukan}</p>}
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        ) : (
+                          <div className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm max-w-sm">
+                            <p className="font-bold text-foreground">Bank Syariah Indonesia (BSI)</p>
+                            <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">714-888-9990</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">a.n. PPTQ Al-Ausath</p>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="rounded-lg border border-border bg-background p-3 text-sm shadow-sm max-w-sm">
-                        <p className="font-bold text-foreground">Bank Syariah Indonesia (BSI)</p>
-                        <p className="font-mono text-base font-bold text-primary tracking-wider mt-0.5">714-888-9990</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">a.n. PPTQ Al-Ausath</p>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="space-y-2 pt-2 border-t">
-                    <p className="text-sm font-medium">Instruksi Pembayaran:</p>
-                    <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
-                      <li>Transfer sesuai nominal di atas ke salah satu rekening di atas.</li>
-                      <li>Simpan struk / bukti transfer (format JPG, PNG, atau PDF).</li>
-                      <li>Unggah bukti transfer pada form di bawah ini.</li>
-                    </ol>
-                    <p className="text-xs text-muted-foreground">
-                      Infaq yang Anda pilih saat pendaftaran disimpan di backend dan dipakai sebagai tagihan setelah status PPDB diterima.
-                    </p>
-                  </div>
+                      <div className="space-y-2 pt-2 border-t">
+                        <p className="text-sm font-medium">Instruksi Pembayaran:</p>
+                        <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
+                          <li>Transfer sesuai nominal di atas ke salah satu rekening di atas.</li>
+                          <li>Simpan struk / bukti transfer (format JPG, PNG, atau PDF).</li>
+                          <li>Unggah bukti transfer pada form di bawah ini.</li>
+                        </ol>
+                        <p className="text-xs text-muted-foreground">
+                          Infaq yang Anda pilih saat pendaftaran disimpan di backend dan dipakai sebagai tagihan setelah status PPDB diterima.
+                        </p>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Banner: Bukti sedang direview admin */}
+                  {isPendingVerification && (
+                    <div className="border-t pt-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 mt-2">
+                      <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-semibold text-amber-800">Bukti pembayaran Anda sedang direview</p>
+                        <p className="text-sm text-amber-700">
+                          Admin akan memverifikasi bukti transfer Anda. Harap tunggu — <strong>jangan upload ulang</strong> kecuali ada kesalahan dokumen.
+                          Setelah disetujui, halaman ini akan otomatis berpindah.
+                        </p>
+                        <p className="text-xs text-amber-600 mt-1">
+                          Jika ingin mengunggah ulang karena salah dokumen, scroll ke bawah untuk memilih file baru.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {!isVerified && (

@@ -97,9 +97,25 @@ export default function SiapMenjadiSantriPage() {
                 <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                   Nomor Induk Santri (NIS)
                 </span>
-                <p className="text-xl font-mono font-bold text-primary flex items-center gap-2 bg-primary/5 px-2.5 py-1 rounded w-fit border border-primary/10">
-                  {data?.nomorIndukGenerated || 'Sedang Diproses'}
-                </p>
+                <div className="mt-0.5">
+                  {data?.nomorIndukGenerated ? (
+                    <p className="text-xl font-mono font-bold text-primary flex items-center gap-2 bg-primary/5 px-2.5 py-1 rounded w-fit border border-primary/10">
+                      {data.nomorIndukGenerated}
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-base font-semibold text-amber-600 flex items-center gap-2">
+                        <span className="animate-pulse">⏳</span> Sedang Diproses
+                      </p>
+                      <button
+                        onClick={() => void fetchDashboard()}
+                        className="text-xs text-primary underline underline-offset-2 hover:opacity-70 transition-opacity"
+                      >
+                        Klik untuk refresh status NIS
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">

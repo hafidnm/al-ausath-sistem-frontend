@@ -47,12 +47,14 @@ import {
   wait,
   getCorrectFrontendStep,
 } from '@/lib/ppdb/santri/dashboard';
+import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import {
   initialPpdbDashboardFiles,
   initialPpdbDashboardForm,
   type PpdbDashboardFileState,
   type PpdbDashboardFormState,
 } from '@/types/ppdb/santri/dashboard';
+import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
 const AUTO_SAVE_DELAY_MS = 1500;
 
@@ -116,6 +118,7 @@ export default function PpdbDashboardPage() {
   const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
   const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
   const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
+  const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
   const [buktiAnakGuruFile, setBuktiAnakGuruFile] = useState<File | null>(null);
   const [buktiAnakGuruPreview, setBuktiAnakGuruPreview] = useState<string | null>(null);
   const buktiOrtuGuruRef = useRef<HTMLInputElement>(null);
@@ -204,6 +207,14 @@ export default function PpdbDashboardPage() {
   }, [fetchDashboard, toast]);
 
   useEffect(() => {
+    void ppdbPortalApi.getBillingInfo(form.program || undefined)
+      .then(setBillingInfo)
+      .catch(() => {
+        setBillingInfo(null);
+      });
+  }, [form.program]);
+
+  useEffect(() => {
     if (!data) return;
 
     const mappedForm = mapDashboardToForm(data);
@@ -247,6 +258,29 @@ export default function PpdbDashboardPage() {
       return;
     }
   }, [data, router]);
+
+  // Reset pilihan ke default setiap kali program berubah
+  const prevProgramRef = useRef(form.program);
+  useEffect(() => {
+    if (!hasHydratedFromServerRef.current) return;
+    if (prevProgramRef.current === form.program) return;
+    prevProgramRef.current = form.program;
+    // Reset ke pilihan 1 ketika program berganti — billing options mungkin berbeda
+    setPilihanUangGedung(1);
+    setPilihanInfaqBulanan(1);
+  }, [form.program]);
+
+  useEffect(() => {
+    if (!billingInfo) return;
+
+    if (billingInfo.pilihanUangGedung === 1 || billingInfo.pilihanUangGedung === 2) {
+      setPilihanUangGedung(billingInfo.pilihanUangGedung);
+    }
+    if (billingInfo.pilihanInfaqBulanan === 1 || billingInfo.pilihanInfaqBulanan === 2) {
+      setPilihanInfaqBulanan(billingInfo.pilihanInfaqBulanan);
+    }
+    setIsAnakGuru(Boolean(billingInfo.isAnakGuru));
+  }, [billingInfo]);
 
   useEffect(() => {
     if (!data || !hasHydratedFromServerRef.current) return;
@@ -452,6 +486,9 @@ export default function PpdbDashboardPage() {
   }, [autoSaveStatus, lastAutoSaveAt]);
 
 
+
+  const uangGedungOptions = billingInfo?.uangGedungOptions ?? [];
+  const infaqOptions = billingInfo?.infaqBulananOptions ?? [];
 
   if (loading && !data) {
     return (
@@ -931,10 +968,7 @@ export default function PpdbDashboardPage() {
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Uang Gedung</Label>
                 <div className="flex gap-3">
-                  {([
-                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 1.500.000' },
-                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 2.000.000' },
-                  ]).map((opsi) => (
+                  {uangGedungOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
@@ -959,10 +993,7 @@ export default function PpdbDashboardPage() {
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Infaq Bulanan / SPP</Label>
                 <div className="flex gap-3">
-                  {([
-                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 650.000 / bln' },
-                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 700.000 / bln' },
-                  ]).map((opsi) => (
+                  {infaqOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
