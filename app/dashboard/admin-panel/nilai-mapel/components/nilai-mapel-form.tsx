@@ -113,17 +113,19 @@ const parseNilai = (val: string): number => {
 }
 
 export function NilaiMapelForm() {
-  const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedTahunAjaran, selectedKodeTahun } = useTahunAjaran()
 
   const [rawKelasOptions, setRawKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
   const [rawMapelOptions, setRawMapelOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
   
-  const { selectedUnit } = useUnit()
-  const selectedKodeUnit = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+  const { selectedKodeUnit: contextKodeUnit } = useUnit()
+  const selectedKodeUnit = contextKodeUnit?.toUpperCase() ?? ""
 
   const [kodeKelas, setKodeKelas] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
-  const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
+  const tahunAjaranDisplay = selectedTahunAjaran?.nama_tahun ?? ""
+  // kode_tahun digunakan sebagai param API (kolom tahun_ajaran di backend menyimpan kode_tahun)
+  const tahunAjaran = selectedKodeTahun ?? ""
   const [semester, setSemester] = useState("1")
 
   const [santris, setSantris] = useState<SantriRow[]>([])
@@ -155,7 +157,7 @@ export function NilaiMapelForm() {
       const isAdmin = hasRole(me, "Petugas Admin")
       setPetugasInputId(idPetugas)
 
-      if (!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit) {
+      if (!tahunAjaran || !selectedKodeUnit) {
         setRawKelasOptions([])
         setRawMapelOptions([])
         setKodeKelas("")
@@ -163,76 +165,70 @@ export function NilaiMapelForm() {
         return
       }
 
-      if (idPetugas || isAdmin) {
-        setIsOptionsLoading(true)
-        try {
-          const params: any = {
-            status: "AKTIF",
-            per_page: 200,
-          }
-
-          if (!isAdmin && idPetugas) {
-            params.id_petugas = idPetugas
-          }
-          params.tahun_ajaran = selectedTahunAjaran.nama_tahun
-          if (semester) params.semester = Number(semester)
-          params.kode_unit = selectedKodeUnit
-
-          const { data } = await dataKelasMapelService.getAll(params)
-
-          const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
-          const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
-
-          for (const item of data) {
-            const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
-            const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
-            const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
-            const namaMapel = item.nama_mapel ?? item.mapel?.nama_mapel ?? item.mata_pelajaran?.nama_mapel ?? item.mataPelajaran?.nama_mapel ?? kodeMapel
-            const kodeUnit = item.kode_unit ?? item.kelas?.kode_unit ?? undefined
-
-            if (kodeKelas && !kelasMap.has(kodeKelas)) {
-              kelasMap.set(kodeKelas, {
-                value: kodeKelas,
-                label: namaKelas ?? kodeKelas,
-                kode_unit: kodeUnit,
-              })
-            }
-
-            if (kodeMapel && !mapelMap.has(kodeMapel)) {
-              mapelMap.set(kodeMapel, {
-                value: kodeMapel,
-                label: namaMapel ?? kodeMapel,
-                kode_unit: kodeUnit,
-              })
-            }
-          }
-
-          setRawKelasOptions(Array.from(kelasMap.values()))
-          setRawMapelOptions(Array.from(mapelMap.values()))
-          return
-        } catch (error) {
-          console.error(error)
-          setRawKelasOptions([])
-          setRawMapelOptions([])
-          return
-        } finally {
-          setIsOptionsLoading(false)
+      // Selalu fetch jika tahunAjaran dan unit sudah dipilih (halaman ini hanya untuk admin/petugas)
+      setIsOptionsLoading(true)
+      try {
+        const params: any = {
+          status: "AKTIF",
+          per_page: 200,
         }
 
+        // Jika bukan admin dan punya id_petugas → filter hanya mapel yg diajar petugas tsb
+        if (!isAdmin && idPetugas) {
+          params.id_petugas = idPetugas
+        }
+        params.tahun_ajaran = tahunAjaran  // kode_tahun = "2026/2027" sesuai format di DB
+        if (semester) params.semester = Number(semester)
+        params.kode_unit = selectedKodeUnit
+
+        const { data } = await dataKelasMapelService.getAll(params)
+
+        const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+        const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+
+        for (const item of data) {
+          const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
+          const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
+          const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
+          const namaMapel = item.nama_mapel ?? item.mapel?.nama_mapel ?? item.mata_pelajaran?.nama_mapel ?? item.mataPelajaran?.nama_mapel ?? kodeMapel
+          const kodeUnit = item.kode_unit ?? item.kelas?.kode_unit ?? undefined
+
+          if (kodeKelas && !kelasMap.has(kodeKelas)) {
+            kelasMap.set(kodeKelas, {
+              value: kodeKelas,
+              label: namaKelas ?? kodeKelas,
+              kode_unit: kodeUnit,
+            })
+          }
+
+          if (kodeMapel && !mapelMap.has(kodeMapel)) {
+            mapelMap.set(kodeMapel, {
+              value: kodeMapel,
+              label: namaMapel ?? kodeMapel,
+              kode_unit: kodeUnit,
+            })
+          }
+        }
+
+        setRawKelasOptions(Array.from(kelasMap.values()))
+        setRawMapelOptions(Array.from(mapelMap.values()))
+      } catch (error) {
+        console.error(error)
+        setRawKelasOptions([])
+        setRawMapelOptions([])
+      } finally {
+        setIsOptionsLoading(false)
       }
 
-      setRawKelasOptions([])
-      setRawMapelOptions([])
-      return
     }
 
     fetchOptions()
-  }, [selectedTahunAjaran?.nama_tahun, semester, selectedKodeUnit])
+  }, [tahunAjaran, semester, selectedKodeUnit])
 
   useEffect(() => {
     setKodeKelas("")
     setKodeMapel("")
-  }, [selectedTahunAjaran?.nama_tahun, selectedKodeUnit])
+  }, [tahunAjaran, selectedKodeUnit])
 
   const kelasOptions = useMemo(() => {
     let filtered = rawKelasOptions
@@ -559,11 +555,11 @@ export function NilaiMapelForm() {
               <Select
                 value={kodeKelas}
                 onValueChange={setKodeKelas}
-                disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
+                disabled={!tahunAjaran || !selectedKodeUnit}
               >
                 <SelectTrigger>
                   <div className="flex items-center justify-between">
-                    <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Kelas" : "Pilih Tahun Ajaran + Unit dulu"} />
+                    <SelectValue placeholder={tahunAjaran && selectedKodeUnit ? "Pilih Kelas" : "Pilih Tahun Ajaran + Unit dulu"} />
                     {isOptionsLoading && (
                       <Loader2 className="w-4 h-4 animate-spin text-primary ml-2" />
                     )}
@@ -589,11 +585,11 @@ export function NilaiMapelForm() {
               <Select
                 value={kodeMapel}
                 onValueChange={setKodeMapel}
-                disabled={!selectedTahunAjaran?.nama_tahun || !selectedKodeUnit}
+                disabled={!tahunAjaran || !selectedKodeUnit}
               >
                 <SelectTrigger>
                   <div className="flex items-center justify-between">
-                    <SelectValue placeholder={selectedTahunAjaran?.nama_tahun && selectedKodeUnit ? "Pilih Mapel" : "Pilih Tahun Ajaran + Unit dulu"} />
+                    <SelectValue placeholder={tahunAjaran && selectedKodeUnit ? "Pilih Mapel" : "Pilih Tahun Ajaran + Unit dulu"} />
                     {isOptionsLoading && (
                       <Loader2 className="w-4 h-4 animate-spin text-primary ml-2" />
                     )}
@@ -618,7 +614,7 @@ export function NilaiMapelForm() {
               <Label>Tahun Ajaran</Label>
               <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
                 <BookMarked className="w-4 h-4 text-primary shrink-0" />
-                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
+                <span className="flex-1 truncate text-foreground">{tahunAjaranDisplay || "Belum dipilih"}</span>
                 <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
               </div>
             </div>

@@ -429,12 +429,9 @@ export default function PpdbPage() {
       const kelasParams = {
         per_page: 500,
         status: "AKTIF" as const,
-        status_ppdb: "AKTIF" as const,
-      } as Parameters<typeof dataKelasService.getAll>[0] & { status_ppdb: "AKTIF" }
+      } as Parameters<typeof dataKelasService.getAll>[0]
 
       const result = await dataKelasService.getAll(kelasParams)
-      const activePendaftar = pendaftar ?? terimaPendaftar
-      const jenjangPendaftar = activePendaftar?.jenjang || activePendaftar?.programPendaftaran
       
       const mappedList = result.data
         .map(item => ({
@@ -447,8 +444,6 @@ export default function PpdbPage() {
         }))
         .filter(item => item.kode_kelas)
         .filter(item => !item.status || item.status === "AKTIF")
-        // Filter untuk menampilkan hanya kelas penerimaan awal
-        .filter(item => isFirstYearClass(item, jenjangPendaftar))
       
       setKelasList(mappedList)
     } catch (err) {
