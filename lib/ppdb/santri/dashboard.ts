@@ -209,6 +209,15 @@ export const buildPpdbUpdatePayload = (
   };
 };
 
+export const portalStepRoute = (step: PpdbPortalStep): string | null => {
+  if (step === 'infaq') return '/ppdb/dashboard/infaq';
+  if (step === 'tes') return '/ppdb/tes';
+  if (step === 'pembayaran-ppdb') return '/ppdb/dashboard/pembayaran';
+  if (step === 'siap-menjadi-santri') return '/ppdb/dashboard/siap-menjadi-santri';
+  if (step === 'pengumuman' || step === 'menunggu-pengumuman') return '/ppdb/dashboard/pengumuman';
+  return null;
+};
+
 export const getCorrectFrontendStep = (data: PpdbPortalDashboard | null): PpdbPortalStep => {
   if (!data) return 'lengkapi-form';
 

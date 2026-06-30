@@ -105,6 +105,80 @@ const pickValue = (sources: Rec[], keys: string[]): unknown => {
   return undefined;
 };
 
+const normalizeProgramFamily = (value: string): string => {
+  const raw = value.trim().toUpperCase();
+  if (!raw) return '';
+  if (raw === 'SD') return 'MI';
+  if (raw === 'SMP') return 'MTS';
+  if (raw === 'SMA' || raw === 'SMK') return 'MA';
+  if (raw === 'RA') return 'TK';
+  return raw;
+};
+
+const hasFilledText = (value: string): boolean => value.trim().length > 0;
+
+const deriveFormCompleted = (sources: Rec[]): boolean => {
+  const program = normalizeProgramFamily(
+    pickText(sources, ['program', 'program_pendaftaran', 'jenjang']),
+  );
+  const requiresSekolah = ['MI', 'MTS', 'MA'].includes(program);
+
+  const namaLengkap = pickText(sources, ['namaLengkap', 'nama_lengkap', 'nama_calon', 'nama_calon_santri', 'nama']);
+  const jenisKelamin = pickText(sources, ['jenisKelamin', 'jenis_kelamin']);
+  const tempatLahir = pickText(sources, ['tempatLahir', 'tempat_lahir']);
+  const tanggalLahir = pickText(sources, ['tanggalLahir', 'tanggal_lahir']);
+  const nikCalonSantri = pickText(sources, ['nikCalonSantri', 'nik_calon_santri', 'nik']);
+  const alamatLengkap = pickText(sources, ['alamatLengkap', 'alamat_lengkap', 'alamat']);
+  const namaAyah = pickText(sources, ['namaAyah', 'nama_ayah']);
+  const noHpAyah = pickText(sources, ['noHpAyah', 'no_hp_ayah', 'no_hp_calon']);
+  const namaIbu = pickText(sources, ['namaIbu', 'nama_ibu']);
+  const noHpIbu = pickText(sources, ['noHpIbu', 'no_hp_ibu']);
+  const asalSekolah = pickText(sources, ['asalSekolah', 'asal_sekolah', 'sekolah_asal', 'asalKota', 'asal_kota']);
+
+  const berkasAkta = pickText(sources, ['berkasAktaUrl', 'berkas_akta_url', 'fileAktaPath', 'file_akta_path']);
+  const berkasKk = pickText(sources, ['berkasKkUrl', 'berkas_kk_url', 'fileKkPath', 'file_kk_path']);
+  const berkasRekomendasi = pickText(sources, [
+    'berkasRekomendasiUstadzUrl',
+    'berkas_rekomendasi_ustadz_url',
+    'fileSuratRekomendasiPath',
+    'file_surat_rekomendasi_path',
+  ]);
+  const berkasSuratPernyataan = pickText(sources, [
+    'berkasSuratPernyataanUrl',
+    'berkas_surat_pernyataan_url',
+    'suratPernyataanFilePath',
+    'surat_pernyataan_file_path',
+  ]);
+
+  return (
+    hasFilledText(program) &&
+    hasFilledText(namaLengkap) &&
+    hasFilledText(jenisKelamin) &&
+    hasFilledText(tempatLahir) &&
+    hasFilledText(tanggalLahir) &&
+    hasFilledText(nikCalonSantri) &&
+    hasFilledText(alamatLengkap) &&
+    hasFilledText(namaAyah) &&
+    hasFilledText(noHpAyah) &&
+    hasFilledText(namaIbu) &&
+    hasFilledText(noHpIbu) &&
+    (!requiresSekolah || hasFilledText(asalSekolah)) &&
+    hasFilledText(berkasAkta) &&
+    hasFilledText(berkasKk) &&
+    hasFilledText(berkasRekomendasi) &&
+    hasFilledText(berkasSuratPernyataan)
+  );
+};
+
+/** Backend `is_form_lengkap` is authoritative when present — do not OR with derived heuristics. */
+const resolveFormCompleted = (sources: Rec[]): boolean => {
+  const explicit = pickValue(sources, ['formCompleted', 'form_completed', 'is_form_lengkap']);
+  if (explicit !== undefined && explicit !== null) {
+    return asBool(explicit);
+  }
+  return deriveFormCompleted(sources);
+};
+
 const toMultipartFormData = (payload: PpdbPortalFormRequest): FormData => {
   const formData = new FormData();
   Object.entries(payload).forEach(([key, value]) => {
@@ -191,7 +265,7 @@ const normalizeDashboard = (payload: unknown): PpdbPortalDashboard => {
 
   const soalJawab = pickText(sources, ['soalJawab', 'soal_jawab']);
   const showHalamanTes = asBool(pickValue(sources, ['showHalamanTes', 'show_halaman_tes']));
-  const formCompleted = asBool(pickValue(sources, ['formCompleted', 'form_completed', 'is_form_lengkap']));
+  const formCompleted = resolveFormCompleted(sources);
   const pendaftaranSelesai = asBool(pickValue(sources, ['pendaftaranSelesai', 'pendaftaran_selesai']));
   const pengumumanOpen = asBool(pickValue(sources, ['pengumumanOpen', 'pengumuman_open', 'is_pengumuman_dibuka']));
 

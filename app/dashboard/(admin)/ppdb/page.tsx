@@ -78,6 +78,28 @@ const normalizeClassText = (value?: string | null): string =>
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
 
+const normalizePpdbJenjang = (value?: string | null): string => {
+  const n = (value || "").replace(/[^a-z0-9]+/gi, "").toUpperCase()
+  if (!n) return ""
+  if (n.includes("PAUD")) return "PAUD"
+  if (n.includes("TK") || n.includes("RA")) return "TK"
+  if (n.includes("IBTIDAIYAH")) return "MI"
+  if (n.includes("MI") || n.includes("SD")) return "MI"
+  if (n.includes("MUTAWASITHAH")) return "MTS"
+  if (n.includes("MTS") || n.includes("SMP")) return "MTS"
+  if (n.includes("ALIYAH")) return "MA"
+  if (n.includes("MA") || n.includes("SMA") || n.includes("SMK")) return "MA"
+  return n
+}
+
+const FIRST_YEAR_GRADE_MARKERS: Record<string, string[]> = {
+  MI: ["1", "01", "i", "satu"],
+  MTS: ["7", "07", "vii", "tujuh"],
+  MA: ["10", "x", "sepuluh"],
+}
+
+const isActiveStatus = (value?: string | null): boolean => !value || value.toUpperCase() === "AKTIF"
+
 const hasGradeMarker = (value: string | null | undefined, grade: string): boolean => {
   const normalized = normalizeClassText(value)
   if (!normalized) return false
@@ -95,49 +117,36 @@ const hasGradeMarker = (value: string | null | undefined, grade: string): boolea
   )
 }
 
+const hasAnyGradeMarker = (kelas: KelasItem, grades: string[]): boolean =>
+  grades.some((grade) => hasGradeMarker(kelas.kode_kelas, grade) || hasGradeMarker(kelas.nama_kelas, grade))
+
 const classMatchesJenjang = (kelas: KelasItem, jenjang?: string): boolean => {
-  const normalizedJenjang = (jenjang || "").replace(/[^a-z]/gi, "").toUpperCase()
+  const normalizedJenjang = normalizePpdbJenjang(jenjang)
   if (!normalizedJenjang) return true
 
-  const kodeUnit = (kelas.kode_unit || "").replace(/[^a-z]/gi, "").toUpperCase()
+  const kodeUnit = normalizePpdbJenjang(kelas.kode_unit)
+  const kelasJenjang = normalizePpdbJenjang(kelas.jenjang)
   const combined = normalizeClassText(`${kelas.kode_kelas} ${kelas.nama_kelas}`)
+  const compactCombined = `${kelas.kode_kelas || ""}${kelas.nama_kelas || ""}`.replace(/[^a-z0-9]+/gi, "").toUpperCase()
 
   if (kodeUnit) return kodeUnit === normalizedJenjang
-  return combined.split(/\s+/).includes(normalizedJenjang.toLowerCase())
+  if (kelasJenjang) return kelasJenjang === normalizedJenjang
+  if (combined.split(/\s+/).includes(normalizedJenjang.toLowerCase())) return true
+  return compactCombined.includes(normalizedJenjang)
 }
 
-// Filter untuk menampilkan hanya kelas penerimaan awal (Kelas 1 untuk MI, Kelas 7 untuk MTS, Kelas 10 untuk MA, PAUD, TK)
+// Only show entry classes for PPDB acceptance: MI 1, MTS 7, MA 10; PAUD/TK use all matching units.
 const isFirstYearClass = (kelas: KelasItem, jenjang?: string): boolean => {
-  const normalizedJenjang = (jenjang || "").toUpperCase()
+  const normalizedJenjang = normalizePpdbJenjang(jenjang)
 
-  // Untuk PAUD dan TK, tampilkan semua kelas yang cocok dengan jenjang
   if (normalizedJenjang === "PAUD" || normalizedJenjang === "TK") {
     return classMatchesJenjang(kelas, jenjang)
   }
 
-  // Untuk MI: hanya tampilkan kelas 1
-  if (normalizedJenjang === "MI") {
-    return classMatchesJenjang(kelas, jenjang) && (
-      hasGradeMarker(kelas.kode_kelas, "1") || hasGradeMarker(kelas.nama_kelas, "1")
-    )
-  }
+  const gradeMarkers = FIRST_YEAR_GRADE_MARKERS[normalizedJenjang]
+  if (gradeMarkers) return classMatchesJenjang(kelas, jenjang) && hasAnyGradeMarker(kelas, gradeMarkers)
 
-  // Untuk MTS: hanya tampilkan kelas 7 (tingkat awal MTS)
-  if (normalizedJenjang === "MTS") {
-    return classMatchesJenjang(kelas, jenjang) && (
-      hasGradeMarker(kelas.kode_kelas, "7") || hasGradeMarker(kelas.nama_kelas, "7")
-    )
-  }
-
-  // Untuk MA: hanya tampilkan kelas 10 (tingkat awal MA)
-  if (normalizedJenjang === "MA") {
-    return classMatchesJenjang(kelas, jenjang) && (
-      hasGradeMarker(kelas.kode_kelas, "10") || hasGradeMarker(kelas.nama_kelas, "10")
-    )
-  }
-
-  // Fallback default jika jenjang tidak cocok
-  return hasGradeMarker(kelas.kode_kelas, "1") || hasGradeMarker(kelas.nama_kelas, "1")
+  return false
 }
 
 import { toErrorMessage } from "@/hooks/shared/react-query-helpers"
@@ -402,6 +411,7 @@ export default function PpdbPage() {
   const handleVerifikasi = async (p: PpdbDetail, status: "Diterima" | "Ditolak" | "Menunggu") => {
     if (status === "Diterima") {
       setTerimaPendaftar(p)
+      setKodeKelasDiterima("")
       setIsTerimaOpen(true)
       void loadKelasList(p)
       return
@@ -426,6 +436,7 @@ export default function PpdbPage() {
   const loadKelasList = useCallback(async (pendaftar?: PpdbDetail | null) => {
     setKelasLoading(true)
     try {
+      const jenjangPendaftar = pendaftar?.jenjang || pendaftar?.programPendaftaran || ""
       const kelasParams = {
         per_page: 500,
         status: "AKTIF" as const,
@@ -434,18 +445,42 @@ export default function PpdbPage() {
       const result = await dataKelasService.getAll(kelasParams)
       
       const mappedList = result.data
-        .map(item => ({
-          id: item.id_kelas ?? item.id ?? -1,
-          kode_kelas: item.kode_kelas ?? "",
-          nama_kelas: item.nama_kelas ?? "",
-          kode_unit: item.kode_unit ?? item.unit?.kode_unit ?? "",
-          status: item.status ?? undefined,
-          tahun_ajaran: item.tahun_ajaran ?? (item.tahunAjaranRelasi as any)?.tahun_ajaran ?? (item.tahun_ajaran_relasi as any)?.tahun_ajaran ?? "",
-        }))
+        .map(item => {
+          const raw = item as typeof item & {
+            status_ppdb?: string | null
+            jenjang?: string | null
+            tahunAjaranRelasi?: { tahun_ajaran?: string; nama_tahun?: string } | null
+            tahun_ajaran_relasi?: { tahun_ajaran?: string; nama_tahun?: string } | null
+          }
+
+          return {
+            id: item.id_kelas ?? item.id ?? -1,
+            kode_kelas: item.kode_kelas ?? "",
+            nama_kelas: item.nama_kelas ?? "",
+            kode_unit: item.kode_unit ?? item.unit?.kode_unit ?? "",
+            jenjang: raw.jenjang ?? item.unit?.kode_unit ?? "",
+            status: item.status ?? undefined,
+            status_ppdb: raw.status_ppdb ?? undefined,
+            tahun_ajaran:
+              item.tahun_ajaran
+              ?? raw.tahunAjaranRelasi?.tahun_ajaran
+              ?? raw.tahunAjaranRelasi?.nama_tahun
+              ?? raw.tahun_ajaran_relasi?.tahun_ajaran
+              ?? raw.tahun_ajaran_relasi?.nama_tahun
+              ?? "",
+          }
+        })
         .filter(item => item.kode_kelas)
-        .filter(item => !item.status || item.status === "AKTIF")
+        .filter(item => isActiveStatus(item.status))
+        .filter(item => isActiveStatus(item.status_ppdb))
+        .sort((a, b) => a.kode_kelas.localeCompare(b.kode_kelas, "id", { numeric: true }))
+
+      const matchingJenjang = mappedList.filter(item => classMatchesJenjang(item, jenjangPendaftar))
+      const firstYearMatches = matchingJenjang.filter(item => isFirstYearClass(item, jenjangPendaftar))
+
+      const finalList = (firstYearMatches.length > 0 ? firstYearMatches : matchingJenjang)
       
-      setKelasList(mappedList)
+      setKelasList(finalList)
     } catch (err) {
       console.error("Error loading kelas list:", err)
       setKelasList([])
@@ -823,7 +858,7 @@ export default function PpdbPage() {
                   </SelectTrigger>
                   <SelectContent>
                     {kelasList.length === 0 ? (
-                      <SelectItem value="__empty" disabled>Tidak ada kelas aktif tersedia</SelectItem>
+                      <SelectItem value="__empty" disabled>Tidak ada kelas PPDB aktif untuk kelas awal jenjang ini</SelectItem>
                     ) : (
                       kelasList.map((kelas) => (
                         <SelectItem key={kelas.kode_kelas} value={kelas.kode_kelas}>
@@ -835,7 +870,7 @@ export default function PpdbPage() {
                 </Select>
               )}
               <p className="text-xs text-muted-foreground">
-                Kelas wajib diisi saat menerima santri untuk keperluan master data.
+                Opsi dibatasi ke kelas awal jenjang: MI kelas 1, MTS kelas 7, MA kelas 10, serta kelas PAUD/TK yang PPDB-nya aktif.
               </p>
             </div>
 
