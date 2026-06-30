@@ -11,7 +11,7 @@ import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useSemester } from "@/contexts/semester-context"
 
 export default function AnalitikSantriPage() {
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedTahunAjaran, selectedKodeTahun } = useTahunAjaran()
   const { semester } = useSemester()
 
   const {
@@ -35,13 +35,15 @@ export default function AnalitikSantriPage() {
     fetch: fetchProgress,
   } = useAcademicProgress()
 
-  useEffect(() => {
-    if (!selectedKodeTahun) return
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun || selectedKodeTahun
 
-    fetchScores({ tahun_ajaran: selectedKodeTahun, semester })
-    fetchTrend({ tahun_ajaran: selectedKodeTahun })
-    fetchProgress({ tahun_ajaran: selectedKodeTahun, semester })
-  }, [selectedKodeTahun, semester, fetchScores, fetchTrend, fetchProgress])
+  useEffect(() => {
+    if (!tahunAjaran) return
+
+    fetchScores({ tahun_ajaran: tahunAjaran, semester })
+    fetchTrend({ tahun_ajaran: tahunAjaran })
+    fetchProgress({ tahun_ajaran: tahunAjaran, semester })
+  }, [tahunAjaran, semester, fetchScores, fetchTrend, fetchProgress])
 
   return (
     <div className="space-y-6">
