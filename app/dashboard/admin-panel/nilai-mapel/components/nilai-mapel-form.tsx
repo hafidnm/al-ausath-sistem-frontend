@@ -375,6 +375,15 @@ export function NilaiMapelForm() {
     }))
   }
 
+  const handleKeteranganChange = (nomor_induk: string, value: string) => {
+    setSantris(prev => prev.map(s => {
+      if (s.nomor_induk === nomor_induk) {
+        return { ...s, keterangan: value, isDirty: true }
+      }
+      return s
+    }))
+  }
+
   const addTugasColumn = () => {
     setTugasCount(prev => prev + 1)
     setSantris(prev => prev.map(s => ({ ...s, tugas: [...s.tugas, ""] })))
@@ -701,6 +710,7 @@ export function NilaiMapelForm() {
                         <TableHead key={`th-u-${i}`} className="w-[80px] text-center px-1">UH{i+1}</TableHead>
                       ))}
                       <TableHead className="w-[80px] text-center px-1">UAS</TableHead>
+                      <TableHead className="min-w-[150px] text-center px-2">Keterangan</TableHead>
                       <TableHead className="w-[80px] text-center">Akhir</TableHead>
                       <TableHead className="text-center">Status</TableHead>
                     </TableRow>
@@ -708,7 +718,7 @@ export function NilaiMapelForm() {
                   <TableBody>
                     {filteredSantris.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={tugasCount + ulanganCount + 4} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={tugasCount + ulanganCount + 5} className="text-center py-8 text-muted-foreground">
                           Tidak ada data santri.
                         </TableCell>
                       </TableRow>
@@ -738,6 +748,7 @@ export function NilaiMapelForm() {
                               <TableCell key={`u-${i}`} className="px-1"><Input className="h-8 w-16 px-2 text-center mx-auto" value={val} onChange={e => handleArrayInputChange(s.nomor_induk, "ulangan", i, e.target.value)} /></TableCell>
                             ))}
                             <TableCell className="px-1"><Input className="h-8 w-16 px-2 text-center mx-auto" value={s.uas} onChange={e => handleUasChange(s.nomor_induk, e.target.value)} /></TableCell>
+                            <TableCell className="px-2"><Input className="h-8 w-full min-w-[120px] px-2" placeholder="Catatan..." value={s.keterangan || ""} onChange={e => handleKeteranganChange(s.nomor_induk, e.target.value)} /></TableCell>
                             <TableCell className="text-center font-semibold">
                               {!isKosong ? norm.nilai : "-"}
                             </TableCell>
