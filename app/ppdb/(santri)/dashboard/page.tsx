@@ -119,6 +119,7 @@ export default function PpdbDashboardPage() {
   const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
   const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
   const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
   const [buktiAnakGuruFile, setBuktiAnakGuruFile] = useState<File | null>(null);
   const [buktiAnakGuruPreview, setBuktiAnakGuruPreview] = useState<string | null>(null);
   const buktiOrtuGuruRef = useRef<HTMLInputElement>(null);
@@ -207,12 +208,59 @@ export default function PpdbDashboardPage() {
   }, [fetchDashboard, toast]);
 
   useEffect(() => {
-    void ppdbPortalApi.getBillingInfo(form.program || undefined)
-      .then(setBillingInfo)
+    const program = (form.program || '').trim();
+    if (!program) {
+      setBillingInfo(null);
+      setBillingLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBillingLoading(true);
+    setBillingInfo(null);
+
+    void ppdbPortalApi.getBillingInfo(program)
+      .then((info) => {
+        if (cancelled) return;
+
+        setBillingInfo(info);
+
+        const serverProgram = (data?.program || '').trim().toUpperCase();
+        const currentProgram = program.toUpperCase();
+        const matchesSavedProgram = serverProgram === currentProgram;
+
+        if (matchesSavedProgram) {
+          if (info.pilihanUangGedung === 1 || info.pilihanUangGedung === 2) {
+            setPilihanUangGedung(info.pilihanUangGedung);
+          }
+          if (info.pilihanInfaqBulanan === 1 || info.pilihanInfaqBulanan === 2) {
+            setPilihanInfaqBulanan(info.pilihanInfaqBulanan);
+          }
+          setIsAnakGuru(Boolean(info.isAnakGuru));
+        } else {
+          setPilihanUangGedung(1);
+          setPilihanInfaqBulanan(1);
+        }
+      })
       .catch(() => {
+        if (cancelled) return;
         setBillingInfo(null);
+        toast({
+          title: 'Gagal memuat pilihan infaq',
+          description: 'Tidak dapat mengambil konfigurasi biaya untuk jenjang ini. Coba pilih ulang atau refresh halaman.',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBillingLoading(false);
+        }
       });
-  }, [form.program]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.program, data?.program, toast]);
 
   useEffect(() => {
     if (!data) return;
@@ -258,29 +306,6 @@ export default function PpdbDashboardPage() {
       return;
     }
   }, [data, router]);
-
-  // Reset pilihan ke default setiap kali program berubah
-  const prevProgramRef = useRef(form.program);
-  useEffect(() => {
-    if (!hasHydratedFromServerRef.current) return;
-    if (prevProgramRef.current === form.program) return;
-    prevProgramRef.current = form.program;
-    // Reset ke pilihan 1 ketika program berganti — billing options mungkin berbeda
-    setPilihanUangGedung(1);
-    setPilihanInfaqBulanan(1);
-  }, [form.program]);
-
-  useEffect(() => {
-    if (!billingInfo) return;
-
-    if (billingInfo.pilihanUangGedung === 1 || billingInfo.pilihanUangGedung === 2) {
-      setPilihanUangGedung(billingInfo.pilihanUangGedung);
-    }
-    if (billingInfo.pilihanInfaqBulanan === 1 || billingInfo.pilihanInfaqBulanan === 2) {
-      setPilihanInfaqBulanan(billingInfo.pilihanInfaqBulanan);
-    }
-    setIsAnakGuru(Boolean(billingInfo.isAnakGuru));
-  }, [billingInfo]);
 
   useEffect(() => {
     if (!data || !hasHydratedFromServerRef.current) return;
@@ -622,7 +647,13 @@ export default function PpdbDashboardPage() {
                 <Label>Program yang Ingin Didaftar</Label>
                 <Select
                   value={form.program}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, program: value }))}
+                  onValueChange={(value) => {
+                    setForm((prev) => ({ ...prev, program: value }));
+                    setPilihanUangGedung(1);
+                    setPilihanInfaqBulanan(1);
+                    setBillingInfo(null);
+                    setBillingLoading(true);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih program" />
@@ -958,17 +989,38 @@ export default function PpdbDashboardPage() {
             </div>
 
             {/* ── Pilihan Infaq & Anak Guru ──────────────────────────────── */}
-            <div className="rounded-lg border border-border p-4 space-y-4 bg-muted/20">
+            <div
+              key={form.program || 'no-program'}
+              className="rounded-lg border border-border p-4 space-y-4 bg-muted/20"
+            >
               <p className="font-medium text-foreground text-sm flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-primary" />
                 Pilihan Infaq Pendidikan
+                {form.program ? (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    — Jenjang {form.program}
+                  </span>
+                ) : null}
               </p>
 
+              {!form.program ? (
+                <p className="text-sm text-muted-foreground">
+                  Pilih program/jenjang terlebih dahulu untuk melihat pilihan infaq.
+                </p>
+              ) : billingLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Memuat pilihan infaq untuk jenjang {form.program}...
+                </div>
+              ) : (
+              <>
               {/* Uang Gedung */}
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Uang Gedung</Label>
                 <div className="flex gap-3">
-                  {uangGedungOptions.map((opsi) => (
+                  {uangGedungOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Belum ada opsi uang gedung untuk jenjang ini.</p>
+                  ) : uangGedungOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
@@ -993,7 +1045,9 @@ export default function PpdbDashboardPage() {
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Infaq Bulanan / SPP</Label>
                 <div className="flex gap-3">
-                  {infaqOptions.map((opsi) => (
+                  {infaqOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Belum ada opsi infaq bulanan untuk jenjang ini.</p>
+                  ) : infaqOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
@@ -1118,6 +1172,8 @@ export default function PpdbDashboardPage() {
                 <Info className="inline w-3 h-3 mr-1 text-primary" />
                 Pilihan infaq disimpan bersama form pendaftaran. Tagihan SPP dan infaq bulanan hanya muncul di portal santri setelah diterima.
               </p>
+              </>
+              )}
             </div>
 
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
