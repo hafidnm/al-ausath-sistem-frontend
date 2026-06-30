@@ -15,7 +15,8 @@ import { Check } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
 import { semesterOptions } from "../utils/constants"
 import { useUnit } from "@/contexts/unit-context"
-import { kelasService } from "@/lib/services/kelas.service"
+import { dataKelasService } from "@/lib/services/kelas.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import { useMemo } from "react"
 
 interface NilaiAkhlakFiltersProps {
@@ -61,13 +62,37 @@ export function NilaiAkhlakFilters({
   const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
 
   useEffect(() => {
-    kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setRawKelasOptions(res.map(k => ({ 
-        value: k.kode_kelas ?? "", 
-        label: k.nama_kelas ?? k.kode_kelas ?? "",
-        kode_unit: k.kode_unit
-      }))))
-      .catch(console.error)
+    let cancelled = false;
+
+    const fetchKelas = async () => {
+      try {
+        const authData = await getCachedUser();
+        const idPetugas = authData?.user?.id_petugas ?? authData?.user?.petugas?.id_petugas;
+        const rolesStr = String(authData?.user?.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
+        const res = await dataKelasService.getAll({ status: "AKTIF", per_page: 200 });
+        if (!cancelled) {
+          let classes = res.data;
+          
+          // Restrict to wali kelas unless admin
+          if (!isAdmin) {
+            classes = classes.filter(c => c.id_wali_kelas === idPetugas);
+          }
+
+          setRawKelasOptions(classes.map(k => ({ 
+            value: k.kode_kelas ?? "", 
+            label: k.nama_kelas ?? k.kode_kelas ?? "",
+            kode_unit: k.kode_unit
+          })));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchKelas();
+    return () => { cancelled = true; };
   }, [])
 
   const displayedKelasOptions = useMemo(() => {

@@ -7,6 +7,10 @@ import { NilaiAkhlakHeader } from "./components/nilai-akhlak-header"
 import { NilaiAkhlakTable } from "./components/nilai-akhlak-table"
 import { NilaiAkhlakItem, nilaiAkhlakService } from "@/lib/services/nilai-akhlak.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { getCachedUser } from "@/lib/auth-cache"
+import { dataKelasService } from "@/lib/services/kelas.service"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 export default function NilaiAkhlakPage() {
   const router = useRouter()
@@ -20,6 +24,41 @@ export default function NilaiAkhlakPage() {
   const [items, setItems] = useState<NilaiAkhlakItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const authData = await getCachedUser();
+        if (!authData?.user) {
+          setHasAccess(false);
+          return;
+        }
+
+        const idPetugas = authData.user.id_petugas ?? authData.user.petugas?.id_petugas;
+        const rolesStr = String(authData.user.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
+        if (isAdmin) {
+          setHasAccess(true);
+          return;
+        }
+
+        if (!idPetugas) {
+          setHasAccess(false);
+          return;
+        }
+
+        const res = await dataKelasService.getAll({ status: "AKTIF", per_page: 200 });
+        const isWaliKelas = res.data.some(c => c.id_wali_kelas === idPetugas);
+        setHasAccess(isWaliKelas);
+      } catch (err) {
+        console.error("Access check failed", err);
+        setHasAccess(false);
+      }
+    };
+    checkAccess();
+  }, []);
 
   const fetchNilaiAkhlak = useCallback(async () => {
     if (isTahunLoading) return
@@ -64,6 +103,21 @@ export default function NilaiAkhlakPage() {
     } catch (err: any) {
       setError(err?.response?.data?.message || "Gagal menghapus nilai akhlak")
     }
+  }
+
+  if (hasAccess === null) {
+    return <div className="space-y-6" /> // loading access
+  }
+
+  if (hasAccess === false) {
+    return (
+      <Alert className="border-yellow-200 bg-yellow-50">
+        <AlertCircle className="h-4 w-4 text-yellow-600" />
+        <AlertDescription className="text-yellow-800">
+          Halaman ini hanya dapat diakses oleh Wali Kelas atau Admin.
+        </AlertDescription>
+      </Alert>
+    )
   }
 
   return (
