@@ -50,8 +50,14 @@ import { PpdbPeriodsTab } from "@/components/ppdb/admin/ppdb-periods-tab"
 import {
   PpdbFormState,
   emptyPendaftarForm,
+  emptyPpdbAdminFiles,
+  isAdminPpdbFormIncomplete,
+  PROGRAM_OPTIONS,
+  type PpdbAdminFileState,
   PpdbStatus,
 } from "@/components/ppdb/admin/ppdb-form-fields"
+import { getAdminBillingInfo } from "@/lib/ppdb/admin-billing"
+import type { PpdbPortalBillingInfo } from "@/types/ppdb/portal"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -180,6 +186,9 @@ export default function PpdbPage() {
   // Selection & form state
   const [selectedPendaftar, setSelectedPendaftar] = useState<PpdbDetail | null>(null)
   const [newForm, setNewForm] = useState<PpdbFormState>(emptyPendaftarForm)
+  const [newFormFiles, setNewFormFiles] = useState<PpdbAdminFileState>(emptyPpdbAdminFiles)
+  const [addBillingInfo, setAddBillingInfo] = useState<PpdbPortalBillingInfo | null>(null)
+  const [addBillingLoading, setAddBillingLoading] = useState(false)
 
   // Table filters
   const [searchQuery, setSearchQuery] = useState("")
@@ -235,14 +244,26 @@ export default function PpdbPage() {
     : null
 
   const programOptions = useMemo(() => {
-    const defaultOptions = ['MI', 'MTS', 'MA']
-    const set = new Set<string>(defaultOptions)
+    const set = new Set<string>([...PROGRAM_OPTIONS])
     ppdbData.forEach((item) => {
       const c = item.programPendaftaran || item.jenjang
       if (c?.trim()) set.add(c.toUpperCase())
     })
     return Array.from(set).sort((a, b) => a.localeCompare(b, "id"))
   }, [ppdbData])
+
+  useEffect(() => {
+    const program = (newForm.program || newForm.programPendaftaran || newForm.jenjang || "").trim()
+    if (!program) {
+      setAddBillingInfo(null)
+      setAddBillingLoading(false)
+      return
+    }
+
+    setAddBillingLoading(true)
+    setAddBillingInfo(getAdminBillingInfo(program))
+    setAddBillingLoading(false)
+  }, [newForm.program, newForm.programPendaftaran, newForm.jenjang])
 
   // ── Load tes konfigurasi ──────────────────────────────────────────────────
   const loadTesKonfigurasi = useCallback(async () => {
@@ -383,10 +404,47 @@ export default function PpdbPage() {
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleAddPendaftar = async () => {
-    if (!newForm.name || !newForm.jenjang) { alert("Harap lengkapi data sebelum menyimpan"); return }
+    if (isAdminPpdbFormIncomplete(newForm)) {
+      alert("Harap lengkapi data wajib (identitas, orang tua, dan asal sekolah jika jenjang MI/MTS/MA) sebelum menyimpan")
+      return
+    }
+
+    const program = newForm.program || newForm.programPendaftaran || newForm.jenjang
+
     try {
-      await createPendaftar({ ...newForm, status: newForm.status as PpdbStatus })
+      const result = await createPendaftar({
+        ...newForm,
+        program,
+        programPendaftaran: program,
+        jenjang: program,
+        status: newForm.status as PpdbStatus,
+        suratPernyataanSetuju: newForm.suratPernyataanText.trim() ? "accepted" : undefined,
+      })
+
+      const createdId = result?.id_pendaftaran
+      if (createdId) {
+        const fileUploads: Array<[keyof PpdbAdminFileState, string]> = [
+          ["dokumenAkta", "akta"],
+          ["dokumenKk", "kk"],
+          ["dokumenRekomendasiUstadz", "surat_rekomendasi"],
+          ["dokumenSuratPernyataan", "surat_pernyataan"],
+        ]
+
+        for (const [fileKey, jenisBerkas] of fileUploads) {
+          const file = newFormFiles[fileKey]
+          if (file) {
+            await upload(String(createdId), file, jenisBerkas)
+          }
+        }
+
+        if (newForm.isAnakGuru && newFormFiles.buktiOrtuGuru) {
+          await upload(String(createdId), newFormFiles.buktiOrtuGuru, "bukti_ortu_guru")
+        }
+      }
+
       setNewForm(emptyPendaftarForm)
+      setNewFormFiles(emptyPpdbAdminFiles)
+      setAddBillingInfo(null)
       setIsAddOpen(false)
       await fetchList()
     } catch (err) { alert(getErrorMessage(err, "Gagal menambah pendaftar")) }
@@ -688,7 +746,11 @@ export default function PpdbPage() {
             form={newForm}
             programOptions={programOptions}
             isLoading={createLoading}
+            billingInfo={addBillingInfo}
+            billingLoading={addBillingLoading}
+            files={newFormFiles}
             onFormChange={(patch) => setNewForm((prev) => ({ ...prev, ...patch }))}
+            onFileChange={(key, file) => setNewFormFiles((prev) => ({ ...prev, [key]: file }))}
             onSubmit={handleAddPendaftar}
           />
         </div>

@@ -84,6 +84,67 @@ const mapVerificationHasil = (
   return 'terverifikasi';
 };
 
+const mapStatusToBackend = (
+  status?: 'Menunggu' | 'Terverifikasi' | 'Diterima' | 'Ditolak',
+): string => {
+  if (status === 'Diterima') return 'diterima';
+  if (status === 'Ditolak') return 'ditolak';
+  if (status === 'Terverifikasi') return 'terverifikasi';
+  return 'pending';
+};
+
+export const mapPpdbFormToBackendPayload = (
+  form: CreatePpdbRequest | UpdatePpdbRequest,
+): Rec => {
+  const program = (
+    ('program' in form && form.program)
+    || form.programPendaftaran
+    || form.jenjang
+    || ''
+  ).trim();
+
+  const payload: Rec = {
+    nama_calon: form.name,
+    program_pendaftaran: program || undefined,
+    jenjang: program || undefined,
+    jenis_kelamin: form.jenisKelamin || undefined,
+    tempat_lahir: form.tempatLahir || undefined,
+    tanggal_lahir: form.tanggalLahir || undefined,
+    nik_calon_santri: form.nikCalonSantri || undefined,
+    alamat_lengkap: form.alamatLengkap || undefined,
+    riwayat_penyakit: form.riwayatPenyakit || undefined,
+    surat_pernyataan_text: form.suratPernyataanText || undefined,
+    nama_ayah: form.namaAyah || undefined,
+    penghasilan_ayah: form.penghasilanAyah || undefined,
+    no_hp_calon: form.noHpAyah || form.noHpCalon || form.phone || undefined,
+    nama_ibu: form.namaIbu || undefined,
+    no_hp_ibu: form.noHpIbu || undefined,
+    asal_kota: form.asalSekolah || undefined,
+    nomor_umi: form.wali || undefined,
+    soal_jawab: form.soalJawab || undefined,
+    surat_pernyataan_setuju: form.suratPernyataanSetuju ? true : undefined,
+    is_anak_guru: form.isAnakGuru ? 1 : 0,
+    pilihan_uang_gedung: form.pilihanUangGedung || undefined,
+    pilihan_infaq_bulanan: form.pilihanInfaqBulanan || undefined,
+  };
+
+  if (form.tanggalDaftar) {
+    payload.tanggal_daftar = form.tanggalDaftar;
+  }
+
+  if (form.status) {
+    payload.status_verifikasi = mapStatusToBackend(form.status);
+  }
+
+  Object.keys(payload).forEach((key) => {
+    if (payload[key] === undefined || payload[key] === '') {
+      delete payload[key];
+    }
+  });
+
+  return payload;
+};
+
 const getErrorStatus = (error: unknown): number | undefined => {
   if (!error || typeof error !== 'object') return undefined;
   const errObj = error as { response?: { status?: number } };
@@ -536,17 +597,23 @@ export const ppdbAdminApi = {
     return normalizePpdbDetail(payload);
   },
 
-  async create(payload: CreatePpdbRequest): Promise<unknown> {
+  async create(payload: CreatePpdbRequest): Promise<{ id_pendaftaran?: string }> {
     const response = await requestWithBasePathFallback((basePath) =>
-      api.post(basePath, payload),
+      api.post(basePath, mapPpdbFormToBackendPayload(payload)),
     );
 
-    return response.data;
+    const body = asRecord(response.data);
+    const data = asRecord(body.data);
+    return {
+      ...body,
+      ...data,
+      id_pendaftaran: toText(data.id_pendaftaran ?? data.id ?? body.id_pendaftaran),
+    };
   },
 
   async update(id: string, payload: UpdatePpdbRequest): Promise<unknown> {
     const response = await requestWithBasePathFallback((basePath) =>
-      api.put(buildPath(basePath, `/${id}`), payload),
+      api.put(buildPath(basePath, `/${id}`), mapPpdbFormToBackendPayload(payload)),
     );
 
     return response.data;

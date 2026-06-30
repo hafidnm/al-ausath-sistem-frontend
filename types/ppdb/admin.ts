@@ -1,33 +1,6 @@
 export interface CreatePpdbRequest {
   name: string;
-  programPendaftaran?: string;
-  jenjang: string;
-  jenisKelamin?: string;
-  tempatLahir?: string;
-  tanggalLahir?: string;
-  nikCalonSantri?: string;
-  alamatLengkap?: string;
-  riwayatPenyakit?: string;
-  namaAyah?: string;
-  penghasilanAyah?: string;
-  noHpCalon?: string;
-  namaIbu?: string;
-  noHpIbu?: string;
-  soalJawab?: string;
-  fileAktaPath?: string;
-  fileKkPath?: string;
-  fileSuratRekomendasiPath?: string;
-  suratPernyataanSetuju?: string;
-  suratPernyataanFilePath?: string;
-  asalSekolah: string;
-  wali: string;
-  phone: string;
-  tanggalDaftar: string;
-  status?: 'Menunggu' | 'Terverifikasi' | 'Diterima' | 'Ditolak';
-}
-
-export interface UpdatePpdbRequest {
-  name?: string;
+  program?: string;
   programPendaftaran?: string;
   jenjang?: string;
   jenisKelamin?: string;
@@ -36,8 +9,10 @@ export interface UpdatePpdbRequest {
   nikCalonSantri?: string;
   alamatLengkap?: string;
   riwayatPenyakit?: string;
+  suratPernyataanText?: string;
   namaAyah?: string;
   penghasilanAyah?: string;
+  noHpAyah?: string;
   noHpCalon?: string;
   namaIbu?: string;
   noHpIbu?: string;
@@ -50,8 +25,47 @@ export interface UpdatePpdbRequest {
   asalSekolah?: string;
   wali?: string;
   phone?: string;
+  email?: string;
   tanggalDaftar?: string;
   status?: 'Menunggu' | 'Terverifikasi' | 'Diterima' | 'Ditolak';
+  pilihanUangGedung?: 1 | 2;
+  pilihanInfaqBulanan?: 1 | 2;
+  isAnakGuru?: boolean;
+}
+
+export interface UpdatePpdbRequest {
+  name?: string;
+  program?: string;
+  programPendaftaran?: string;
+  jenjang?: string;
+  jenisKelamin?: string;
+  tempatLahir?: string;
+  tanggalLahir?: string;
+  nikCalonSantri?: string;
+  alamatLengkap?: string;
+  riwayatPenyakit?: string;
+  suratPernyataanText?: string;
+  namaAyah?: string;
+  penghasilanAyah?: string;
+  noHpAyah?: string;
+  noHpCalon?: string;
+  namaIbu?: string;
+  noHpIbu?: string;
+  soalJawab?: string;
+  fileAktaPath?: string;
+  fileKkPath?: string;
+  fileSuratRekomendasiPath?: string;
+  suratPernyataanSetuju?: string;
+  suratPernyataanFilePath?: string;
+  asalSekolah?: string;
+  wali?: string;
+  phone?: string;
+  email?: string;
+  tanggalDaftar?: string;
+  status?: 'Menunggu' | 'Terverifikasi' | 'Diterima' | 'Ditolak';
+  pilihanUangGedung?: 1 | 2;
+  pilihanInfaqBulanan?: 1 | 2;
+  isAnakGuru?: boolean;
 }
 
 export interface PpdbDetail {
