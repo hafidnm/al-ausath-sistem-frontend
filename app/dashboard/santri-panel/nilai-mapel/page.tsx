@@ -5,7 +5,7 @@ import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useSemester } from "@/contexts/semester-context"
 
 export default function NilaiMapelPage() {
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedTahunAjaran } = useTahunAjaran()
   const { semester } = useSemester()
 
   return (
@@ -14,7 +14,7 @@ export default function NilaiMapelPage() {
         <h1 className="text-2xl font-bold text-foreground">Nilai Per Mata Pelajaran</h1>
         <p className="text-sm text-muted-foreground">Daftar nilai untuk setiap mata pelajaran yang Anda pelajari</p>
       </div>
-      <NilaiMapelList tahunAjaran={selectedKodeTahun || ""} semester={semester} />
+      <NilaiMapelList tahunAjaran={selectedTahunAjaran?.nama_tahun || ""} semester={semester} />
     </div>
   )
 }

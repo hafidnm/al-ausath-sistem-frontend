@@ -6,7 +6,7 @@ import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useSemester } from "@/contexts/semester-context"
 
 export default function SantriRaportPage() {
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedTahunAjaran } = useTahunAjaran()
   const { semester } = useSemester()
 
   return (
@@ -23,7 +23,7 @@ export default function SantriRaportPage() {
       </div>
 
       {/* Raport Display */}
-      <RaportDisplay tahunAjaran={selectedKodeTahun || ""} semester={semester} />
+      <RaportDisplay tahunAjaran={selectedTahunAjaran?.nama_tahun || ""} semester={semester} />
     </div>
   )
 }

@@ -96,7 +96,7 @@ export function NilaiMapelFilters({
   onPerPageChange,
   onApply,
 }: NilaiMapelFiltersProps) {
-  const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedTahunAjaran, selectedKodeTahun } = useTahunAjaran()
   const [classSantris, setClassSantris] = useState<SantriItem[]>([])
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
   const [isOptionsLoading, setIsOptionsLoading] = useState(false)
@@ -131,7 +131,7 @@ export function NilaiMapelFilters({
       if (kodeUnitFromContext) {
         params.kode_unit = kodeUnitFromContext
       }
-      params.tahun_ajaran = tahunAjaranFromContext
+      params.tahun_ajaran = selectedKodeTahun // dataKelasMapelService butuh kode_tahun (2026/2027)
 
       if (semester !== "all") {
         params.semester = Number(semester)

@@ -123,9 +123,7 @@ export function NilaiMapelForm() {
 
   const [kodeKelas, setKodeKelas] = useState("")
   const [kodeMapel, setKodeMapel] = useState("")
-  const tahunAjaranDisplay = selectedTahunAjaran?.nama_tahun ?? ""
-  // kode_tahun digunakan sebagai param API (kolom tahun_ajaran di backend menyimpan kode_tahun)
-  const tahunAjaran = selectedKodeTahun ?? ""
+  const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
   const [semester, setSemester] = useState("1")
 
   const [santris, setSantris] = useState<SantriRow[]>([])
@@ -177,7 +175,7 @@ export function NilaiMapelForm() {
         if (!isAdmin && idPetugas) {
           params.id_petugas = idPetugas
         }
-        params.tahun_ajaran = tahunAjaran  // kode_tahun = "2026/2027" sesuai format di DB
+        params.tahun_ajaran = selectedKodeTahun  // data_kelas_mapel butuh format kode ("2026/2027")
         if (semester) params.semester = Number(semester)
         params.kode_unit = selectedKodeUnit
 
@@ -614,7 +612,7 @@ export function NilaiMapelForm() {
               <Label>Tahun Ajaran</Label>
               <div className="flex h-10 items-center gap-2 rounded-md border border-input bg-muted/40 px-3 text-sm">
                 <BookMarked className="w-4 h-4 text-primary shrink-0" />
-                <span className="flex-1 truncate text-foreground">{tahunAjaranDisplay || "Belum dipilih"}</span>
+                <span className="flex-1 truncate text-foreground">{tahunAjaran || "Belum dipilih"}</span>
                 <Badge variant="secondary" className="text-xs shrink-0">Dari Header</Badge>
               </div>
             </div>
