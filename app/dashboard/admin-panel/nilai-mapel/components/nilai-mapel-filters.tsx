@@ -11,12 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Check } from "lucide-react"
+import { Check, Loader2 } from "lucide-react"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
 import { semesterOptions } from "../utils/constants"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
-import { kelasService } from "@/lib/services/kelas.service"
-import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
+import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import { useMemo } from "react"
 
 interface NilaiMapelFiltersProps {
@@ -33,6 +34,55 @@ interface NilaiMapelFiltersProps {
   onApply?: () => void
 }
 
+const normalizeRoleValue = (value: unknown): string[] => {
+  if (value == null) return []
+  if (Array.isArray(value)) {
+    return value.flat(Infinity).filter(Boolean).map(String).map((v) => v.trim().toLowerCase())
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim()
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return parsed.flat(Infinity).filter(Boolean).map(String).map((v) => v.trim().toLowerCase())
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return [trimmed.toLowerCase()]
+  }
+  return [String(value).trim().toLowerCase()]
+}
+
+const hasRole = (me: any, targetRole: string): boolean => {
+  const roles = normalizeRoleValue(me?.user?.peran_akun ?? me?.peran_akun)
+  return roles.includes(targetRole.toLowerCase())
+}
+
+const extractPetugasInputId = (me: any): number | undefined => {
+  const candidates = [
+    me?.user?.id_petugas,
+    me?.user?.petugas?.id_petugas,
+    me?.user?.petugas_id,
+    me?.user?.idDataPetugas,
+    me?.user?.data_petugas?.id,
+    me?.id_petugas,
+    me?.petugas?.id_petugas,
+    me?.petugas_id,
+    me?.idDataPetugas,
+    me?.data_petugas?.id,
+    me?.user?.id,
+    me?.id,
+  ]
+  for (const candidate of candidates) {
+    const id = Number(candidate)
+    if (Number.isFinite(id) && id > 0) return id
+  }
+  return undefined
+}
+
 export function NilaiMapelFilters({
   nomorInduk,
   onNomorIndukChange,
@@ -46,34 +96,100 @@ export function NilaiMapelFilters({
   onPerPageChange,
   onApply,
 }: NilaiMapelFiltersProps) {
+  const { selectedTahunAjaran } = useTahunAjaran()
   const [classSantris, setClassSantris] = useState<SantriItem[]>([])
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
+  const [isOptionsLoading, setIsOptionsLoading] = useState(false)
 
   const [rawKelasOptions, setRawKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
   const [rawMapelOptions, setRawMapelOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
 
   const { selectedUnit } = useUnit()
   const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
+  const tahunAjaranFromContext = selectedTahunAjaran?.nama_tahun ?? ""
 
   useEffect(() => {
-    kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setRawKelasOptions(res.map(k => ({ 
-        value: k.kode_kelas ?? "", 
-        label: k.nama_kelas ?? k.kode_kelas ?? "",
-        kode_unit: k.kode_unit
-      }))))
-      .catch(console.error)
+    const fetchOptions = async () => {
+      setIsOptionsLoading(true)
 
-    mataPelajaranService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => {
-        setRawMapelOptions(res.map(m => ({
-          value: m.kode_mapel ?? "",
-          label: `${m.kode_mapel} - ${m.nama_mapel}`,
-          kode_unit: m.kode_unit ?? undefined
-        })))
-      })
-      .catch(console.error)
-  }, [])
+      const me = await getCachedUser()
+      const petugasId = extractPetugasInputId(me)
+      const isAdmin = hasRole(me, "Petugas Admin")
+
+      const params: any = {
+        per_page: 200,
+        include_wali: true,
+      }
+
+      if (!tahunAjaranFromContext) {
+        setRawKelasOptions([])
+        setRawMapelOptions([])
+        setIsOptionsLoading(false)
+        return
+      }
+
+      if (kodeUnitFromContext) {
+        params.kode_unit = kodeUnitFromContext
+      }
+      params.tahun_ajaran = tahunAjaranFromContext
+
+      if (semester !== "all") {
+        params.semester = Number(semester)
+      }
+
+      if (!isAdmin) {
+        if (!petugasId) {
+          setRawKelasOptions([])
+          setRawMapelOptions([])
+          setIsOptionsLoading(false)
+          return
+        }
+        params.id_petugas = petugasId
+      }
+
+      try {
+        const { data } = await dataKelasMapelService.getAll(params)
+
+        const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+        const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+
+        for (const item of data) {
+          const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
+          const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
+          const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
+          const namaMapel = item.nama_mapel ?? item.mapel?.nama_mapel ?? item.mata_pelajaran?.nama_mapel ?? item.mataPelajaran?.nama_mapel ?? kodeMapel
+          const kodeUnit = item.kode_unit ?? item.kelas?.kode_unit ?? undefined
+
+          if (kodeKelas && !kelasMap.has(kodeKelas)) {
+            kelasMap.set(kodeKelas, {
+              value: kodeKelas,
+              label: namaKelas ?? kodeKelas,
+              kode_unit: kodeUnit,
+            })
+          }
+
+          if (kodeMapel && !mapelMap.has(kodeMapel)) {
+            mapelMap.set(kodeMapel, {
+              value: kodeMapel,
+              label: namaMapel ?? kodeMapel,
+              kode_unit: kodeUnit,
+            })
+          }
+        }
+
+        setRawKelasOptions(Array.from(kelasMap.values()))
+        setRawMapelOptions(Array.from(mapelMap.values()))
+      } catch (error) {
+        console.error(error)
+        setRawKelasOptions([])
+        setRawMapelOptions([])
+      } finally {
+        setIsOptionsLoading(false)
+      }
+    }
+
+    fetchOptions()
+  }, [kodeUnitFromContext, tahunAjaranFromContext, semester])
 
   const displayedKelasOptions = useMemo(() => {
     let filtered = rawKelasOptions
@@ -131,19 +247,40 @@ export function NilaiMapelFilters({
     }
   }, [kodeKelas, classSantris, nomorInduk, onNomorIndukChange])
 
+  useEffect(() => {
+    if (kodeKelas && kodeKelas !== "all" && !displayedKelasOptions.some((item) => item.value === kodeKelas)) {
+      onKodeKelasChange("all")
+    }
+
+    if (kodeMapel && kodeMapel !== "all" && !displayedMapelOptions.some((item) => item.value === kodeMapel)) {
+      onKodeMapelChange("all")
+    }
+  }, [displayedKelasOptions, displayedMapelOptions, kodeKelas, kodeMapel, onKodeKelasChange, onKodeMapelChange])
+
   return (
     <Card className="border-border/50">
       <CardContent className="p-4">
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           <Select value={kodeKelas} onValueChange={onKodeKelasChange}>
             <SelectTrigger>
-              <SelectValue placeholder="Semua Kelas" />
+              <div className="flex items-center justify-between gap-2">
+                <SelectValue placeholder={isOptionsLoading ? "Memuat kelas..." : "Semua Kelas"} />
+                {isOptionsLoading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Kelas</SelectItem>
-              {displayedKelasOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
+              {isOptionsLoading ? (
+                <SelectItem value="loading-kelas" disabled>
+                  Memuat kelas...
+                </SelectItem>
+              ) : (
+                <>
+                  <SelectItem value="all">Semua Kelas</SelectItem>
+                  {displayedKelasOptions.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
 
@@ -173,13 +310,24 @@ export function NilaiMapelFilters({
 
           <Select value={kodeMapel} onValueChange={onKodeMapelChange}>
             <SelectTrigger>
-              <SelectValue placeholder="Semua Mapel" />
+              <div className="flex items-center justify-between gap-2">
+                <SelectValue placeholder={isOptionsLoading ? "Memuat mapel..." : "Semua Mapel"} />
+                {isOptionsLoading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+              </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Semua Mapel</SelectItem>
-              {displayedMapelOptions.map((item) => (
-                <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
-              ))}
+              {isOptionsLoading ? (
+                <SelectItem value="loading-mapel" disabled>
+                  Memuat mapel...
+                </SelectItem>
+              ) : (
+                <>
+                  <SelectItem value="all">Semua Mapel</SelectItem>
+                  {displayedMapelOptions.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
 
