@@ -109,6 +109,8 @@ export interface PpdbDetail {
   pilihanInfaqBulanan?: number | null;
   buktiOrtuGuruPath?: string;
   buktiOrtuGuruVerified?: boolean | null;
+  /** Kode kelas yang sudah ditetapkan saat penerimaan santri */
+  kodeKelasDiterima?: string;
 }
 
 export interface PpdbListResponse {
@@ -127,6 +129,8 @@ export interface PpdbListQuery {
   tanggal_daftar_selesai?: string;
   pendaftaran_selesai?: boolean;
   q?: string;
+  kelas?: string;
+  status_kelas?: string;
 }
 
 export interface UpdateTestResultRequest {

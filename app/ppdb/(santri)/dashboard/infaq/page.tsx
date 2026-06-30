@@ -17,33 +17,15 @@ import { buildPpdbUpdatePayload, mapDashboardToForm, getCorrectFrontendStep } fr
 import { initialPpdbDashboardFiles } from '@/types/ppdb/santri/dashboard';
 import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
-const OPSI_UANG_GEDUNG = [
-  { value: 1, label: 'Pilihan A', amount: 1_500_000, display: 'Rp 1.500.000' },
-  { value: 2, label: 'Pilihan B', amount: 2_000_000, display: 'Rp 2.000.000' },
-];
-
-const OPSI_INFAQ_BULANAN = [
-  { value: 1, label: 'Pilihan A', amount: 650_000, display: 'Rp 650.000' },
-  { value: 2, label: 'Pilihan B', amount: 700_000, display: 'Rp 700.000' },
-];
-
-const FIXED_UANG_PANGKAL_ITEMS = [
-  { label: 'Meja belajar', amount: 100_000, note: 'hak pakai 3 tahun' },
-  { label: 'Papan sekat tidur', amount: 100_000, note: 'hak pakai 3 tahun' },
-  { label: 'Almari (pakaian & buku)', amount: 300_000, note: 'hak pakai 3 tahun' },
-  { label: 'Kasur', amount: 375_000, note: 'hak milik' },
-];
-
-const UANG_MODUL = 250_000;
-
 const formatRupiah = (amount: number) =>
   'Rp ' + amount.toLocaleString('id-ID');
 
 export default function PpdbInfoInfaqPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data, loading, fetchDashboard } = usePpdbPortalDashboard();
+  const { data, loading: dashboardLoading, fetchDashboard } = usePpdbPortalDashboard();
   const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
+  const [billingLoading, setBillingLoading] = useState(true);
 
   const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
   const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
@@ -63,12 +45,21 @@ export default function PpdbInfoInfaqPage() {
   }, [fetchDashboard, toast]);
 
   useEffect(() => {
-    void ppdbPortalApi.getBillingInfo()
-      .then(setBillingInfo)
+    setBillingLoading(true);
+    ppdbPortalApi.getBillingInfo(data?.program || undefined)
+      .then((info) => {
+        setBillingInfo(info);
+        setBillingLoading(false);
+      })
       .catch(() => {
-        setBillingInfo(null);
+        toast({
+          title: 'Gagal memuat billing',
+          description: 'Tidak dapat mengambil konfigurasi biaya dari server. Silakan muat ulang halaman.',
+          variant: 'destructive',
+        });
+        setBillingLoading(false);
       });
-  }, []);
+  }, [toast, data?.program]);
 
   // Sync from backend data once loaded
   useEffect(() => {
@@ -119,13 +110,26 @@ export default function PpdbInfoInfaqPage() {
   }, [billingInfo]);
 
   // Computed totals
-  const uangGedungOptions = (billingInfo?.uangGedungOptions?.length ? billingInfo.uangGedungOptions : OPSI_UANG_GEDUNG) as PpdbPortalBillingOption[];
-  const infaqOptions = (billingInfo?.infaqBulananOptions?.length ? billingInfo.infaqBulananOptions : OPSI_INFAQ_BULANAN) as PpdbPortalBillingOption[];
+  const uangGedungOptions = (billingInfo?.uangGedungOptions ?? []) as PpdbPortalBillingOption[];
+  const infaqOptions = (billingInfo?.infaqBulananOptions ?? []) as PpdbPortalBillingOption[];
+  const perlengkapanAmount = billingInfo?.perlengkapanAmount ?? 0;
+  const uangModul = billingInfo?.uangModulAmount ?? 0;
+
+  const FIXED_UANG_PANGKAL_ITEMS = perlengkapanAmount === 875000
+    ? [
+        { label: 'Meja belajar', amount: 100000, note: 'hak pakai 3 tahun' },
+        { label: 'Papan sekat tidur', amount: 100000, note: 'hak pakai 3 tahun' },
+        { label: 'Almari (pakaian & buku)', amount: 300000, note: 'hak pakai 3 tahun' },
+        { label: 'Kasur', amount: 375000, note: 'hak milik' },
+      ]
+    : perlengkapanAmount > 0
+      ? [{ label: 'Perlengkapan', amount: perlengkapanAmount, note: '' }]
+      : [];
 
   const gedungAmount = uangGedungOptions.find(o => o.value === pilihanUangGedung)?.amount ?? 0;
-  const fixedTotal = FIXED_UANG_PANGKAL_ITEMS.reduce((s, i) => s + i.amount, 0);
+  const fixedTotal = perlengkapanAmount;
   const totalUangPangkal = gedungAmount + fixedTotal; // e.g. 2.375.000 or 2.875.000
-  const totalKeseluruhan = totalUangPangkal + UANG_MODUL;
+  const totalKeseluruhan = totalUangPangkal + uangModul;
   const infaqBulananDisplay = infaqOptions.find(o => o.value === pilihanInfaqBulanan)?.display ?? '-';
 
   const handleLanjut = async () => {
@@ -179,10 +183,11 @@ export default function PpdbInfoInfaqPage() {
     }
   };
 
-  if (loading && !data) {
+  if ((dashboardLoading && !data) || billingLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-background flex items-center justify-center flex-col gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-emerald-600" />
+        <p className="text-sm text-muted-foreground">Memuat informasi billing...</p>
       </div>
     );
   }
@@ -276,20 +281,22 @@ export default function PpdbInfoInfaqPage() {
         </Card>
 
         {/* 2. Uang Modul */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-xs flex items-center justify-center font-bold">2</span>
-              INFAQ UANG MODUL
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex justify-between text-sm">
-              <span>Infaq modul semester ganjil</span>
-              <span className="font-medium text-primary">{formatRupiah(UANG_MODUL)}</span>
-            </div>
-          </CardContent>
-        </Card>
+        {uangModul > 0 && (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-violet-600 text-white text-xs flex items-center justify-center font-bold">2</span>
+                INFAQ UANG MODUL
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-between text-sm">
+                <span>Infaq modul semester ganjil</span>
+                <span className="font-medium text-primary">{formatRupiah(uangModul)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* 3. Bulanan dengan pilihan */}
         <Card className="shadow-sm">
@@ -337,10 +344,12 @@ export default function PpdbInfoInfaqPage() {
                 <span>1. Uang Pangkal</span>
                 <span className="font-medium">{formatRupiah(totalUangPangkal)}</span>
               </div>
-              <div className="flex justify-between">
-                <span>2. Infaq Uang Modul</span>
-                <span className="font-medium">{formatRupiah(UANG_MODUL)}</span>
-              </div>
+              {uangModul > 0 && (
+                <div className="flex justify-between">
+                  <span>2. Infaq Uang Modul</span>
+                  <span className="font-medium">{formatRupiah(uangModul)}</span>
+                </div>
+              )}
               <div className="flex justify-between border-t pt-2 font-bold">
                 <span>JUMLAH (tanpa SPP)</span>
                 <span className="text-primary">{formatRupiah(totalKeseluruhan)}</span>

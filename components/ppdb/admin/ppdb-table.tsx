@@ -38,6 +38,7 @@ import {
   XCircle,
   Loader2,
   Wallet,
+  UserCheck,
 } from "lucide-react"
 import type { PpdbDetail } from "@/types/ppdb/admin"
 import type { PaginationMeta } from "@/lib/ppdb/admin-api"
@@ -70,6 +71,9 @@ interface PpdbTableProps {
   onCreateTagihan: (item: PpdbDetail) => void
   onCreateTagihanInfaq: (item: PpdbDetail) => void
   tagihanLoading: boolean
+  /** Dipanggil untuk santri berstatus Diterima yang belum punya NIS — generate/integrasi ulang */
+  onIntegrasikanSantri?: (item: PpdbDetail) => void
+  integrasiLoading?: boolean
 }
 
 const formatDate = (value: string) => {
@@ -134,6 +138,8 @@ export function PpdbTable({
   onCreateTagihan,
   onCreateTagihanInfaq,
   tagihanLoading,
+  onIntegrasikanSantri,
+  integrasiLoading = false,
 }: PpdbTableProps) {
   // We use server-side filtering and pagination now, so data is already filtered for the current page
   const filtered = data;
@@ -312,6 +318,20 @@ export function PpdbTable({
                               >
                                 <Wallet className="w-4 h-4 mr-2" />
                                 Buat Tagihan Infaq
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {/* Santri Diterima tapi NIS belum ada — tampilkan tombol integrasi ulang */}
+                          {p.status === "Diterima" && !p.nomorIndukGenerated && onIntegrasikanSantri && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-amber-600 focus:text-amber-700"
+                                onClick={() => onIntegrasikanSantri(p)}
+                                disabled={integrasiLoading}
+                              >
+                                <UserCheck className="w-4 h-4 mr-2" />
+                                Generate NIS Santri
                               </DropdownMenuItem>
                             </>
                           )}

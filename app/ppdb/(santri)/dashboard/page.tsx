@@ -47,12 +47,14 @@ import {
   wait,
   getCorrectFrontendStep,
 } from '@/lib/ppdb/santri/dashboard';
+import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import {
   initialPpdbDashboardFiles,
   initialPpdbDashboardForm,
   type PpdbDashboardFileState,
   type PpdbDashboardFormState,
 } from '@/types/ppdb/santri/dashboard';
+import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
 
 const AUTO_SAVE_DELAY_MS = 1500;
 
@@ -116,6 +118,8 @@ export default function PpdbDashboardPage() {
   const [pilihanUangGedung, setPilihanUangGedung] = useState<1 | 2>(1);
   const [pilihanInfaqBulanan, setPilihanInfaqBulanan] = useState<1 | 2>(1);
   const [isAnakGuru, setIsAnakGuru] = useState<boolean>(false);
+  const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
+  const [billingLoading, setBillingLoading] = useState(false);
   const [buktiAnakGuruFile, setBuktiAnakGuruFile] = useState<File | null>(null);
   const [buktiAnakGuruPreview, setBuktiAnakGuruPreview] = useState<string | null>(null);
   const buktiOrtuGuruRef = useRef<HTMLInputElement>(null);
@@ -202,6 +206,61 @@ export default function PpdbDashboardPage() {
       });
     })();
   }, [fetchDashboard, toast]);
+
+  useEffect(() => {
+    const program = (form.program || '').trim();
+    if (!program) {
+      setBillingInfo(null);
+      setBillingLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setBillingLoading(true);
+    setBillingInfo(null);
+
+    void ppdbPortalApi.getBillingInfo(program)
+      .then((info) => {
+        if (cancelled) return;
+
+        setBillingInfo(info);
+
+        const serverProgram = (data?.program || '').trim().toUpperCase();
+        const currentProgram = program.toUpperCase();
+        const matchesSavedProgram = serverProgram === currentProgram;
+
+        if (matchesSavedProgram) {
+          if (info.pilihanUangGedung === 1 || info.pilihanUangGedung === 2) {
+            setPilihanUangGedung(info.pilihanUangGedung);
+          }
+          if (info.pilihanInfaqBulanan === 1 || info.pilihanInfaqBulanan === 2) {
+            setPilihanInfaqBulanan(info.pilihanInfaqBulanan);
+          }
+          setIsAnakGuru(Boolean(info.isAnakGuru));
+        } else {
+          setPilihanUangGedung(1);
+          setPilihanInfaqBulanan(1);
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setBillingInfo(null);
+        toast({
+          title: 'Gagal memuat pilihan infaq',
+          description: 'Tidak dapat mengambil konfigurasi biaya untuk jenjang ini. Coba pilih ulang atau refresh halaman.',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setBillingLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.program, data?.program, toast]);
 
   useEffect(() => {
     if (!data) return;
@@ -453,6 +512,9 @@ export default function PpdbDashboardPage() {
 
 
 
+  const uangGedungOptions = billingInfo?.uangGedungOptions ?? [];
+  const infaqOptions = billingInfo?.infaqBulananOptions ?? [];
+
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -585,7 +647,13 @@ export default function PpdbDashboardPage() {
                 <Label>Program yang Ingin Didaftar</Label>
                 <Select
                   value={form.program}
-                  onValueChange={(value) => setForm((prev) => ({ ...prev, program: value }))}
+                  onValueChange={(value) => {
+                    setForm((prev) => ({ ...prev, program: value }));
+                    setPilihanUangGedung(1);
+                    setPilihanInfaqBulanan(1);
+                    setBillingInfo(null);
+                    setBillingLoading(true);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Pilih program" />
@@ -921,20 +989,38 @@ export default function PpdbDashboardPage() {
             </div>
 
             {/* ── Pilihan Infaq & Anak Guru ──────────────────────────────── */}
-            <div className="rounded-lg border border-border p-4 space-y-4 bg-muted/20">
+            <div
+              key={form.program || 'no-program'}
+              className="rounded-lg border border-border p-4 space-y-4 bg-muted/20"
+            >
               <p className="font-medium text-foreground text-sm flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-primary" />
                 Pilihan Infaq Pendidikan
+                {form.program ? (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    — Jenjang {form.program}
+                  </span>
+                ) : null}
               </p>
 
+              {!form.program ? (
+                <p className="text-sm text-muted-foreground">
+                  Pilih program/jenjang terlebih dahulu untuk melihat pilihan infaq.
+                </p>
+              ) : billingLoading ? (
+                <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Memuat pilihan infaq untuk jenjang {form.program}...
+                </div>
+              ) : (
+              <>
               {/* Uang Gedung */}
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Uang Gedung</Label>
                 <div className="flex gap-3">
-                  {([
-                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 1.500.000' },
-                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 2.000.000' },
-                  ]).map((opsi) => (
+                  {uangGedungOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Belum ada opsi uang gedung untuk jenjang ini.</p>
+                  ) : uangGedungOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
@@ -959,10 +1045,9 @@ export default function PpdbDashboardPage() {
               <div className="space-y-2">
                 <Label className="text-sm">Pilihan Infaq Bulanan / SPP</Label>
                 <div className="flex gap-3">
-                  {([
-                    { value: 1 as const, label: 'Pilihan A', display: 'Rp 650.000 / bln' },
-                    { value: 2 as const, label: 'Pilihan B', display: 'Rp 700.000 / bln' },
-                  ]).map((opsi) => (
+                  {infaqOptions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Belum ada opsi infaq bulanan untuk jenjang ini.</p>
+                  ) : infaqOptions.map((opsi) => (
                     <button
                       key={opsi.value}
                       type="button"
@@ -1087,6 +1172,8 @@ export default function PpdbDashboardPage() {
                 <Info className="inline w-3 h-3 mr-1 text-primary" />
                 Pilihan infaq disimpan bersama form pendaftaran. Tagihan SPP dan infaq bulanan hanya muncul di portal santri setelah diterima.
               </p>
+              </>
+              )}
             </div>
 
             <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
