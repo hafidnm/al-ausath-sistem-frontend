@@ -8,9 +8,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { usePpdbPortalPembayaranStatus } from '@/hooks/ppdb/santri';
+import { usePpdbPortalDashboard } from '@/hooks/ppdb/santri';
 import api from '@/lib/axios';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
+import { getCorrectFrontendStep, portalStepRoute } from '@/lib/ppdb/santri/dashboard';
 import type { PpdbPortalBillingInfo } from '@/types/ppdb/portal';
 
 interface RekeningBank {
@@ -27,7 +28,7 @@ interface RekeningBank {
 export default function PpdbPembayaranPage() {
   const router = useRouter();
   const { toast } = useToast();
-  const { data, loading, fetchPembayaranStatus } = usePpdbPortalPembayaranStatus();
+  const { data, loading, fetchDashboard } = usePpdbPortalDashboard();
   const [billingInfo, setBillingInfo] = useState<PpdbPortalBillingInfo | null>(null);
 
   // POIN 17: Dropdown jenjang & kelas dihapus dari halaman pembayaran santri.
@@ -51,14 +52,14 @@ export default function PpdbPembayaranPage() {
   }, []);
 
   useEffect(() => {
-    void fetchPembayaranStatus().catch(() => {
+    void fetchDashboard().catch(() => {
       toast({
         title: 'Gagal memuat data',
         description: 'Tidak dapat memuat status pembayaran',
         variant: 'destructive',
       });
     });
-  }, [fetchPembayaranStatus, toast]);
+  }, [fetchDashboard, toast]);
 
   useEffect(() => {
     void ppdbPortalApi.getBillingInfo()
@@ -71,23 +72,19 @@ export default function PpdbPembayaranPage() {
   useEffect(() => {
     if (!data) return;
 
-    // Redirect mundur jika step awal belum selesai
-    if (!data.formCompleted) {
-      router.replace('/ppdb/dashboard');
-      return;
-    }
-    const hasSelectedInfaq =
-      (data.pilihanUangGedung === 1 || data.pilihanUangGedung === 2) &&
-      (data.pilihanInfaqBulanan === 1 || data.pilihanInfaqBulanan === 2);
-    if (!hasSelectedInfaq) {
-      router.replace('/ppdb/dashboard/infaq');
+    const correctStep = getCorrectFrontendStep(data);
+
+    // Halaman ini hanya untuk step pembayaran PPDB
+    if (correctStep !== 'pembayaran-ppdb') {
+      const targetRoute = portalStepRoute(correctStep);
+      if (targetRoute) {
+        router.replace(targetRoute);
+      }
       return;
     }
 
     // Redirect maju HANYA jika pembayaran sudah benar-benar diverifikasi admin,
     // BUKAN hanya karena sedang menunggu verifikasi (menunggu_verifikasi / menunggu_konfirmasi).
-    // Ini mencegah loop: upload bukti → langsung redirect ke pengumuman → pengumuman
-    // redirect balik ke pembayaran karena status masih "menunggu".
     const paymentStatus = data.pembayaranPpdb?.status || '';
     const isPaymentVerified = ['terverifikasi', 'lunas'].includes(paymentStatus);
 
@@ -99,8 +96,6 @@ export default function PpdbPembayaranPage() {
         router.replace('/ppdb/dashboard/pengumuman');
       }
     }
-    // Jika status 'menunggu_verifikasi' atau 'menunggu_konfirmasi', tetap di halaman ini
-    // agar user bisa melihat pesan bahwa bukti sedang direview.
   }, [data, router]);
 
   useEffect(() => {
@@ -146,7 +141,7 @@ export default function PpdbPembayaranPage() {
       
       setFile(null);
       setPreviewUrl(null);
-      await fetchPembayaranStatus();
+      await fetchDashboard();
     } catch (error: any) {
       toast({
         title: 'Gagal mengunggah',

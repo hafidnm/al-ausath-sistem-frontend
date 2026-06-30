@@ -1,12 +1,23 @@
 "use client"
 
-import { useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Loader2, FileText, CheckCircle2 } from "lucide-react"
-import { useTunggakanSantri } from "@/hooks/use-pembayaran"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { ArrowLeft, Loader2, FileText, CheckCircle2, Trash2 } from "lucide-react"
+import { useTunggakanSantri, useHapusPembayaran } from "@/hooks/use-pembayaran"
+import { useToast } from "@/hooks/use-toast"
 
 const formatCurrency = (v: number) =>
   new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(v)
@@ -22,15 +33,47 @@ const formatDateTime = (v: string) => {
 export default function ProsesPembayaranSantriPage() {
   const params = useParams()
   const router = useRouter()
+  const { toast } = useToast()
   const idSantri = params.id as string
 
   const { data, loading, error, fetchTunggakan } = useTunggakanSantri()
+  const { hapus, loading: hapusLoading } = useHapusPembayaran()
+
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id_pembayaran: string
+    kategori: string
+    nominal_bayar: number
+  } | null>(null)
+
+  const reload = useCallback(async () => {
+    if (idSantri) {
+      await fetchTunggakan(idSantri)
+    }
+  }, [fetchTunggakan, idSantri])
 
   useEffect(() => {
-    if (idSantri) {
-      void fetchTunggakan(idSantri)
+    void reload()
+  }, [reload])
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget?.id_pembayaran) return
+
+    try {
+      await hapus(deleteTarget.id_pembayaran)
+      toast({
+        title: "Tagihan dihapus",
+        description: "Tagihan duplikat atau tidak valid berhasil dihapus.",
+      })
+      setDeleteTarget(null)
+      await reload()
+    } catch (err) {
+      toast({
+        title: "Gagal menghapus tagihan",
+        description: err instanceof Error ? err.message : "Terjadi kesalahan saat menghapus tagihan",
+        variant: "destructive",
+      })
     }
-  }, [idSantri, fetchTunggakan])
+  }
 
   return (
     <div className="space-y-6">
@@ -41,7 +84,7 @@ export default function ProsesPembayaranSantriPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Detail Pembayaran Santri</h1>
           <p className="text-sm text-muted-foreground">
-            Lihat tunggakan dan proses pembayaran untuk santri.
+            Lihat tunggakan, hapus tagihan duplikat, dan proses pembayaran untuk santri.
           </p>
         </div>
       </div>
@@ -57,7 +100,7 @@ export default function ProsesPembayaranSantriPage() {
         <Card>
           <CardContent className="py-20 text-center text-destructive">
             <p>Gagal memuat data: {error}</p>
-            <Button variant="outline" onClick={() => void fetchTunggakan(idSantri)} className="mt-4">Coba Lagi</Button>
+            <Button variant="outline" onClick={() => void reload()} className="mt-4">Coba Lagi</Button>
           </CardContent>
         </Card>
       ) : !data ? (
@@ -70,7 +113,6 @@ export default function ProsesPembayaranSantriPage() {
         </Card>
       ) : (
         <div className="grid md:grid-cols-3 gap-6">
-          {/* Kolom Kiri: Profil & Ringkasan */}
           <div className="space-y-6 md:col-span-1">
             <Card>
               <CardHeader className="pb-4 border-b">
@@ -106,12 +148,13 @@ export default function ProsesPembayaranSantriPage() {
             </Card>
           </div>
 
-          {/* Kolom Kanan: Daftar Tagihan */}
           <div className="md:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Rincian Tagihan Belum Lunas</CardTitle>
-                <CardDescription>Daftar invoice dan tagihan yang perlu diselesaikan.</CardDescription>
+                <CardDescription>
+                  Hapus tagihan duplikat jika siswa pindahan pernah di-generate SPP berulang kali.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
@@ -119,23 +162,44 @@ export default function ProsesPembayaranSantriPage() {
                     <p className="text-center text-muted-foreground py-8">Tidak ada tagihan tertunggak.</p>
                   ) : (
                     data.rincian.map((item, idx) => (
-                      <div key={item.id_pembayaran || idx} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors">
-                        <div className="flex items-start gap-4">
+                      <div
+                        key={item.id_pembayaran || idx}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
+                      >
+                        <div className="flex items-start gap-4 min-w-0">
                           <div className="p-2 bg-primary/10 text-primary rounded-md hidden sm:block">
                             <FileText className="w-5 h-5" />
                           </div>
-                          <div>
-                            <p className="font-semibold">{item.kategori}</p>
+                          <div className="min-w-0">
+                            <p className="font-semibold truncate">{item.kategori || "Tagihan SPP"}</p>
                             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
                               <span>Tgl Jatuh Tempo: {formatDateTime(item.tanggal_bayar)}</span>
                               <span>•</span>
-                              <Badge variant="outline" className="font-normal">{item.status.replace(/_/g, ' ').toUpperCase()}</Badge>
+                              <Badge variant="outline" className="font-normal">
+                                {item.status.replace(/_/g, " ").toUpperCase()}
+                              </Badge>
                             </div>
                           </div>
                         </div>
-                        <div className="mt-4 sm:mt-0 flex flex-col sm:items-end gap-2">
+                        <div className="flex items-center gap-3 sm:flex-shrink-0">
                           <p className="font-bold text-lg">{formatCurrency(item.nominal_bayar)}</p>
-                          {/* Future: Process button per invoice */}
+                          {item.id_pembayaran && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                              disabled={hapusLoading}
+                              onClick={() => setDeleteTarget({
+                                id_pembayaran: item.id_pembayaran,
+                                kategori: item.kategori || "Tagihan",
+                                nominal_bayar: item.nominal_bayar,
+                              })}
+                            >
+                              <Trash2 className="w-4 h-4 mr-1.5" />
+                              Hapus
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))
@@ -146,6 +210,39 @@ export default function ProsesPembayaranSantriPage() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Hapus tagihan ini?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tagihan <strong>{deleteTarget?.kategori}</strong> sebesar{" "}
+              <strong>{formatCurrency(deleteTarget?.nominal_bayar || 0)}</strong> akan dihapus permanen.
+              Gunakan fitur ini untuk membersihkan tagihan SPP duplikat akibat generate ulang.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={hapusLoading}>Batal</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={hapusLoading}
+              onClick={(e) => {
+                e.preventDefault()
+                void handleConfirmDelete()
+              }}
+            >
+              {hapusLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Menghapus...
+                </>
+              ) : (
+                "Ya, Hapus Tagihan"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

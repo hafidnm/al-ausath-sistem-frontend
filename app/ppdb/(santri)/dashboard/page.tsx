@@ -46,6 +46,7 @@ import {
   SURAT_PERNYATAAN_TEMPLATE_URL,
   wait,
   getCorrectFrontendStep,
+  portalStepRoute,
 } from '@/lib/ppdb/santri/dashboard';
 import { ppdbPortalApi } from '@/lib/ppdb/portal-api';
 import {
@@ -54,7 +55,7 @@ import {
   type PpdbDashboardFileState,
   type PpdbDashboardFormState,
 } from '@/types/ppdb/santri/dashboard';
-import type { PpdbPortalBillingInfo, PpdbPortalBillingOption } from '@/types/ppdb/portal';
+import type { PpdbPortalBillingInfo, PpdbPortalBillingOption, PpdbPortalDashboard } from '@/types/ppdb/portal';
 
 const AUTO_SAVE_DELAY_MS = 1500;
 
@@ -77,6 +78,8 @@ const buildAutosaveSignature = (
     },
   });
 
+const routeByStep = portalStepRoute;
+
 export default function PpdbDashboardPage() {
   const { toast } = useToast();
   const router = useRouter();
@@ -93,6 +96,7 @@ export default function PpdbDashboardPage() {
 
   const [autoSaveStatus, setAutoSaveStatus] = useState<AutoSaveStatus>('idle');
   const [lastAutoSaveAt, setLastAutoSaveAt] = useState<Date | null>(null);
+  const [manualSaving, setManualSaving] = useState(false);
 
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
@@ -263,7 +267,7 @@ export default function PpdbDashboardPage() {
   }, [form.program, data?.program, toast]);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || manualSaving) return;
 
     const mappedForm = mapDashboardToForm(data);
     setForm(mappedForm);
@@ -282,30 +286,15 @@ export default function PpdbDashboardPage() {
       setIsAnakGuru(data.isAnakGuru);
     }
 
-    // Auto-redirect ke halaman sesuai flow
-    const correctStep = getCorrectFrontendStep(data);
-
-    if (correctStep === 'infaq') {
-      router.replace('/ppdb/dashboard/infaq');
-      return;
+    // Auto-redirect ke halaman sesuai flow (hanya jika user tidak sedang simpan manual)
+    if (!hasUserSubmittedRef.current) {
+      const correctStep = getCorrectFrontendStep(data);
+      const targetRoute = portalStepRoute(correctStep);
+      if (targetRoute && correctStep !== 'lengkapi-form') {
+        router.replace(targetRoute);
+      }
     }
-    if (correctStep === 'tes') {
-      router.replace('/ppdb/tes');
-      return;
-    }
-    if (correctStep === 'pembayaran-ppdb') {
-      router.replace('/ppdb/dashboard/pembayaran');
-      return;
-    }
-    if (correctStep === 'siap-menjadi-santri') {
-      router.replace('/ppdb/dashboard/siap-menjadi-santri');
-      return;
-    }
-    if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
-      router.replace('/ppdb/dashboard/pengumuman');
-      return;
-    }
-  }, [data, router]);
+  }, [data, manualSaving, router]);
 
   useEffect(() => {
     if (!data || !hasHydratedFromServerRef.current) return;
@@ -378,8 +367,6 @@ export default function PpdbDashboardPage() {
       clearAutoSaveTimer();
     };
   }, [clearAutoSaveTimer, data, fetchDashboard, files, form, updateForm]);
-
-  const [manualSaving, setManualSaving] = useState(false);
 
   const handleSaveForm = async () => {
     if (isPpdbFormIncomplete(form)) {
@@ -456,26 +443,21 @@ export default function PpdbDashboardPage() {
         description: 'Data pendaftar sudah diperbarui.',
       });
 
-      const correctStep = getCorrectFrontendStep(refreshedDashboard);
+      const saveRedirectSnapshot: PpdbPortalDashboard = {
+        ...(refreshedDashboard || data || {}),
+        formCompleted: true,
+        pilihanUangGedung,
+        pilihanInfaqBulanan,
+        isAnakGuru,
+      } as PpdbPortalDashboard;
 
-      if (correctStep === 'infaq') {
-        router.replace('/ppdb/dashboard/infaq');
+      if (redirectAccordingToStep(saveRedirectSnapshot)) {
+        hasUserSubmittedRef.current = false;
         return;
       }
-      if (correctStep === 'tes') {
-        router.replace('/ppdb/tes');
-        return;
-      }
-      if (correctStep === 'pembayaran-ppdb') {
-        router.replace('/ppdb/dashboard/pembayaran');
-        return;
-      }
-      if (correctStep === 'siap-menjadi-santri') {
-        router.replace('/ppdb/dashboard/siap-menjadi-santri');
-        return;
-      }
-      if (correctStep === 'pengumuman' || correctStep === 'menunggu-pengumuman') {
-        router.replace('/ppdb/dashboard/pengumuman');
+
+      if (redirectAccordingToStep(refreshedDashboard)) {
+        hasUserSubmittedRef.current = false;
         return;
       }
     } catch (error) {
@@ -491,6 +473,7 @@ export default function PpdbDashboardPage() {
     } finally {
       isSavingRef.current = false;
       setManualSaving(false);
+      hasUserSubmittedRef.current = false;
     }
   };
 
@@ -511,6 +494,17 @@ export default function PpdbDashboardPage() {
   }, [autoSaveStatus, lastAutoSaveAt]);
 
 
+
+  const redirectAccordingToStep = useCallback((source: PpdbPortalDashboard | null) => {
+    if (!source) return false;
+
+    const step = getCorrectFrontendStep(source);
+    const targetRoute = routeByStep(step);
+    if (!targetRoute) return false;
+
+    router.replace(targetRoute);
+    return true;
+  }, [router]);
 
   const uangGedungOptions = billingInfo?.uangGedungOptions ?? [];
   const infaqOptions = billingInfo?.infaqBulananOptions ?? [];

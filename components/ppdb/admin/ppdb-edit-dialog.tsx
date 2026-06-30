@@ -71,6 +71,9 @@ export function PpdbEditDialog({
             programOptions={programOptions}
             onChange={onFormChange}
             showStatus={false}
+            showAdminMeta={false}
+            showDocuments={false}
+            showInfaq={false}
           />
 
           {/* Konfigurasi Soal Tes */}

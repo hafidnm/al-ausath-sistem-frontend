@@ -11,7 +11,13 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Loader2, Plus } from "lucide-react"
-import { PpdbFormFields, PpdbFormState, emptyPendaftarForm } from "./ppdb-form-fields"
+import type { PpdbPortalBillingInfo } from "@/types/ppdb/portal"
+import {
+  PpdbFormFields,
+  PpdbFormState,
+  PpdbAdminFileState,
+  emptyPpdbAdminFiles,
+} from "./ppdb-form-fields"
 
 interface PpdbAddDialogProps {
   open: boolean
@@ -19,7 +25,11 @@ interface PpdbAddDialogProps {
   form: PpdbFormState
   programOptions: string[]
   isLoading: boolean
+  billingInfo?: PpdbPortalBillingInfo | null
+  billingLoading?: boolean
+  files?: PpdbAdminFileState
   onFormChange: (patch: Partial<PpdbFormState>) => void
+  onFileChange?: (key: keyof PpdbAdminFileState, file: File | null) => void
   onSubmit: () => void
 }
 
@@ -29,7 +39,11 @@ export function PpdbAddDialog({
   form,
   programOptions,
   isLoading,
+  billingInfo = null,
+  billingLoading = false,
+  files = emptyPpdbAdminFiles,
   onFormChange,
+  onFileChange,
   onSubmit,
 }: PpdbAddDialogProps) {
   return (
@@ -40,21 +54,28 @@ export function PpdbAddDialog({
           Tambah Pendaftar
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tambah Pendaftar Baru</DialogTitle>
           <DialogDescription>
-            Lengkapi data calon murid untuk proses PPDB
+            Lengkapi data calon santri sesuai form PPDB portal santri
           </DialogDescription>
         </DialogHeader>
 
-        <div className="py-4">
+        <div className="py-2">
           <PpdbFormFields
             idPrefix="new"
             form={form}
             programOptions={programOptions}
             onChange={onFormChange}
             showStatus
+            showAdminMeta
+            showDocuments
+            showInfaq
+            files={files}
+            onFileChange={onFileChange}
+            billingInfo={billingInfo}
+            billingLoading={billingLoading}
           />
         </div>
 
