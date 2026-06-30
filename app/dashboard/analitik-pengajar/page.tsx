@@ -19,7 +19,7 @@ export default function AnalitikPengajarPage() {
   const [kodeKelas, setKodeKelas] = useState<string>("")
   const [semester, setSemester] = useState<number>(1)
 
-  const { selectedKodeTahun } = useTahunAjaran()
+  const { selectedTahunAjaran, selectedKodeTahun } = useTahunAjaran()
 
   const {
     data: classStats,
@@ -63,7 +63,7 @@ export default function AnalitikPengajarPage() {
     if (!mounted || !selectedKodeTahun) return
 
     const query: AnalyticsQuery = {
-      tahun_ajaran: selectedKodeTahun,
+      tahun_ajaran: selectedTahunAjaran?.nama_tahun || selectedKodeTahun,
       semester,
       ...(kodeKelas ? { kode_kelas: kodeKelas } : {}),
     }
@@ -71,7 +71,7 @@ export default function AnalitikPengajarPage() {
     fetchClassStatistics(query)
     fetchSubjectRecap(query)
     fetchScoreDistribution(query)
-  }, [mounted, selectedKodeTahun, semester, kodeKelas])
+  }, [mounted, selectedTahunAjaran, selectedKodeTahun, semester, kodeKelas])
 
   const handleKodeKelasChange = (kelas: string) => {
     setKodeKelas(kelas)
