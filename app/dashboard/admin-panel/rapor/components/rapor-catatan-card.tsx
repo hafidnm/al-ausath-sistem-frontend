@@ -6,6 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
 import type { RaporDetail, RaporItem } from "@/lib/services/rapor.service"
@@ -109,31 +116,87 @@ export function RaporCatatanCard({
           <div className="grid gap-4 sm:grid-cols-3 md:grid-cols-4">
             <div>
               <Label>Kebersihan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kebersihan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_kebersihan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_kebersihan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Kerapian</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kerapian ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_kerapian || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_kerapian: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Keterampilan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_keterampilan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_keterampilan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_keterampilan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Kelakuan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kelakuan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kelakuan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_kelakuan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_kelakuan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Kerajinan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kerajinan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kerajinan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_kerajinan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_kerajinan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Kedisiplinan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_kedisiplinan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_kedisiplinan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_kedisiplinan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_kedisiplinan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Ketaatan</Label>
-              <Input className="mt-2" value={catatanForm.keseharian_ketaatan ?? ""} onChange={(event) => onCatatanFormChange((current) => ({ ...current, keseharian_ketaatan: event.target.value }))} disabled={!isReportReady || isPublishedReport} placeholder="A/B/C/D" />
+              <Select value={catatanForm.keseharian_ketaatan || undefined} onValueChange={(val) => onCatatanFormChange((current) => ({ ...current, keseharian_ketaatan: val }))} disabled={!isReportReady || isPublishedReport}>
+                <SelectTrigger className="mt-2"><SelectValue placeholder="Pilih Nilai" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A">A</SelectItem>
+                  <SelectItem value="B">B</SelectItem>
+                  <SelectItem value="C">C</SelectItem>
+                  <SelectItem value="D">D</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
