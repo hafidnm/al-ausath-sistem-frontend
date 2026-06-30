@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/select"
 import { BookMarked } from "lucide-react"
 import { semesterOptions } from "../utils/constants"
-import { mataPelajaranService } from "@/lib/services/mata-pelajaran.service"
+import { dataKelasMapelService } from "@/lib/services/kelas-mapel.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
 import { Badge } from "@/components/ui/badge"
@@ -23,6 +23,9 @@ interface KkmFiltersProps {
   onSemesterChange: (value: string) => void
   perPage: string
   onPerPageChange: (value: string) => void
+  kodeKelas: string
+  onKodeKelasChange: (value: string) => void
+  onValidMapelsChange?: (mapels: string[]) => void
 }
 
 export function KkmFilters({
@@ -32,48 +35,100 @@ export function KkmFilters({
   onSemesterChange,
   perPage,
   onPerPageChange,
+  kodeKelas,
+  onKodeKelasChange,
+  onValidMapelsChange,
 }: KkmFiltersProps) {
-  const { selectedTahunAjaran } = useTahunAjaran()
+  const { selectedTahunAjaran, selectedKodeTahun } = useTahunAjaran()
   const { selectedUnit } = useUnit()
   const kodeUnitFromContext = selectedUnit?.kode_unit ?? ""
 
-  const [mapelOptions, setMapelOptions] = useState<{ kode_mapel: string; nama_mapel: string }[]>([])
-  const [isLoadingMapel, setIsLoadingMapel] = useState(false)
+  const [rawKelasOptions, setRawKelasOptions] = useState<{ value: string; label: string; kode_unit?: string }[]>([])
+  const [rawMapelOptions, setRawMapelOptions] = useState<{ value: string; label: string; kode_unit?: string }[]>([])
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false)
 
-  // Load mapel filtered by unit from header
+  // Load options from data_kelas_mapel
   useEffect(() => {
-    let cancelled = false
-    setIsLoadingMapel(true)
+    if (!selectedKodeTahun) return
 
-    mataPelajaranService.getAll({
+    let cancelled = false
+    setIsLoadingOptions(true)
+
+    dataKelasMapelService.getAll({
       kode_unit: kodeUnitFromContext || undefined,
+      tahun_ajaran: selectedKodeTahun,
       status: "AKTIF",
       per_page: "200",
     })
-      .then(rows => {
+      .then(res => {
         if (!cancelled) {
-          setMapelOptions(rows.map(m => ({
-            kode_mapel: m.kode_mapel ?? "",
-            nama_mapel: m.nama_mapel ?? m.kode_mapel ?? "",
-          })).filter(m => m.kode_mapel))
+          const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+          const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
+
+          for (const item of res.data || []) {
+            const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
+            const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
+            const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
+            const namaMapel = item.nama_mapel ?? item.mapel?.nama_mapel ?? item.mata_pelajaran?.nama_mapel ?? item.mataPelajaran?.nama_mapel ?? kodeMapel
+            const unit = item.kode_unit ?? item.kelas?.kode_unit ?? undefined
+
+            if (kodeKelas && !kelasMap.has(kodeKelas)) {
+              kelasMap.set(kodeKelas, { value: kodeKelas, label: namaKelas ?? kodeKelas, kode_unit: unit })
+            }
+
+            if (kodeMapel && !mapelMap.has(kodeMapel)) {
+              mapelMap.set(kodeMapel, { value: kodeMapel, label: namaMapel ?? kodeMapel, kode_unit: unit })
+            }
+          }
+
+          setRawKelasOptions(Array.from(kelasMap.values()))
+          setRawMapelOptions(Array.from(mapelMap.values()))
         }
       })
       .catch(console.error)
       .finally(() => {
-        if (!cancelled) setIsLoadingMapel(false)
+        if (!cancelled) setIsLoadingOptions(false)
       })
 
     return () => { cancelled = true }
-  }, [kodeUnitFromContext])
+  }, [kodeUnitFromContext, selectedKodeTahun])
+
+  const mapelOptions = rawMapelOptions
+
+  // Inform parent of valid mapels if kodeKelas is selected
+  useEffect(() => {
+    if (onValidMapelsChange) {
+      if (kodeKelas && kodeKelas !== "all") {
+        // Find all mapels that are actually assigned to this class
+        dataKelasMapelService.getAll({
+          kode_kelas: kodeKelas,
+          tahun_ajaran: selectedKodeTahun,
+          per_page: "200"
+        }).then(res => {
+          const mapelsForClass = Array.from(new Set(res.data.map(m => m.kode_mapel).filter(Boolean) as string[]))
+          onValidMapelsChange(mapelsForClass)
+        })
+      } else {
+        onValidMapelsChange([])
+      }
+    }
+  }, [kodeKelas, selectedKodeTahun, onValidMapelsChange])
 
   // Reset selected mapel when unit changes and current selection is no longer valid
   useEffect(() => {
     if (query && mapelOptions.length > 0) {
-      if (!mapelOptions.find(m => m.kode_mapel === query)) {
+      if (!mapelOptions.find(m => m.value === query)) {
         onQueryChange("")
       }
     }
   }, [mapelOptions, query, onQueryChange])
+
+  // Reset selected mapel if class changes
+  useEffect(() => {
+    if (kodeKelas !== "all") {
+       onQueryChange("")
+    }
+  }, [kodeKelas, onQueryChange])
 
   return (
     <Card className="border-border/50">
@@ -96,21 +151,42 @@ export function KkmFilters({
         </div>
 
         {/* Filters */}
-        <div className="grid gap-3 lg:grid-cols-3">
-          {/* Mapel dropdown — filtered by unit from header */}
+        <div className="grid gap-3 lg:grid-cols-4">
+          <Select
+            value={kodeKelas || "all"}
+            onValueChange={(val) => onKodeKelasChange(val === "all" ? "" : val)}
+            disabled={isLoadingOptions}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder={isLoadingOptions ? "Memuat kelas..." : "Semua Kelas"} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua Kelas</SelectItem>
+              {rawKelasOptions.map(k => (
+                <SelectItem key={k.value} value={k.value}>
+                  {k.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Mapel dropdown */}
           <Select
             value={query || "all"}
             onValueChange={(val) => onQueryChange(val === "all" ? "" : val)}
-            disabled={isLoadingMapel}
+            disabled={isLoadingOptions || (kodeKelas && kodeKelas !== "all")}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder={isLoadingMapel ? "Memuat mapel..." : "Pilih Mapel"} />
+              <SelectValue placeholder={
+                kodeKelas && kodeKelas !== "all" ? "Tampil Berdasarkan Kelas" :
+                isLoadingOptions ? "Memuat mapel..." : "Semua Mapel"
+              } />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Semua Mapel</SelectItem>
               {mapelOptions.map(m => (
-                <SelectItem key={m.kode_mapel} value={m.kode_mapel}>
-                  {m.nama_mapel} ({m.kode_mapel})
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
                 </SelectItem>
               ))}
             </SelectContent>

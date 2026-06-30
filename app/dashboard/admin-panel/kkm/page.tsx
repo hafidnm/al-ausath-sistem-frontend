@@ -20,6 +20,9 @@ export default function KkmPage() {
   const [items, setItems] = useState<KkmItem[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  
+  const [kodeKelas, setKodeKelas] = useState("all")
+  const [validMapels, setValidMapels] = useState<string[]>([])
 
   // Track apakah ini fetch pertama setelah context ready
   const contextReadyRef = useRef(false)
@@ -57,6 +60,11 @@ export default function KkmPage() {
         data = data.filter((item) =>
           item.kode_mapel.toLowerCase() === queryTrimmed.toLowerCase()
         )
+      } else if (kodeKelas !== "all") {
+        const mapelsLower = validMapels.map(m => m.toLowerCase())
+        data = data.filter((item) =>
+          mapelsLower.includes(item.kode_mapel.toLowerCase())
+        )
       }
 
       if (!controller.signal.aborted) {
@@ -71,7 +79,7 @@ export default function KkmPage() {
         setIsLoading(false)
       }
     }
-  }, [isTahunLoading, isUnitLoading, selectedTahunAjaran, selectedUnit, perPage, query, semester])
+  }, [isTahunLoading, isUnitLoading, selectedTahunAjaran, selectedUnit, perPage, query, semester, kodeKelas, validMapels])
 
   // Hanya trigger fetch ketika context sudah selesai loading
   useEffect(() => {
@@ -110,6 +118,9 @@ export default function KkmPage() {
         onSemesterChange={setSemester}
         perPage={perPage}
         onPerPageChange={setPerPage}
+        kodeKelas={kodeKelas}
+        onKodeKelasChange={setKodeKelas}
+        onValidMapelsChange={setValidMapels}
       />
 
       <KkmTable
