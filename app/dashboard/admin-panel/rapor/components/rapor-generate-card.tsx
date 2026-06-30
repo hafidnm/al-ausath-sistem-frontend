@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
-import { kelasService } from "@/lib/services/kelas.service"
+import { dataKelasService } from "@/lib/services/kelas.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import { santriService, type SantriItem } from "@/lib/services/santri.service"
 
 interface CatatanFormState {
@@ -63,15 +64,35 @@ export function RaporGenerateCard({
   const [classSantris, setClassSantris] = useState<SantriItem[]>([])
   const [isLoadingSantri, setIsLoadingSantri] = useState(false)
 
-  // Load all kelas on mount
   useEffect(() => {
-    kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setRawKelasOptions(res.map(k => ({
-        value: k.kode_kelas ?? "",
-        label: k.nama_kelas ?? k.kode_kelas ?? "",
-        kode_unit: k.kode_unit,
-      }))))
-      .catch(console.error)
+    let cancelled = false;
+    const fetchKelas = async () => {
+      try {
+        const authData = await getCachedUser();
+        const idPetugas = authData?.user?.id_petugas ?? authData?.user?.petugas?.id_petugas;
+        const rolesStr = String(authData?.user?.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
+        const res = await dataKelasService.getAll({ status: "AKTIF", per_page: 200 });
+        if (!cancelled) {
+          let classes = res.data;
+          
+          if (!isAdmin) {
+            classes = classes.filter(c => c.id_wali_kelas === idPetugas);
+          }
+
+          setRawKelasOptions(classes.map(k => ({
+            value: k.kode_kelas ?? "",
+            label: k.nama_kelas ?? k.kode_kelas ?? "",
+            kode_unit: k.kode_unit,
+          })));
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchKelas();
+    return () => { cancelled = true; };
   }, [])
 
   // Filter kelas by unit from header

@@ -17,6 +17,9 @@ import { RaporSummaryCards } from "./components/rapor-summary-cards"
 import { RaporTable } from "./components/rapor-table"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
+import { getCachedUser } from "@/lib/auth-cache"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { AlertCircle } from "lucide-react"
 
 type CatatanFormState = {
   nomor_induk: string
@@ -105,6 +108,41 @@ export default function AdminPanelRaporPage() {
   const [namaWaliSantri, setNamaWaliSantri] = useState<string | null>(null)
   const [namaWaliKelas, setNamaWaliKelas] = useState<string | null>(null)
   const selectedIdentity = selected ? getRaporIdentity(selected) : null
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const authData = await getCachedUser();
+        if (!authData?.user) {
+          setHasAccess(false);
+          return;
+        }
+
+        const idPetugas = authData.user.id_petugas ?? authData.user.petugas?.id_petugas;
+        const rolesStr = String(authData.user.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
+        if (isAdmin) {
+          setHasAccess(true);
+          return;
+        }
+
+        if (!idPetugas) {
+          setHasAccess(false);
+          return;
+        }
+
+        const res = await dataKelasService.getAll({ status: "AKTIF", per_page: 200 });
+        const isWaliKelas = res.data.some(c => c.id_wali_kelas === idPetugas);
+        setHasAccess(isWaliKelas);
+      } catch (err) {
+        console.error("Access check failed", err);
+        setHasAccess(false);
+      }
+    };
+    checkAccess();
+  }, []);
 
   const selectedParams = useMemo(() => {
     const nomorInduk = selected?.nomor_induk || catatanForm.nomor_induk.trim()
@@ -610,6 +648,21 @@ export default function AdminPanelRaporPage() {
 
   const totalTerbit = items.filter((item) => (item.status || "").toUpperCase() === "TERBIT").length
   const totalDraft = items.length - totalTerbit
+
+  if (hasAccess === null) {
+    return <div className="space-y-6" /> // loading access
+  }
+
+  if (hasAccess === false) {
+    return (
+      <Alert className="border-yellow-200 bg-yellow-50">
+        <AlertCircle className="h-4 w-4 text-yellow-600" />
+        <AlertDescription className="text-yellow-800">
+          Halaman ini hanya dapat diakses oleh Wali Kelas atau Admin.
+        </AlertDescription>
+      </Alert>
+    )
+  }
 
   return (
     <div className="space-y-6">
