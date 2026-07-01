@@ -13,6 +13,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel"
 import { useToast } from "@/hooks/use-toast"
 import { usePpdbPortalRegister, usePpdbPortalPeriodCheck } from "@/hooks/ppdb/santri"
 import { pengumumanService, type Pengumuman } from "@/lib/services/pengumuman.service"
@@ -186,113 +193,108 @@ export default function LandingPage() {
 
       {/* Profile Section */}
       <section id="profile" className="py-20 bg-sidebar/5">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 sm:px-12">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4">Profil Institusi Mitra</Badge>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Pondok Pesantren Al Ausath
             </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Kenali lebih dekat visi, misi, dan program unggulan dari masing-masing jenjang pendidikan di pesantren kami.
+            </p>
           </div>
 
-          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
-            <Card>
-              <CardHeader>
-                <Building2 className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Visi Pesantren</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed">
-                  Menjadi lembaga pendidikan Islam terkemuka yang menghasilkan generasi Qur'ani, berakhlak mulia, berprestasi, dan berwawasan global yang mampu berkontribusi positif bagi masyarakat dan bangsa.
-                </p>
-              </CardContent>
-            </Card>
+          <div className="max-w-6xl mx-auto">
+            <Carousel
+              opts={{
+                align: "start",
+                loop: true,
+              }}
+              className="w-full"
+            >
+              <CarouselContent>
+                {jenjangProfiles.map((profile) => (
+                  <CarouselItem key={profile.id} className="md:basis-1/1 lg:basis-1/1">
+                    <div className="p-1">
+                      <div className="bg-background rounded-2xl border border-border/50 shadow-sm p-6 md:p-10">
+                        <div className="text-center mb-10">
+                          <h3 className="text-2xl md:text-3xl font-bold text-primary mb-3">{profile.name}</h3>
+                          <div className="h-1 w-20 bg-primary/20 mx-auto rounded-full" />
+                        </div>
+                        
+                        <div className="grid md:grid-cols-2 gap-8 mb-8">
+                          <Card className="border-border/40 shadow-none bg-muted/20">
+                            <CardHeader className="pb-3">
+                              <Building2 className="w-8 h-8 text-primary mb-2" />
+                              <CardTitle className="text-xl">Visi</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <p className="text-muted-foreground leading-relaxed">
+                                {profile.visi}
+                              </p>
+                            </CardContent>
+                          </Card>
 
-            <Card>
-              <CardHeader>
-                <GraduationCap className="w-10 h-10 text-primary mb-2" />
-                <CardTitle>Misi Pesantren</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-muted-foreground">
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
-                    <span>Menyelenggarakan pendidikan berbasis Al-Qur'an dan As-Sunnah</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
-                    <span>Membentuk santri berakhlakul karimah</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
-                    <span>Mengembangkan potensi akademik dan non-akademik</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
-                    <span>Mempersiapkan generasi yang siap bersaing global</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          </div>
+                          <Card className="border-border/40 shadow-none bg-muted/20">
+                            <CardHeader className="pb-3">
+                              <GraduationCap className="w-8 h-8 text-primary mb-2" />
+                              <CardTitle className="text-xl">Misi</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <ul className="space-y-2 text-muted-foreground">
+                                {profile.misi.map((m, i) => (
+                                  <li key={i} className="flex gap-2">
+                                    <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
+                                    <span>{m}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </CardContent>
+                          </Card>
+                        </div>
 
-          <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8 mt-8">
-            <Card className="flex flex-col h-full">
-              <CardHeader>
-                <CardTitle>Sejarah Singkat</CardTitle>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-4">
-                <p className="text-muted-foreground leading-relaxed text-justify">
-                  Pondok Pesantren Al Ausath merupakan salah satu lembaga pendidikan yang berada di Kabupaten Karanganyar, Jawa Tengah. Pondok pesantren ini menggabungkan sistem pendidikan formal dengan pendidikan berbasis keagamaan, sehingga santri tidak hanya memperoleh ilmu akademik, tetapi juga pemahaman agama yang kuat.
-                </p>
-                <p className="text-muted-foreground leading-relaxed text-justify">
-                  Dalam proses pembelajaran, Pondok Pesantren Al Ausath menerapkan kurikulum yang berlaku secara umum serta dipadukan dengan kurikulum keislaman. Selain kegiatan belajar mengajar, pesantren juga menyediakan berbagai kegiatan ekstrakurikuler seperti karate, basket, futsal, serta kelompok belajar untuk menunjang pengembangan kemampuan santri secara menyeluruh.
-                </p>
-                <p className="text-muted-foreground leading-relaxed text-justify">
-                  Pondok Pesantren Al Ausath memiliki tenaga pengajar yang kompeten, baik ustadz maupun guru, yang memiliki keahlian pada bidangnya masing-masing. Selain itu, tersedia berbagai fasilitas pendukung seperti ruang kelas, asrama, laboratorium, perpustakaan, lapangan olahraga, kantin, serta masjid yang menunjang kegiatan belajar dan kehidupan santri di lingkungan pesantren.
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="flex flex-col h-full">
-              <CardHeader>
-                <CardTitle>Bidang Kegiatan</CardTitle>
-                <CardDescription>
-                  Program dan lingkup kegiatan Pondok Pesantren Al Ausath
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex-1">
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">1</div>
-                    <div>
-                      <p className="font-semibold text-foreground">Pendidikan formal dan keagamaan</p>
-                      <p className="text-sm text-muted-foreground">Penggabungan kurikulum umum nasional dengan pengajaran keagamaan Islam secara intensif.</p>
+                        <div className="grid md:grid-cols-2 gap-8">
+                          <div className="space-y-4">
+                            <h4 className="text-lg font-semibold flex items-center gap-2">
+                              <BookOpen className="w-5 h-5 text-primary" />
+                              Sejarah Singkat
+                            </h4>
+                            <p className="text-muted-foreground leading-relaxed text-justify">
+                              {profile.sejarah}
+                            </p>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <h4 className="text-lg font-semibold flex items-center gap-2">
+                              <Star className="w-5 h-5 text-primary" />
+                              Program Unggulan
+                            </h4>
+                            <ul className="space-y-3">
+                              {profile.kegiatan.map((k, i) => (
+                                <li key={i} className="flex items-start gap-3">
+                                  <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold text-xs">
+                                    {i + 1}
+                                  </div>
+                                  <span className="text-muted-foreground text-sm mt-0.5">{k}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">2</div>
-                    <div>
-                      <p className="font-semibold text-foreground">Pengelolaan administrasi santri</p>
-                      <p className="text-sm text-muted-foreground">Sistem informasi untuk mempermudah pendaftaran (PPDB), e-Rapor, dan rekam perkembangan santri.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">3</div>
-                    <div>
-                      <p className="font-semibold text-foreground">Kegiatan ekstrakurikuler</p>
-                      <p className="text-sm text-muted-foreground">Penunjang minat bakat santri seperti olahraga karate, basket, futsal, dan kelompok belajar.</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">4</div>
-                    <div>
-                      <p className="font-semibold text-foreground">Pembinaan karakter dan keagamaan</p>
-                      <p className="text-sm text-muted-foreground">Pendidikan moral, pembentukan disiplin ibadah harian, dan kepribadian Islami yang kokoh.</p>
-                    </div>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <div className="hidden sm:block">
+                <CarouselPrevious className="-left-12 h-12 w-12 border-2" />
+                <CarouselNext className="-right-12 h-12 w-12 border-2" />
+              </div>
+              <div className="flex justify-center gap-4 mt-6 sm:hidden">
+                <CarouselPrevious className="static translate-y-0 h-10 w-10" />
+                <CarouselNext className="static translate-y-0 h-10 w-10" />
+              </div>
+            </Carousel>
           </div>
         </div>
       </section>
@@ -573,6 +575,73 @@ export default function LandingPage() {
     </div>
   )
 }
+
+const jenjangProfiles = [
+  {
+    id: "paud-tk",
+    name: "PAUD & TK Al Ausath",
+    visi: "Mewujudkan generasi usia dini yang ceria, sehat, dan cinta Al-Qur'an.",
+    misi: [
+      "Menanamkan aqidah dan akhlak mulia sejak dini",
+      "Melatih kemandirian dan motorik anak melalui bermain bermakna",
+      "Mengenalkan dasar-dasar membaca Al-Qur'an dan doa harian"
+    ],
+    sejarah: "PAUD dan TK Al Ausath didirikan sebagai langkah awal pesantren dalam membina tunas bangsa. Dengan metode pendidikan yang menyenangkan, kami berkomitmen menjadi mitra terbaik orang tua dalam fase golden age anak.",
+    kegiatan: [
+      "Bermain sambil belajar nilai Islam",
+      "Hafalan surat pendek & doa harian",
+      "Pengembangan kreativitas seni & motorik"
+    ]
+  },
+  {
+    id: "mi",
+    name: "Madrasah Ibtidaiyah (MI)",
+    visi: "Mewujudkan generasi dasar yang Qur'ani, berakhlak mulia, dan berprestasi.",
+    misi: [
+      "Menyelenggarakan pendidikan dasar berbasis Al-Qur'an dan As-Sunnah",
+      "Membiasakan adab dan akhlakul karimah sejak dini",
+      "Mengembangkan kemampuan dasar calistung dan tahfidz juz 30"
+    ],
+    sejarah: "MI Al Ausath hadir untuk merespon tingginya minat masyarakat terhadap pendidikan dasar yang mengintegrasikan kurikulum nasional dengan ilmu agama secara intensif.",
+    kegiatan: [
+      "Pembelajaran tematik terpadu",
+      "Ekstrakurikuler pramuka & tahfidz",
+      "Pembiasaan sholat dhuha & dzuhur berjamaah"
+    ]
+  },
+  {
+    id: "mts",
+    name: "Madrasah Tsanawiyah (MTs)",
+    visi: "Menjadi lembaga pendidikan menengah yang unggul dalam IPTEK dan IMTAQ.",
+    misi: [
+      "Mengintegrasikan kurikulum nasional dengan kepesantrenan",
+      "Mencetak generasi penghafal Al-Qur'an (Target 3 Juz)",
+      "Membekali santri dengan kemampuan bahasa Arab dan Inggris"
+    ],
+    sejarah: "MTs Al Ausath merupakan wadah lanjutan bagi santri usia remaja awal untuk mendalami ilmu agama dan sains secara komprehensif, ditunjang dengan fasilitas pesantren yang memadai.",
+    kegiatan: [
+      "Kajian kitab kuning dasar",
+      "English & Arabic club",
+      "Pelatihan kepemimpinan santri"
+    ]
+  },
+  {
+    id: "ma",
+    name: "Madrasah Aliyah (MA)",
+    visi: "Mencetak lulusan yang siap bersaing global dengan landasan akidah yang lurus.",
+    misi: [
+      "Mempersiapkan santri menembus Perguruan Tinggi Negeri & Timur Tengah",
+      "Meningkatkan kualitas tahfidz (Target 5 Juz) dan pemahaman agama",
+      "Mengembangkan jiwa kemandirian dan kewirausahaan"
+    ],
+    sejarah: "MA Al Ausath didirikan sebagai jenjang puncak pendidikan menengah pesantren, berfokus pada kematangan intelektual, kemandirian spiritual, dan persiapan karir atau studi lanjut santri.",
+    kegiatan: [
+      "Bimbingan intensif UTBK/SNBT",
+      "Kajian kitab (Takhassus)",
+      "Program pengabdian masyarakat"
+    ]
+  }
+]
 
 function PpdbRegistrationForm() {
   const { toast } = useToast()
