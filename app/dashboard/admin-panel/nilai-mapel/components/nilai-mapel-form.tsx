@@ -472,7 +472,7 @@ export function NilaiMapelForm() {
       return
     }
     downloadNilaiTemplate(
-      santris.map(s => ({ nomor_induk: s.nomor_induk, nama_santri: s.nama_santri, tugas: s.tugas, ulangan: s.ulangan, uas: s.uas })),
+      santris.map(s => ({ nomor_induk: s.nomor_induk, nama_santri: s.nama_santri, tugas: s.tugas, ulangan: s.ulangan, uas: s.uas, keterangan: s.keterangan })),
       tugasCount,
       ulanganCount,
       { kodeKelas, kodeMapel, tahunAjaran, semester },
@@ -498,7 +498,7 @@ export function NilaiMapelForm() {
       const tugas = Array.from({ length: newTugasCount }, (_, i) => csvRow.tugas[i] ?? "")
       const ulangan = Array.from({ length: newUlanganCount }, (_, i) => csvRow.ulangan[i] ?? "")
 
-      return { ...s, tugas, ulangan, uas: csvRow.uas, isDirty: true }
+      return { ...s, tugas, ulangan, uas: csvRow.uas, keterangan: csvRow.keterangan !== undefined ? csvRow.keterangan : s.keterangan, isDirty: true }
     }))
 
     const warningText = result.errors.length > 0

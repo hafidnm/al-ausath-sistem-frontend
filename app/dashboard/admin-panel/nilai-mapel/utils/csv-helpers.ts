@@ -13,6 +13,7 @@ export interface CsvSantriRow {
   tugas: string[]
   ulangan: string[]
   uas: string
+  keterangan: string
 }
 
 export interface CsvParseResult {
@@ -43,12 +44,12 @@ export function downloadNilaiTemplate(
   const tugasHeaders = Array.from({ length: tugasCount }, (_, i) => `T${i + 1}`)
   const ulanganHeaders = Array.from({ length: ulanganCount }, (_, i) => `UH${i + 1}`)
 
-  const header = ["nomor_induk", "nama_santri", ...tugasHeaders, ...ulanganHeaders, "UAS"]
+  const header = ["nomor_induk", "nama_santri", ...tugasHeaders, ...ulanganHeaders, "UAS", "KETERANGAN"]
 
   const rows = santris.map((s) => {
     const tugas = Array.from({ length: tugasCount }, (_, i) => s.tugas[i] ?? "")
     const ulangan = Array.from({ length: ulanganCount }, (_, i) => s.ulangan[i] ?? "")
-    return [s.nomor_induk, s.nama_santri, ...tugas, ...ulangan, s.uas]
+    return [s.nomor_induk, s.nama_santri, ...tugas, ...ulangan, s.uas, s.keterangan]
   })
 
   const csvLines = [header, ...rows].map((row) =>
@@ -136,12 +137,14 @@ export async function parseNilaiCsv(file: File): Promise<CsvParseResult> {
   const tugasIndexes: number[] = []
   const ulanganIndexes: number[] = []
   let uasIndex = -1
+  let keteranganIndex = -1
 
   for (let col = 0; col < headerCols.length; col++) {
     const h = headerCols[col]
     if (/^T\d+$/.test(h)) tugasIndexes.push(col)
     else if (/^UH\d+$/.test(h)) ulanganIndexes.push(col)
     else if (h === "UAS") uasIndex = col
+    else if (h === "KETERANGAN") keteranganIndex = col
   }
 
   const tugasCount = tugasIndexes.length
@@ -188,7 +191,9 @@ export async function parseNilaiCsv(file: File): Promise<CsvParseResult> {
       }
     }
 
-    rows.push({ nomor_induk: nomorInduk, nama_santri: namaSantri, tugas, ulangan, uas: uasRaw })
+    const keteranganRaw = keteranganIndex !== -1 ? cols[keteranganIndex]?.trim() ?? "" : ""
+
+    rows.push({ nomor_induk: nomorInduk, nama_santri: namaSantri, tugas, ulangan, uas: uasRaw, keterangan: keteranganRaw })
   }
 
   return { rows, errors, tugasCount, ulanganCount }
