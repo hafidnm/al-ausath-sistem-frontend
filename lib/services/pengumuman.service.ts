@@ -25,6 +25,7 @@ export type PengumumanKategori = 'ppdb' | 'akademik' | 'umum' | 'kegiatan';
 
 export interface Pengumuman {
   id: number;
+  id_unit?: number | null;
   judul: string;
   konten: string;
   lampiran_path: string | null;
@@ -41,16 +42,23 @@ export interface Pengumuman {
   created_at: string;
   updated_at: string;
   created_by?: number;
+  unit?: {
+    id_unit: number;
+    kode_unit: string;
+    nama_unit: string;
+  };
 }
 
 export interface PengumumanListQuery {
   per_page?: number;
+  id_unit?: number;
   kategori?: PengumumanKategori | string;
   is_aktif?: boolean;
   q?: string;
 }
 
 export interface CreatePengumumanRequest {
+  id_unit?: number | null;
   judul: string;
   konten: string;
   kategori: PengumumanKategori | string;
@@ -110,6 +118,8 @@ const normalizePengumuman = (item: ApiRecord): Pengumuman => ({
   created_at: String(item.created_at ?? ''),
   updated_at: String(item.updated_at ?? ''),
   created_by: item.created_by !== undefined ? Number(item.created_by) : undefined,
+  unit: item.unit ? (item.unit as any) : undefined,
+  id_unit: item.id_unit !== undefined && item.id_unit !== null ? Number(item.id_unit) : null,
 });
 
 const extractList = (payload: unknown): ApiRecord[] => {

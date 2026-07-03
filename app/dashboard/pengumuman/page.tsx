@@ -40,6 +40,7 @@ import {
   type PengumumanListQuery,
 } from "@/lib/services/pengumuman.service"
 import { authService } from "@/lib/services/auth.service"
+import { useUnit } from "@/contexts/unit-context"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ const KATEGORI_OPTIONS: { value: PengumumanKategori | string; label: string }[] 
 ]
 
 const emptyForm: CreatePengumumanRequest = {
+  id_unit: null,
   judul: "",
   konten: "",
   kategori: "umum",
@@ -100,6 +102,9 @@ export default function PengumumanPage() {
   const [searchQ, setSearchQ] = useState("")
   const [filterKategori, setFilterKategori] = useState("all")
   const [filterAktif, setFilterAktif] = useState("all")
+  const [filterUnit, setFilterUnit] = useState<string>("all")
+
+  const { allUnit, selectedUnit } = useUnit()
 
   const [role, setRole] = useState<string>("")
 
@@ -116,7 +121,11 @@ export default function PengumumanPage() {
   const fetchList = useCallback(async (query?: PengumumanListQuery) => {
     setLoading(true)
     try {
-      const data = await pengumumanService.getList(query)
+      const activeQuery = query || {}
+      if (selectedUnit) {
+        activeQuery.id_unit = selectedUnit.id_unit || selectedUnit.id
+      }
+      const data = await pengumumanService.getList(activeQuery)
       setList(data)
     } catch (err) {
       console.error("Gagal memuat pengumuman:", err)
@@ -134,6 +143,7 @@ export default function PengumumanPage() {
     if (searchQ.trim()) query.q = searchQ.trim()
     if (filterKategori !== "all") query.kategori = filterKategori as PengumumanKategori
     if (filterAktif !== "all") query.is_aktif = filterAktif === "aktif"
+    if (filterUnit !== "all") query.id_unit = parseInt(filterUnit, 10)
     void fetchList(query)
   }
 
@@ -141,6 +151,7 @@ export default function PengumumanPage() {
     setSearchQ("")
     setFilterKategori("all")
     setFilterAktif("all")
+    setFilterUnit("all")
     void fetchList()
   }
 
@@ -155,6 +166,7 @@ export default function PengumumanPage() {
   const openEdit = (p: Pengumuman) => {
     setEditTarget(p)
     setForm({
+      id_unit: p.id_unit ?? null,
       judul: p.judul,
       konten: p.konten,
       kategori: p.kategori,
@@ -178,6 +190,7 @@ export default function PengumumanPage() {
       const payload: CreatePengumumanRequest = {
         ...form,
         urutan: Number(form.urutan),
+        id_unit: form.id_unit === 0 || !form.id_unit ? null : Number(form.id_unit),
         tanggal_selesai: form.tanggal_selesai || null,
         lampiran: lampiranFile,
         hapus_lampiran: hapusLampiran,
@@ -302,6 +315,19 @@ export default function PengumumanPage() {
                 ))}
               </SelectContent>
             </Select>
+            {!isSantri && (
+              <Select value={filterUnit} onValueChange={setFilterUnit}>
+                <SelectTrigger className="w-full sm:w-[150px]">
+                  <SelectValue placeholder="Unit/Jenjang" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua Unit</SelectItem>
+                  {allUnit.map(u => (
+                    <SelectItem key={u.id_unit || u.id} value={(u.id_unit || u.id).toString()}>{u.nama_unit}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Select value={filterAktif} onValueChange={setFilterAktif}>
               <SelectTrigger className="w-full sm:w-[130px]">
                 <SelectValue placeholder="Status" />
@@ -345,6 +371,7 @@ export default function PengumumanPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Judul</TableHead>
+                    <TableHead>Unit</TableHead>
                     <TableHead>Kategori</TableHead>
                     <TableHead>Berakhir</TableHead>
                     <TableHead>Lampiran</TableHead>
@@ -363,6 +390,9 @@ export default function PengumumanPage() {
                             <p className="text-xs text-muted-foreground line-clamp-1 max-w-xs">{p.konten}</p>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm font-medium">{p.unit?.nama_unit ?? "Semua Unit"}</span>
                       </TableCell>
                       <TableCell>
                         <Badge className={getKategoriBadge(p.kategori)}>
@@ -461,6 +491,23 @@ export default function PengumumanPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Unit / Jenjang</Label>
+                <Select
+                  value={form.id_unit ? form.id_unit.toString() : "all"}
+                  onValueChange={(v) => setForm((prev) => ({ ...prev, id_unit: v === "all" ? null : parseInt(v, 10) }))}
+                >
+                  <SelectTrigger id="form-unit">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Semua Unit (Global)</SelectItem>
+                    {allUnit.map(u => (
+                      <SelectItem key={u.id_unit || u.id} value={(u.id_unit || u.id).toString()}>{u.nama_unit}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-2">
                 <Label>Kategori</Label>
                 <Select

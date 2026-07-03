@@ -13,6 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Carousel,
   CarouselContent,
@@ -29,6 +30,12 @@ export default function LandingPage() {
   const [pengumuman, setPengumuman] = React.useState<Pengumuman[]>([])
   const [pengumumanLoading, setPengumumanLoading] = React.useState(true)
   const [pengumumanError, setPengumumanError] = React.useState<string | null>(null)
+  const [activePengumumanTab, setActivePengumumanTab] = React.useState("semua")
+
+  const [jenjangProfiles, setJenjangProfiles] = React.useState<any[]>([])
+  const [profilLoading, setProfilLoading] = React.useState(true)
+
+  const [publicUnits, setPublicUnits] = React.useState<any[]>([])
 
   const { isOpen, isKuotaPenuh, period, loading: periodLoading } = usePpdbPortalPeriodCheck()
 
@@ -51,7 +58,40 @@ export default function LandingPage() {
       }
     }
 
+    const loadProfilWeb = async () => {
+      setProfilLoading(true)
+      try {
+        // Fetch from API
+        const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/profil-web')
+        const data = await response.json()
+        if (isMounted && data.data) {
+          setJenjangProfiles(data.data)
+        }
+      } catch (error) {
+        console.error("Failed to load profil web", error)
+      } finally {
+        if (isMounted) setProfilLoading(false)
+      }
+    }
+
+    const loadPublicUnits = async () => {
+      try {
+        const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/unit')
+        const data = await response.json()
+        if (isMounted && data.data) {
+          setPublicUnits(data.data)
+          if (data.data.length > 0 && activePengumumanTab === "semua") {
+            setActivePengumumanTab("umum")
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load public units", error)
+      }
+    }
+
     void loadPengumuman()
+    void loadProfilWeb()
+    void loadPublicUnits()
 
     return () => {
       isMounted = false
@@ -80,11 +120,8 @@ export default function LandingPage() {
               <Link href="#profile" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Profil
               </Link>
-              <Link href="#announcement" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
+              <Link href="#pengumuman" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Pengumuman
-              </Link>
-              <Link href="#education" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
-                Jenjang Pendidikan
               </Link>
               <Link href="#location" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Lokasi
@@ -213,12 +250,27 @@ export default function LandingPage() {
               className="w-full"
             >
               <CarouselContent>
-                {jenjangProfiles.map((profile) => (
-                  <CarouselItem key={profile.id} className="md:basis-1/1 lg:basis-1/1">
+                {profilLoading ? (
+                  <CarouselItem className="md:basis-1/1 lg:basis-1/1">
                     <div className="p-1">
-                      <div className="bg-background rounded-2xl border border-border/50 shadow-sm p-6 md:p-10">
+                      <div className="bg-background rounded-2xl border border-border/50 shadow-sm p-6 md:p-10 text-center animate-pulse h-96 flex items-center justify-center">
+                        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground mx-auto" />
+                      </div>
+                    </div>
+                  </CarouselItem>
+                ) : jenjangProfiles.map((profile) => (
+                  <CarouselItem key={profile.id_profil} className="md:basis-1/1 lg:basis-1/1">
+                    <div className="p-1">
+                      <div className="bg-background rounded-2xl border border-border/50 shadow-sm p-6 md:p-10 relative">
+                        {profile.lama_pendidikan && (
+                          <div className="absolute top-12 right-12 md:top-12 md:right-12">
+                            <Badge variant="secondary" className="px-3 py-1 bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+                              {profile.lama_pendidikan}
+                            </Badge>
+                          </div>
+                        )}
                         <div className="text-center mb-10">
-                          <h3 className="text-2xl md:text-3xl font-bold text-primary mb-3">{profile.name}</h3>
+                          <h3 className="text-2xl md:text-3xl font-bold text-primary mb-3">{profile.nama}</h3>
                           <div className="h-1 w-20 bg-primary/20 mx-auto rounded-full" />
                         </div>
                         
@@ -242,12 +294,12 @@ export default function LandingPage() {
                             </CardHeader>
                             <CardContent>
                               <ul className="space-y-2 text-muted-foreground">
-                                {profile.misi.map((m, i) => (
+                                {Array.isArray(profile.misi) ? profile.misi.map((m: string, i: number) => (
                                   <li key={i} className="flex gap-2">
                                     <CheckCircle2 className="w-4 h-4 text-primary mt-1 flex-shrink-0" />
                                     <span>{m}</span>
                                   </li>
-                                ))}
+                                )) : null}
                               </ul>
                             </CardContent>
                           </Card>
@@ -270,14 +322,14 @@ export default function LandingPage() {
                               Program Unggulan
                             </h4>
                             <ul className="space-y-3">
-                              {profile.kegiatan.map((k, i) => (
+                              {Array.isArray(profile.program_unggulan) ? profile.program_unggulan.map((k: string, i: number) => (
                                 <li key={i} className="flex items-start gap-3">
                                   <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold text-xs">
                                     {i + 1}
                                   </div>
                                   <span className="text-muted-foreground text-sm mt-0.5">{k}</span>
                                 </li>
-                              ))}
+                              )) : null}
                             </ul>
                           </div>
                         </div>
@@ -300,7 +352,7 @@ export default function LandingPage() {
       </section>
 
       {/* Announcement Section */}
-      <section id="announcement" className="py-20 bg-background">
+      <section id="pengumuman" className="py-20 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <Badge variant="outline" className="mb-4">
@@ -349,69 +401,58 @@ export default function LandingPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="max-w-5xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {pengumuman.slice(0, 6).map((item) => (
-                <AnnouncementCard
-                  key={item.id}
-                  id={item.id}
-                  date={item.tanggal_mulai || item.created_at}
-                  title={item.judul}
-                  description={item.konten}
-                  badge={item.kategori}
-                />
-              ))}
+            <div className="max-w-5xl mx-auto">
+              <Tabs value={activePengumumanTab} onValueChange={setActivePengumumanTab} className="w-full mb-8">
+                <TabsList className="flex flex-wrap h-auto justify-center mx-auto max-w-fit">
+                  <TabsTrigger value="umum">Umum (Global)</TabsTrigger>
+                  {publicUnits.map((unit) => (
+                    <TabsTrigger key={unit.id_unit} value={unit.id_unit.toString()}>
+                      {unit.nama_unit}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              
+              {(() => {
+                const filteredPengumuman = pengumuman.filter(item => {
+                  if (activePengumumanTab === "umum") return item.id_unit === null;
+                  
+                  // For unit tabs, show specific unit announcements PLUS global announcements (id_unit === null)
+                  return item.id_unit === null || (item.unit && item.unit.id_unit.toString() === activePengumumanTab);
+                });
+
+                if (filteredPengumuman.length === 0) {
+                  return (
+                    <Card className="max-w-3xl mx-auto border-border/60">
+                      <CardContent className="p-6 text-center space-y-2">
+                        <p className="font-semibold text-foreground">Belum ada pengumuman</p>
+                        <p className="text-sm text-muted-foreground">Tidak ada pengumuman untuk kategori ini.</p>
+                      </CardContent>
+                    </Card>
+                  )
+                }
+
+                return (
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredPengumuman.slice(0, 6).map((item) => (
+                      <AnnouncementCard
+                        key={item.id}
+                        id={item.id}
+                        date={item.tanggal_mulai || item.created_at}
+                        title={item.judul}
+                        description={item.konten}
+                        badge={item.kategori}
+                      />
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
           )}
         </div>
       </section>
 
-      {/* Education Level Section */}
-      <section id="education" className="py-20 bg-sidebar/5">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">Jenjang Pendidikan</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Program Pendidikan
-            </h2>
-            <p className="text-muted-foreground">
-              Kami menyediakan pendidikan berkualitas untuk semua jenjang
-            </p>
-          </div>
 
-          <div className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <EducationCard
-              level="PAUD"
-              ageRange="3-5 Tahun"
-              description="Program pendidikan anak usia dini dengan metode bermain sambil belajar berbasis nilai-nilai Islam."
-              features={["Pembelajaran Interaktif", "Hafalan Doa Harian", "Pengembangan Motorik", "Pengenalan Huruf Hijaiyah"]}
-            />
-            <EducationCard
-              level="TK"
-              ageRange="5-6 Tahun"
-              description="Taman kanak-kanak Islam dengan kurikulum yang mempersiapkan anak memasuki jenjang SD."
-              features={["Calistung Dasar", "Hafalan Surat Pendek", "Kegiatan Seni", "Pembiasaan Akhlak"]}
-            />
-            <EducationCard
-              level="MI"
-              ageRange="6-12 Tahun"
-              description="Sekolah Dasar/Madrasah Ibtidaiyah dengan perpaduan kurikulum nasional dan pesantren."
-              features={["Kurikulum Merdeka", "Tahfidz Juz 30", "Bahasa Arab & Inggris", "Ekstrakulikuler"]}
-            />
-            <EducationCard
-              level="MTs"
-              ageRange="12-15 Tahun"
-              description="Sekolah Menengah Pertama dengan pendalaman ilmu agama dan sains modern."
-              features={["Pembelajaran Terpadu", "Tahfidz 3 Juz", "Sains & Teknologi", "Leadership Training"]}
-            />
-            <EducationCard
-              level="MA"
-              ageRange="15-18 Tahun"
-              description="Sekolah Menengah Atas dengan penjurusan IPA, IPS, dan Keagamaan."
-              features={["Persiapan PTN", "Tahfidz 5 Juz", "Penelitian Ilmiah", "Kewirausahaan"]}
-            />
-          </div>
-        </div>
-      </section>
 
       {/* Location Section */}
       <section id="location" className="py-20 bg-background">
@@ -575,73 +616,6 @@ export default function LandingPage() {
     </div>
   )
 }
-
-const jenjangProfiles = [
-  {
-    id: "paud-tk",
-    name: "PAUD & TK Al Ausath",
-    visi: "Mewujudkan generasi usia dini yang ceria, sehat, dan cinta Al-Qur'an.",
-    misi: [
-      "Menanamkan aqidah dan akhlak mulia sejak dini",
-      "Melatih kemandirian dan motorik anak melalui bermain bermakna",
-      "Mengenalkan dasar-dasar membaca Al-Qur'an dan doa harian"
-    ],
-    sejarah: "PAUD dan TK Al Ausath didirikan sebagai langkah awal pesantren dalam membina tunas bangsa. Dengan metode pendidikan yang menyenangkan, kami berkomitmen menjadi mitra terbaik orang tua dalam fase golden age anak.",
-    kegiatan: [
-      "Bermain sambil belajar nilai Islam",
-      "Hafalan surat pendek & doa harian",
-      "Pengembangan kreativitas seni & motorik"
-    ]
-  },
-  {
-    id: "mi",
-    name: "Madrasah Ibtidaiyah (MI)",
-    visi: "Mewujudkan generasi dasar yang Qur'ani, berakhlak mulia, dan berprestasi.",
-    misi: [
-      "Menyelenggarakan pendidikan dasar berbasis Al-Qur'an dan As-Sunnah",
-      "Membiasakan adab dan akhlakul karimah sejak dini",
-      "Mengembangkan kemampuan dasar calistung dan tahfidz juz 30"
-    ],
-    sejarah: "MI Al Ausath hadir untuk merespon tingginya minat masyarakat terhadap pendidikan dasar yang mengintegrasikan kurikulum nasional dengan ilmu agama secara intensif.",
-    kegiatan: [
-      "Pembelajaran tematik terpadu",
-      "Ekstrakurikuler pramuka & tahfidz",
-      "Pembiasaan sholat dhuha & dzuhur berjamaah"
-    ]
-  },
-  {
-    id: "mts",
-    name: "Madrasah Tsanawiyah (MTs)",
-    visi: "Menjadi lembaga pendidikan menengah yang unggul dalam IPTEK dan IMTAQ.",
-    misi: [
-      "Mengintegrasikan kurikulum nasional dengan kepesantrenan",
-      "Mencetak generasi penghafal Al-Qur'an (Target 3 Juz)",
-      "Membekali santri dengan kemampuan bahasa Arab dan Inggris"
-    ],
-    sejarah: "MTs Al Ausath merupakan wadah lanjutan bagi santri usia remaja awal untuk mendalami ilmu agama dan sains secara komprehensif, ditunjang dengan fasilitas pesantren yang memadai.",
-    kegiatan: [
-      "Kajian kitab kuning dasar",
-      "English & Arabic club",
-      "Pelatihan kepemimpinan santri"
-    ]
-  },
-  {
-    id: "ma",
-    name: "Madrasah Aliyah (MA)",
-    visi: "Mencetak lulusan yang siap bersaing global dengan landasan akidah yang lurus.",
-    misi: [
-      "Mempersiapkan santri menembus Perguruan Tinggi Negeri & Timur Tengah",
-      "Meningkatkan kualitas tahfidz (Target 5 Juz) dan pemahaman agama",
-      "Mengembangkan jiwa kemandirian dan kewirausahaan"
-    ],
-    sejarah: "MA Al Ausath didirikan sebagai jenjang puncak pendidikan menengah pesantren, berfokus pada kematangan intelektual, kemandirian spiritual, dan persiapan karir atau studi lanjut santri.",
-    kegiatan: [
-      "Bimbingan intensif UTBK/SNBT",
-      "Kajian kitab (Takhassus)",
-      "Program pengabdian masyarakat"
-    ]
-  }
-]
 
 function PpdbRegistrationForm() {
   const { toast } = useToast()

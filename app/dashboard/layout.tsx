@@ -252,6 +252,7 @@ const adminMenuItems: MenuItem[] = [
       { icon: CreditCard, label: "Setting SPP", href: "/dashboard/admin-panel/spp-settings" },
       { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
       { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
+      { icon: Building2, label: "Profil Web", href: "/dashboard/admin-panel/profil-web" },
     ],
   },
 ]
