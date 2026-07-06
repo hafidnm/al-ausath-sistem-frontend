@@ -30,9 +30,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X, Trophy } from "lucide-react"
 
 import { raporService } from "@/lib/services/rapor.service"
+import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { santriService } from "@/lib/services/santri.service"
 import { getCachedUser } from "@/lib/auth-cache"
@@ -83,6 +84,7 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   const [isOptionsLoading, setIsOptionsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isRanking, setIsRanking] = useState(false)
   const [error, setError] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
 
@@ -221,6 +223,25 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   useEffect(() => {
     fetchData()
   }, [kodeKelas, tahunAjaran, semester])
+
+  const handleGenerateRanking = async () => {
+    if (!kodeKelas || !tahunAjaran || !semester) return
+    setIsRanking(true)
+    setError("")
+    setSuccessMsg("")
+    try {
+      const result = await rangkingKelasService.generate({
+        kode_kelas: kodeKelas,
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+      })
+      setSuccessMsg(`Ranking kelas berhasil diperbarui — ${result.total_siswa} santri terurut.`)
+    } catch (err: any) {
+      setError(err?.message || "Gagal memperbarui ranking kelas.")
+    } finally {
+      setIsRanking(false)
+    }
+  }
 
   const handleGenerateBulk = async () => {
     const ungenerated = santris.filter(s => s.status === "BELUM_GENERATE")
@@ -449,6 +470,10 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-4 flex-wrap">
+                <Button onClick={handleGenerateRanking} disabled={isRanking || santris.length === 0} variant="outline">
+                  {isRanking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trophy className="w-4 h-4 mr-2" />}
+                  Perbarui Ranking
+                </Button>
                 {ungeneratedCount > 0 && (
                   <Button onClick={handleGenerateBulk} disabled={isGenerating} variant="default" className="bg-blue-600 hover:bg-blue-700">
                     {isGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />}
