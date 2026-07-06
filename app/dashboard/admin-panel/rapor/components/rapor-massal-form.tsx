@@ -30,7 +30,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X } from "lucide-react"
 
 import { raporService } from "@/lib/services/rapor.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
@@ -89,6 +89,11 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   // Dialog Ekstra State
   const [ekstraDialogSantri, setEkstraDialogSantri] = useState<SantriRow | null>(null)
   const [tempEkstra, setTempEkstra] = useState<Ekstra[]>([])
+
+  // PDF Preview State
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
+  const [pdfPreviewName, setPdfPreviewName] = useState<string>("")
+  const [isPdfLoading, setIsPdfLoading] = useState(false)
 
   useEffect(() => {
     const fetchKelas = async () => {
@@ -325,6 +330,30 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
     closeEkstraDialog()
   }
 
+  const handlePreviewPdf = async (s: SantriRow) => {
+    setIsPdfLoading(true)
+    setPdfPreviewName(s.nama_santri)
+    try {
+      const blob = await raporService.downloadPdf({
+        nomor_induk: s.nomor_induk,
+        tahun_ajaran: tahunAjaran,
+        semester: Number(semester),
+      })
+      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+      setPdfPreviewUrl(URL.createObjectURL(blob))
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Gagal membuka preview PDF rapor.")
+    } finally {
+      setIsPdfLoading(false)
+    }
+  }
+
+  const closePdfPreview = () => {
+    if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl)
+    setPdfPreviewUrl(null)
+    setPdfPreviewName("")
+  }
+
   const filteredSantris = useMemo(() => {
     return santris.filter(s => {
       return s.nama_santri.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -448,7 +477,8 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="min-w-[200px] sticky left-0 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">Nama Santri</TableHead>
+                      <TableHead className="w-[40px] sticky left-0 bg-background z-10 px-1 text-center" title="Preview PDF">PDF</TableHead>
+                      <TableHead className="min-w-[200px] sticky left-10 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">Nama Santri</TableHead>
                       <TableHead className="w-[100px] text-center px-1">Status</TableHead>
                       <TableHead className="min-w-[250px] px-2">Catatan Wali</TableHead>
                       <TableHead className="w-[60px] text-center px-1" title="Kebersihan">Brs</TableHead>
@@ -464,7 +494,7 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                   <TableBody>
                     {filteredSantris.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={12} className="text-center py-8 text-muted-foreground">
                           Tidak ada data santri.
                         </TableCell>
                       </TableRow>
@@ -474,7 +504,21 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                         
                         return (
                           <TableRow key={s.nomor_induk} className={s.status === "BELUM_GENERATE" ? "bg-muted/50" : ""}>
-                            <TableCell className="sticky left-0 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">
+                            <TableCell className="sticky left-0 bg-background z-10 px-1 text-center">
+                              {s.status !== "BELUM_GENERATE" && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-red-500 hover:text-red-600 hover:bg-red-50"
+                                  title="Preview PDF Rapor"
+                                  onClick={() => handlePreviewPdf(s)}
+                                  disabled={isPdfLoading}
+                                >
+                                  {isPdfLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                                </Button>
+                              )}
+                            </TableCell>
+                            <TableCell className="sticky left-10 bg-background z-10 shadow-[1px_0_0_0_#e2e8f0]">
                               <div className="font-medium text-sm whitespace-nowrap">{s.nama_santri}</div>
                               <div className="text-xs text-muted-foreground">{s.nomor_induk}</div>
                             </TableCell>
@@ -601,6 +645,35 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
             <Button variant="outline" onClick={closeEkstraDialog}>Batal</Button>
             <Button onClick={saveEkstraDialog}>Terapkan</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Preview Dialog */}
+      <Dialog open={!!pdfPreviewUrl} onOpenChange={(open) => !open && closePdfPreview()}>
+        <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col p-0">
+          <DialogHeader className="px-6 pt-5 pb-3 border-b shrink-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-red-500" />
+                  Preview Rapor PDF
+                </DialogTitle>
+                <DialogDescription>{pdfPreviewName}</DialogDescription>
+              </div>
+              <Button variant="ghost" size="icon" onClick={closePdfPreview}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-hidden">
+            {pdfPreviewUrl && (
+              <iframe
+                src={pdfPreviewUrl}
+                className="w-full h-full border-0"
+                title="Preview PDF Rapor"
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
