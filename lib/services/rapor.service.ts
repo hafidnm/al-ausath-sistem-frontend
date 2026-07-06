@@ -65,6 +65,12 @@ export interface GetRaporCatatanParams {
 
 export interface GenerateRaporPayload extends GetRaporCatatanParams {}
 
+export interface GenerateRaporBulkPayload {
+  tahun_ajaran: string
+  semester: number
+  nomor_induks: string[]
+}
+
 export interface GenerateRaporRankingPayload {
   kode_kelas: string
   tahun_ajaran: string
@@ -83,6 +89,25 @@ export interface UpsertCatatanWaliPayload extends GetRaporCatatanParams {
   keseharian_kedisiplinan?: string
   keseharian_ketaatan?: string
   ekstrakurikuler?: Array<{ nama: string; nilai: string }>
+}
+
+export interface UpsertCatatanWaliBulkPayload {
+  kode_kelas: string
+  tahun_ajaran: string
+  semester: number
+  santris: Array<{
+    nomor_induk: string
+    catatan_wali?: string
+    id_wali_kelas?: number
+    keseharian_kebersihan?: string
+    keseharian_kerapian?: string
+    keseharian_keterampilan?: string
+    keseharian_kelakuan?: string
+    keseharian_kerajinan?: string
+    keseharian_kedisiplinan?: string
+    keseharian_ketaatan?: string
+    ekstrakurikuler?: Array<{ nama: string; nilai: string }>
+  }>
 }
 
 export interface PublishRaporPayload {
@@ -308,6 +333,11 @@ export const raporService = {
     return normalizeRaporItem(response.data?.data ?? response.data)
   },
 
+  async generateBulk(payload: GenerateRaporBulkPayload): Promise<RaporItem[]> {
+    const response = await api.post("/akademik/raport/generate/bulk", payload)
+    return extractList(response.data).map(normalizeRaporItem)
+  },
+
   async generateRanking(payload: GenerateRaporRankingPayload): Promise<void> {
     await api.post("/akademik/raport/rank", payload)
   },
@@ -315,6 +345,10 @@ export const raporService = {
   async upsertCatatanWali(payload: UpsertCatatanWaliPayload): Promise<RaporDetail> {
     const response = await api.post("/akademik/raport/catatan-wali", payload)
     return normalizeRaporDetail(response.data?.data ?? response.data)
+  },
+
+  async bulkUpsertCatatanWali(payload: UpsertCatatanWaliBulkPayload): Promise<void> {
+    await api.post("/akademik/raport/catatan-wali/bulk", payload)
   },
 
   async downloadPdf(params: GetRaporCatatanParams): Promise<Blob> {
