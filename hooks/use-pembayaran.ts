@@ -29,7 +29,7 @@ export type {
 
 export function useTagihan() {
   const query = useCallback(
-    (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }) =>
+    (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }) =>
       pembayaranService.getTagihan(params),
     [],
   );
@@ -39,7 +39,7 @@ export function useTagihan() {
   });
 
   const fetchTagihan = useCallback(
-    async (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }) => run(params),
+    async (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }) => run(params),
     [run],
   );
   return { data: responseData?.data || [], meta: responseData?.meta, loading, error, fetchTagihan };
