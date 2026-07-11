@@ -350,7 +350,12 @@ const normalizeTagihanRow = (item: ApiRecord): TagihanRow => ({
         0,
       ),
   ),
-  sumber: toStr(item.sumber ?? '').toLowerCase().includes('ppdb') ? 'ppdb' : 'santri',
+  sumber: (() => {
+    // Backend sends 'sumber_data' (e.g. 'master_data_santri' | 'ppdb')
+    // but also check 'sumber' as fallback
+    const raw = toStr(item.sumber_data ?? item.sumber ?? '').toLowerCase();
+    return raw.includes('ppdb') ? 'ppdb' : 'santri';
+  })(),
   isAnakGuru: Boolean(item.is_anak_guru ?? item.isAnakGuru ?? false),
 });
 
@@ -409,7 +414,7 @@ const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
 
 export const pembayaranService = {
   /** GET /api/administrasi/pembayaran/tagihan — daftar tagihan semua entitas */
-  async getTagihan(params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number }): Promise<{ data: TagihanRow[]; meta?: any }> {
+  async getTagihan(params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }): Promise<{ data: TagihanRow[]; meta?: any }> {
     try {
       const response = await api.get(`${BASE}/tagihan`, { params });
       const data = extractList(response.data).map(normalizeTagihanRow);
@@ -582,10 +587,12 @@ export const pembayaranService = {
       const response = await api.get(`${BASE}/ringkasan`);
       const raw = extractSingle(response.data);
       return {
-        totalTagihan: toNum(raw.nominal_total ?? raw.total_tagihan ?? raw.totalTagihan ?? 0),
-        totalDibayar: toNum(raw.nominal_terverifikasi ?? raw.total_dibayar ?? raw.totalDibayar ?? 0),
-        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ?? 
-          (toNum(raw.nominal_total ?? 0) - toNum(raw.nominal_terverifikasi ?? 0))),
+      // Prioritize explicit total_* fields (from updated ringkasan endpoint)
+        // then fall back to legacy nominal_* fields for backward compatibility
+        totalTagihan: toNum(raw.total_tagihan ?? raw.nominal_total ?? raw.totalTagihan ?? 0),
+        totalDibayar: toNum(raw.total_dibayar ?? raw.nominal_terverifikasi ?? raw.totalDibayar ?? 0),
+        totalTunggakan: toNum(raw.total_tunggakan ?? raw.totalTunggakan ??
+          Math.max(toNum(raw.total_tagihan ?? raw.nominal_total ?? 0) - toNum(raw.total_dibayar ?? raw.nominal_terverifikasi ?? 0), 0)),
         menungguKonfirmasi: toNum(raw.status_menunggu_verifikasi ?? raw.menunggu_konfirmasi ?? raw.menungguKonfirmasi ?? 0),
         lunas: toNum(raw.status_terverifikasi ?? raw.lunas ?? 0),
         dibatalkan: toNum(raw.status_ditolak ?? raw.dibatalkan ?? 0),

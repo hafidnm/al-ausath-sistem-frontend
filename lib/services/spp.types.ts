@@ -52,13 +52,14 @@ export interface SppPayment {
   catatanVerifikasi: string;
 }
 
-/** POST /api/administrasi/spp/pembayaran */
 export interface CreateSppPaymentRequest {
-  id_santri: string | number;
+  id_santri?: string | number;
+  id_pendaftaran?: string | number;
   id_setting: string | number;
   nominal_bayar: number;
-  tanggal_bayar: string; // format: "2026-04-22 10:00:00"
-  metode_bayar: string;  // e.g. "transfer", "cash"
+  tanggal_bayar: string;             // Format: "YYYY-MM-DD HH:MM:SS"
+  metode_bayar: string;              // e.g., "transfer", "cash"
+  status?: string;
 }
 
 /** PUT /api/administrasi/spp/pembayaran/{id} */

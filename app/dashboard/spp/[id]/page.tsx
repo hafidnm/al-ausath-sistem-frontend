@@ -343,8 +343,8 @@ export default function SppTagihanDetailPage() {
         id_setting: Number(tambahForm.id_setting),
         nominal_bayar: tambahForm.nominal_bayar,
         metode_bayar: tambahForm.metode_bayar,
-        status: tambahForm.status,
         tanggal_bayar: tambahForm.tanggal_bayar,
+        status: tambahForm.status,
       }
       if (data?.profil?.sumber === 'ppdb') {
         payload.id_pendaftaran = Number(data.profil.id)

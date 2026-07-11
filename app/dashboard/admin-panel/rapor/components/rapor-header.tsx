@@ -20,6 +20,10 @@ export function RaporHeader({ onRefresh, onBackToAdmin }: RaporHeaderProps) {
           <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
+        <Button variant="outline" size="sm" className="bg-transparent" onClick={() => window.location.href = '/dashboard/admin-panel/rapor/massal'}>
+          <FileText className="mr-2 h-4 w-4" />
+          Input Massal
+        </Button>
         <Button variant="outline" size="sm" className="bg-transparent" onClick={onBackToAdmin}>
           <FileText className="mr-2 h-4 w-4" />
           Panel Admin

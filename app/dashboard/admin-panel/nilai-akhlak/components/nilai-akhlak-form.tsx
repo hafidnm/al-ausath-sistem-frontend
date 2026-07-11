@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,12 +23,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Download, Upload } from "lucide-react"
 
 import { nilaiAkhlakService, BulkUpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
 import { kelasService } from "@/lib/services/kelas.service"
 import { authService } from "@/lib/services/auth.service"
 import { semesterOptions } from "../utils/constants"
+import { downloadAkhlakTemplate, parseAkhlakCsv, CsvAkhlakParseResult } from "../utils/csv-helpers"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
 
@@ -88,8 +89,10 @@ export function NilaiAkhlakForm() {
 
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
   const [error, setError] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
   // Load User & Kelas
   useEffect(() => {
@@ -214,6 +217,68 @@ export function NilaiAkhlakForm() {
       setError(err?.response?.data?.message || "Gagal menyimpan nilai.")
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleDownloadTemplate = () => {
+    if (santris.length === 0) {
+      setError("Pilih kelas terlebih dahulu sebelum mengunduh template.")
+      return
+    }
+    downloadAkhlakTemplate(
+      santris.map(s => ({
+        nomor_induk: s.nomor_induk,
+        nama_santri: s.nama_santri,
+        nilai_angka: s.nilai_angka,
+        deskripsi: s.deskripsi
+      })),
+      { kodeKelas, aspek, tahunAjaran, semester },
+    )
+  }
+
+  const applyCsvData = (result: CsvAkhlakParseResult) => {
+    const csvMap = new Map(result.rows.map(r => [r.nomor_induk, r]))
+
+    setSantris(prev => prev.map(s => {
+      const csvRow = csvMap.get(s.nomor_induk)
+      if (!csvRow) return s
+
+      return {
+        ...s,
+        nilai_angka: csvRow.nilai_angka,
+        deskripsi: csvRow.deskripsi !== undefined ? csvRow.deskripsi : s.deskripsi,
+        isDirty: true
+      }
+    }))
+
+    const warningText = result.errors.length > 0
+      ? ` (${result.errors.length} peringatan validasi — cek kembali nilai yang ditandai)`
+      : ""
+    setSuccessMsg(`CSV berhasil diimpor: ${result.rows.length} santri dimuat.${warningText}`)
+  }
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ""
+
+    setIsImporting(true)
+    setError("")
+    setSuccessMsg("")
+
+    try {
+      const result = await parseAkhlakCsv(file)
+
+      if (result.errors.length > 0 && result.rows.length === 0) {
+        setError(result.errors.map(err => `Baris ${err.line}: ${err.message}`).join(" | "))
+        return
+      }
+
+      applyCsvData(result)
+    } catch {
+      setError("Gagal membaca file CSV. Pastikan format file sesuai template.")
+    } finally {
+      setIsImporting(false)
     }
   }
 
@@ -376,7 +441,37 @@ export function NilaiAkhlakForm() {
                 </Table>
               </div>
             )}
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {/* Hidden file input for CSV upload */}
+                <input
+                  ref={csvInputRef}
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={handleImportCsv}
+                />
+                <Button
+                  variant="outline"
+                  className="bg-transparent gap-2"
+                  onClick={handleDownloadTemplate}
+                  disabled={santris.length === 0}
+                  title="Unduh template CSV sesuai data saat ini"
+                >
+                  <Download className="w-4 h-4" />
+                  Download Template
+                </Button>
+                <Button
+                  variant="outline"
+                  className="bg-transparent gap-2"
+                  onClick={() => csvInputRef.current?.click()}
+                  disabled={isImporting || santris.length === 0}
+                  title="Import nilai dari CSV yang sudah diisi"
+                >
+                  {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                  {isImporting ? "Memproses..." : "Import CSV"}
+                </Button>
+              </div>
               <Button onClick={handleSave} disabled={isSaving || santris.filter(s => s.isDirty).length === 0} className="gap-2">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 Simpan Perubahan
