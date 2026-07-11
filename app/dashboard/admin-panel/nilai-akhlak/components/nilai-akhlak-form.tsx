@@ -27,7 +27,7 @@ import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Download
 
 import { nilaiAkhlakService, BulkUpsertNilaiAkhlakPayload } from "@/lib/services/nilai-akhlak.service"
 import { kelasService } from "@/lib/services/kelas.service"
-import { authService } from "@/lib/services/auth.service"
+import { getCachedUser } from "@/lib/auth-cache"
 import { semesterOptions } from "../utils/constants"
 import { downloadAkhlakTemplate, parseAkhlakCsv, CsvAkhlakParseResult } from "../utils/csv-helpers"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
@@ -74,7 +74,7 @@ export function NilaiAkhlakForm() {
   
   const kodeUnitFromContext = selectedUnit?.kode_unit?.toUpperCase() ?? ""
 
-  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string, kode_unit?: string}[]>([])
+  const [kelasOptions, setKelasOptions] = useState<{value: string, label: string, kode_unit?: string, id_wali_kelas?: number | null}[]>([])
   
   const [kodeKelas, setKodeKelas] = useState("")
   const tahunAjaran = selectedTahunAjaran?.nama_tahun ?? ""
@@ -96,14 +96,34 @@ export function NilaiAkhlakForm() {
 
   // Load User & Kelas
   useEffect(() => {
-    authService.me().then(me => setPetugasInputId(extractPetugasInputId(me)))
-    kelasService.getAll({ status: "AKTIF", per_page: "200" })
-      .then(res => setKelasOptions(res.map(k => ({ 
-        value: k.kode_kelas ?? "", 
-        label: k.nama_kelas ?? k.kode_kelas ?? "",
-        kode_unit: k.kode_unit
-      }))))
-      .catch(console.error)
+    const fetchUserAndKelas = async () => {
+      const me = await getCachedUser()
+      const idPetugas = extractPetugasInputId(me)
+      const rolesStr = String(me?.user?.peran_akun || me?.peran_akun || "").toLowerCase()
+      const isAdmin = rolesStr.includes("admin")
+      setPetugasInputId(idPetugas)
+
+      try {
+        const res = await kelasService.getAll({ status: "AKTIF", per_page: "200" })
+        let list = res
+
+        // Pengajar hanya melihat kelas dimana dia menjadi wali kelas
+        if (!isAdmin && idPetugas) {
+          list = list.filter(k => k.id_wali_kelas === idPetugas)
+        }
+
+        setKelasOptions(list.map(k => ({
+          value: k.kode_kelas ?? "",
+          label: k.nama_kelas ?? k.kode_kelas ?? "",
+          kode_unit: k.kode_unit,
+          id_wali_kelas: k.id_wali_kelas,
+        })))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+
+    fetchUserAndKelas()
   }, [])
 
   const displayedKelasOptions = useMemo(() => {

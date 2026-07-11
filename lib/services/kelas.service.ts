@@ -157,6 +157,7 @@ export interface KelasItem {
   tahun_ajaran?: string
   kode_unit?: string
   status?: string
+  id_wali_kelas?: number | null
 }
 
 export interface GetKelasParams {
@@ -357,6 +358,7 @@ const normalizeKelasItem = (raw: any): KelasItem => ({
   kode_unit: toText(raw?.kode_unit ?? raw?.kelas?.kode_unit),
   jenjang: toText(raw?.jenjang ?? raw?.kelas?.jenjang),
   status: toText(raw?.status ?? raw?.kelas?.status),
+  id_wali_kelas: raw?.id_wali_kelas != null ? Number(raw.id_wali_kelas) : null,
 })
 
 export const kelasService = {
