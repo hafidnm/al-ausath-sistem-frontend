@@ -21,7 +21,7 @@ import { transliterateText } from "@/lib/utils/arabic-transliterate"
 // Helper: Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
   if (!path) return null;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
   
   // Get base URL from API_URL (e.g., http://localhost:8000/api → http://localhost:8000)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
@@ -31,6 +31,58 @@ const getImageUrl = (path?: string): string | null => {
   const cleanPath = path.replace(/^\/storage\/?/, '').replace(/^\//, '');
   return `${base}/storage/${cleanPath}`;
 };
+
+// Compress image and convert to Base64 data URL client-side
+const compressAndConvertToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 800; // Reasonable width for test questions
+        const MAX_HEIGHT = 600;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(event.target?.result as string); // Fallback to original base64 if canvas is not supported
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        // Convert to jpeg with 70% quality for small size
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => {
+        reject(err);
+      };
+    };
+    reader.onerror = (err) => {
+      reject(err);
+    };
+  });
+};
+
 
 const tesJenjangOptions: Array<{ value: TesKonfigurasiJenjangKey; label: string }> = [
   { value: "MI", label: "MI" },
@@ -100,22 +152,14 @@ export function PpdbTesKonfigurasiCard({
     onFormSchemaChange(selectedJenjang, newSchema)
   }
 
-  // Issue 2: Upload gambar soal ke backend dan simpan URL-nya
+  // Issue 2: Compress and store image as base64 client-side
   const handleImageUpload = async (index: number, file: File) => {
     try {
-      const formData = new FormData()
-      formData.append('gambar', file)
-      const response = await api.post('/administrasi/ppdb/tes/konfigurasi/upload-gambar', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      })
-      // Backend return file_url (format: /storage/ppdb/tes_soal/...)
-      const url = (response.data as any)?.file_url ?? (response.data as any)?.url ?? ''
-      if (url) {
-        handleUpdateQuestion(index, { image_url: url })
-      }
+      const base64Url = await compressAndConvertToBase64(file)
+      handleUpdateQuestion(index, { image_url: base64Url })
     } catch (error) {
-      console.error('Image upload error:', error)
-      alert('Gagal mengunggah gambar soal.')
+      console.error('Image compression error:', error)
+      alert('Gagal memproses gambar soal.')
     }
   }
 

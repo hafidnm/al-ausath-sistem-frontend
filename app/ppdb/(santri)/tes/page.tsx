@@ -30,7 +30,7 @@ const formatMultipleChoiceAnswer = (answerValue: string, options?: string[]) => 
 // Construct full image URL from backend path
 const getImageUrl = (path?: string): string | null => {
   if (!path) return null;
-  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) return path;
 
   // Get base URL from API_URL (e.g., http://localhost:8000/api → http://localhost:8000)
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
