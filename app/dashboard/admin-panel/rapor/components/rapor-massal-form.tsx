@@ -107,19 +107,28 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
 
       setIsOptionsLoading(true)
       try {
+        const authData = await getCachedUser();
+        const idPetugas = authData?.user?.id_petugas ?? authData?.user?.petugas?.id_petugas;
+        const rolesStr = String(authData?.user?.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
         const { data } = await dataKelasService.getAll({
           status: "AKTIF",
           per_page: 200,
         })
 
-        const options = data
-          .filter(k => !selectedKodeUnit || k.kode_unit === selectedKodeUnit)
-          .map(k => ({
-            value: k.kode_kelas,
-            label: k.nama_kelas,
-            kode_unit: k.kode_unit,
-            id_wali_kelas: k.id_wali_kelas,
-          }))
+        let classes = data.filter(k => !selectedKodeUnit || k.kode_unit === selectedKodeUnit);
+
+        if (!isAdmin) {
+          classes = classes.filter(k => k.id_wali_kelas === idPetugas);
+        }
+
+        const options = classes.map(k => ({
+          value: k.kode_kelas,
+          label: k.nama_kelas,
+          kode_unit: k.kode_unit,
+          id_wali_kelas: k.id_wali_kelas,
+        }))
 
         setRawKelasOptions(options)
       } catch (error) {
