@@ -9,6 +9,7 @@ export interface ProfilWeb {
   misi: string[]
   sejarah: string
   program_unggulan: string[]
+  fasilitas: string[]
 }
 
 export const profilWebService = {

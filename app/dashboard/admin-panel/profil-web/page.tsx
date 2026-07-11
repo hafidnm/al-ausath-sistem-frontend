@@ -87,7 +87,8 @@ export default function ProfilWebPage() {
         visi: "",
         misi: [],
         sejarah: "",
-        program_unggulan: []
+        program_unggulan: [],
+        fasilitas: []
       })
       toast({ title: "Berhasil", description: "Profil jenjang baru berhasil ditambahkan" })
       setIsAddOpen(false)
@@ -129,7 +130,7 @@ export default function ProfilWebPage() {
 
   const handleArrayChange = (
     profileId: number,
-    field: "misi" | "program_unggulan",
+    field: "misi" | "program_unggulan" | "fasilitas",
     index: number,
     value: string
   ) => {
@@ -145,7 +146,7 @@ export default function ProfilWebPage() {
     )
   }
 
-  const addArrayItem = (profileId: number, field: "misi" | "program_unggulan") => {
+  const addArrayItem = (profileId: number, field: "misi" | "program_unggulan" | "fasilitas") => {
     setProfiles((prev) =>
       prev.map((p) => {
         if (p.id_profil === profileId) {
@@ -156,7 +157,7 @@ export default function ProfilWebPage() {
     )
   }
 
-  const removeArrayItem = (profileId: number, field: "misi" | "program_unggulan", index: number) => {
+  const removeArrayItem = (profileId: number, field: "misi" | "program_unggulan" | "fasilitas", index: number) => {
     setProfiles((prev) =>
       prev.map((p) => {
         if (p.id_profil === profileId) {
@@ -285,6 +286,26 @@ export default function ProfilWebPage() {
                         onChange={(e) => handleArrayChange(profile.id_profil, "program_unggulan", index, e.target.value)}
                       />
                       <Button type="button" variant="destructive" size="icon" onClick={() => removeArrayItem(profile.id_profil, "program_unggulan", index)}>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label>Fasilitas</Label>
+                    <Button type="button" variant="outline" size="sm" onClick={() => addArrayItem(profile.id_profil, "fasilitas")}>
+                      <Plus className="w-4 h-4 mr-2" /> Tambah Fasilitas
+                    </Button>
+                  </div>
+                  {profile.fasilitas && profile.fasilitas.map((p, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input 
+                        value={p} 
+                        onChange={(e) => handleArrayChange(profile.id_profil, "fasilitas", index, e.target.value)}
+                      />
+                      <Button type="button" variant="destructive" size="icon" onClick={() => removeArrayItem(profile.id_profil, "fasilitas", index)}>
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>

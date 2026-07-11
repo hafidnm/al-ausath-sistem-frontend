@@ -305,7 +305,7 @@ export default function LandingPage() {
                           </Card>
                         </div>
 
-                        <div className="grid md:grid-cols-2 gap-8">
+                        <div className="grid md:grid-cols-3 gap-8">
                           <div className="space-y-4">
                             <h4 className="text-lg font-semibold flex items-center gap-2">
                               <BookOpen className="w-5 h-5 text-primary" />
@@ -328,6 +328,22 @@ export default function LandingPage() {
                                     {i + 1}
                                   </div>
                                   <span className="text-muted-foreground text-sm mt-0.5">{k}</span>
+                                </li>
+                              )) : null}
+                            </ul>
+                          </div>
+                          <div className="space-y-4">
+                            <h4 className="text-lg font-semibold flex items-center gap-2">
+                              <Star className="w-5 h-5 text-primary" />
+                              Fasilitas
+                            </h4>
+                            <ul className="space-y-3">
+                              {Array.isArray(profile.fasilitas) ? profile.fasilitas.map((f: string, i: number) => (
+                                <li key={i} className="flex items-start gap-3">
+                                  <div className="w-6 h-6 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold text-xs">
+                                    {i + 1}
+                                  </div>
+                                  <span className="text-muted-foreground text-sm mt-0.5">{f}</span>
                                 </li>
                               )) : null}
                             </ul>
