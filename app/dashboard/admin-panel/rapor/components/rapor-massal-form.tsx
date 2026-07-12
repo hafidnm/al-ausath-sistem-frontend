@@ -36,6 +36,7 @@ import { raporService } from "@/lib/services/rapor.service"
 import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { santriService } from "@/lib/services/santri.service"
+import { ekskulService, EkskulApiItem, PendaftaranApiItem } from "@/lib/services/ekskul.service"
 import { getCachedUser } from "@/lib/auth-cache"
 import { semesterOptions } from "../../nilai-mapel/utils/constants"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
@@ -91,6 +92,8 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   // Dialog Ekstra State
   const [ekstraDialogSantri, setEkstraDialogSantri] = useState<SantriRow | null>(null)
   const [tempEkstra, setTempEkstra] = useState<Ekstra[]>([])
+  const [ekskulOptions, setEkskulOptions] = useState<EkskulApiItem[]>([])
+  const [isEkskulLoading, setIsEkskulLoading] = useState(false)
 
   // PDF Preview State
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
@@ -338,9 +341,25 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
     }))
   }
 
-  const openEkstraDialog = (santri: SantriRow) => {
+  const openEkstraDialog = async (santri: SantriRow) => {
     setEkstraDialogSantri(santri)
     setTempEkstra([...santri.ekstrakurikuler])
+    setEkskulOptions([])
+    setIsEkskulLoading(true)
+    try {
+      const res: any = await ekskulService.getRekap({ nomor_induk: santri.nomor_induk, per_page: 50 })
+      const data = res.data || res.items || res
+      if (Array.isArray(data)) {
+        const list = data
+          .map((item: PendaftaranApiItem) => item.ekskul)
+          .filter((ekskul): ekskul is EkskulApiItem => ekskul !== undefined)
+        setEkskulOptions(list)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsEkskulLoading(false)
+    }
   }
 
   const closeEkstraDialog = () => {
@@ -621,41 +640,66 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-            {tempEkstra.length === 0 ? (
+            {isEkskulLoading ? (
+              <div className="flex items-center justify-center py-6 text-muted-foreground gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Memuat daftar ekskul...
+              </div>
+            ) : tempEkstra.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Belum ada kegiatan ekstrakurikuler.</p>
             ) : (
               tempEkstra.map((ekstra, idx) => (
                 <div key={idx} className="flex gap-2 items-start">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Nama Kegiatan</Label>
-                    <Input 
-                      value={ekstra.nama} 
-                      onChange={(e) => {
+                    <Select
+                      value={ekstra.nama}
+                      onValueChange={(val) => {
                         const newArr = [...tempEkstra]
-                        newArr[idx].nama = e.target.value
+                        newArr[idx] = { ...newArr[idx], nama: val }
                         setTempEkstra(newArr)
                       }}
-                      placeholder="Pramuka, Memanah..."
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih kegiatan..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ekskulOptions.length === 0 ? (
+                          <SelectItem value="__empty" disabled>Tidak ada ekskul terdaftar</SelectItem>
+                        ) : (
+                          ekskulOptions.map((opt) => (
+                            <SelectItem key={opt.id_ekskul} value={opt.nama_ekskul}>
+                              {opt.nama_ekskul}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1 w-20">
+                  <div className="space-y-1 w-28">
                     <Label className="text-xs">Nilai</Label>
-                    <Input 
-                      value={ekstra.nilai} 
-                      maxLength={2}
-                      className="text-center uppercase"
-                      onChange={(e) => {
+                    <Select
+                      value={ekstra.nilai}
+                      onValueChange={(val) => {
                         const newArr = [...tempEkstra]
-                        newArr[idx].nilai = e.target.value
+                        newArr[idx] = { ...newArr[idx], nilai: val }
                         setTempEkstra(newArr)
                       }}
-                      placeholder="A/B..."
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nilai" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A">A (Sangat Baik)</SelectItem>
+                        <SelectItem value="B">B (Baik)</SelectItem>
+                        <SelectItem value="C">C (Cukup)</SelectItem>
+                        <SelectItem value="D">D (Kurang)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="mt-5 text-destructive shrink-0" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mt-5 text-destructive shrink-0"
                     onClick={() => {
                       const newArr = [...tempEkstra]
                       newArr.splice(idx, 1)
@@ -667,9 +711,10 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 </div>
               ))
             )}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full border-dashed"
+              disabled={ekskulOptions.length === 0}
               onClick={() => setTempEkstra([...tempEkstra, { nama: "", nilai: "" }])}
             >
               <Plus className="w-4 h-4 mr-2" /> Tambah Kegiatan
