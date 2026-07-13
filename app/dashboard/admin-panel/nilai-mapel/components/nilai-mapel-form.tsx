@@ -152,7 +152,8 @@ export function NilaiMapelForm() {
     const fetchOptions = async () => {
       const me = await getCachedUser()
       const idPetugas = extractPetugasInputId(me)
-      const isAdmin = hasRole(me, "Petugas Admin")
+      const rolesStr = String(me?.user?.peran_akun || me?.peran_akun || "").toLowerCase()
+      const isAdmin = rolesStr.includes("admin")
       setPetugasInputId(idPetugas)
 
       if (!tahunAjaran || !selectedKodeUnit) {

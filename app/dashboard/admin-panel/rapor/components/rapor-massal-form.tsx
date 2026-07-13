@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,12 +30,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X, Trophy } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X, Trophy, Download, Upload } from "lucide-react"
+
+import { downloadRaporTemplate, parseRaporCsv } from "../utils/csv-helpers"
 
 import { raporService } from "@/lib/services/rapor.service"
 import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { santriService } from "@/lib/services/santri.service"
+import { ekskulService, EkskulApiItem, PendaftaranApiItem } from "@/lib/services/ekskul.service"
 import { getCachedUser } from "@/lib/auth-cache"
 import { semesterOptions } from "../../nilai-mapel/utils/constants"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
@@ -87,10 +90,14 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   const [isRanking, setIsRanking] = useState(false)
   const [error, setError] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
+  const [isImporting, setIsImporting] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
   // Dialog Ekstra State
   const [ekstraDialogSantri, setEkstraDialogSantri] = useState<SantriRow | null>(null)
   const [tempEkstra, setTempEkstra] = useState<Ekstra[]>([])
+  const [ekskulOptions, setEkskulOptions] = useState<EkskulApiItem[]>([])
+  const [isEkskulLoading, setIsEkskulLoading] = useState(false)
 
   // PDF Preview State
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null)
@@ -107,19 +114,28 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
 
       setIsOptionsLoading(true)
       try {
+        const authData = await getCachedUser();
+        const idPetugas = authData?.user?.id_petugas ?? authData?.user?.petugas?.id_petugas;
+        const rolesStr = String(authData?.user?.peran_akun || "").toLowerCase();
+        const isAdmin = rolesStr.includes("admin");
+
         const { data } = await dataKelasService.getAll({
           status: "AKTIF",
           per_page: 200,
         })
 
-        const options = data
-          .filter(k => !selectedKodeUnit || k.kode_unit === selectedKodeUnit)
-          .map(k => ({
-            value: k.kode_kelas,
-            label: k.nama_kelas,
-            kode_unit: k.kode_unit,
-            id_wali_kelas: k.id_wali_kelas,
-          }))
+        let classes = data.filter(k => !selectedKodeUnit || k.kode_unit === selectedKodeUnit);
+
+        if (!isAdmin) {
+          classes = classes.filter(k => k.id_wali_kelas === idPetugas);
+        }
+
+        const options = classes.map(k => ({
+          value: k.kode_kelas,
+          label: k.nama_kelas,
+          kode_unit: k.kode_unit,
+          id_wali_kelas: k.id_wali_kelas,
+        }))
 
         setRawKelasOptions(options)
       } catch (error) {
@@ -237,9 +253,87 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
       })
       setSuccessMsg(`Ranking kelas berhasil diperbarui — ${result.total_siswa} santri terurut.`)
     } catch (err: any) {
-      setError(err?.message || "Gagal memperbarui ranking kelas.")
+      setError(err?.response?.data?.message || "Gagal memperbarui ranking.")
     } finally {
       setIsRanking(false)
+    }
+  }
+
+  const handleDownloadCsv = () => {
+    if (!kodeKelas || !tahunAjaran || santris.length === 0) return
+    const csvData = santris.map((s) => ({
+      nomor_induk: s.nomor_induk,
+      nama_santri: s.nama_santri,
+      catatan_wali: s.catatan_wali,
+      keseharian_kebersihan: s.keseharian_kebersihan,
+      keseharian_kerapian: s.keseharian_kerapian,
+      keseharian_keterampilan: s.keseharian_keterampilan,
+      keseharian_kelakuan: s.keseharian_kelakuan,
+      keseharian_kerajinan: s.keseharian_kerajinan,
+      keseharian_kedisiplinan: s.keseharian_kedisiplinan,
+      keseharian_ketaatan: s.keseharian_ketaatan,
+      ekstrakurikuler: s.ekstrakurikuler.map(e => `${e.nama}:${e.nilai}`).join(";"),
+    }))
+    downloadRaporTemplate(csvData, {
+      kodeKelas,
+      tahunAjaran,
+      semester,
+    })
+  }
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsImporting(true)
+    setError("")
+    setSuccessMsg("")
+
+    try {
+      const result = await parseRaporCsv(file)
+
+      if (result.errors.length > 0) {
+        const errorList = result.errors.slice(0, 5).map(err => `Baris ${err.line}: ${err.message}`).join(", ")
+        const moreCount = result.errors.length > 5 ? ` ... (dan ${result.errors.length - 5} error lainnya)` : ""
+        setError(`Terdapat error pada file CSV: ${errorList}${moreCount}`)
+      } else {
+        // Apply CSV data to santris state
+        setSantris(prev => prev.map(s => {
+          const row = result.rows.find(r => r.nomor_induk === s.nomor_induk)
+          if (!row) return s
+
+          // Parse ekstrakurikuler (e.g. Pramuka:A;Futsal:B)
+          const parsedEkstra: Ekstra[] = row.ekstrakurikuler
+            .split(";")
+            .map(item => item.trim())
+            .filter(item => item.includes(":"))
+            .map(item => {
+              const [nama, ...rest] = item.split(":")
+              const nilai = rest.join(":")
+              return { nama: nama.trim(), nilai: nilai.trim().toUpperCase() }
+            })
+
+          return {
+            ...s,
+            catatan_wali: row.catatan_wali,
+            keseharian_kebersihan: row.keseharian_kebersihan,
+            keseharian_kerapian: row.keseharian_kerapian,
+            keseharian_keterampilan: row.keseharian_keterampilan,
+            keseharian_kelakuan: row.keseharian_kelakuan,
+            keseharian_kerajinan: row.keseharian_kerajinan,
+            keseharian_kedisiplinan: row.keseharian_kedisiplinan,
+            keseharian_ketaatan: row.keseharian_ketaatan,
+            ekstrakurikuler: parsedEkstra,
+            isDirty: true
+          }
+        }))
+        setSuccessMsg(`Berhasil membaca data CSV untuk ${result.rows.length} santri. Silakan klik "Simpan Perubahan" untuk menyimpan.`)
+      }
+    } catch (err: any) {
+      setError("Gagal membaca file CSV. Pastikan format file sesuai template.")
+    } finally {
+      setIsImporting(false)
+      if (csvInputRef.current) csvInputRef.current.value = ""
     }
   }
 
@@ -329,9 +423,25 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
     }))
   }
 
-  const openEkstraDialog = (santri: SantriRow) => {
+  const openEkstraDialog = async (santri: SantriRow) => {
     setEkstraDialogSantri(santri)
     setTempEkstra([...santri.ekstrakurikuler])
+    setEkskulOptions([])
+    setIsEkskulLoading(true)
+    try {
+      const res: any = await ekskulService.getRekap({ nomor_induk: santri.nomor_induk, per_page: 50 })
+      const data = res.data || res.items || res
+      if (Array.isArray(data)) {
+        const list = data
+          .map((item: PendaftaranApiItem) => item.ekskul)
+          .filter((ekskul): ekskul is EkskulApiItem => ekskul !== undefined)
+        setEkskulOptions(list)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsEkskulLoading(false)
+    }
   }
 
   const closeEkstraDialog = () => {
@@ -470,6 +580,34 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    className="hidden" 
+                    ref={csvInputRef}
+                    onChange={handleImportCsv}
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDownloadCsv}
+                    disabled={santris.length === 0}
+                    className="flex-1 sm:flex-none"
+                    title="Unduh Template CSV"
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Template
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => csvInputRef.current?.click()}
+                    disabled={isImporting || santris.length === 0}
+                    className="flex-1 sm:flex-none"
+                    title="Impor Nilai via CSV"
+                  >
+                    {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Impor CSV
+                  </Button>
+                </div>
                 <Button onClick={handleGenerateRanking} disabled={isRanking || santris.length === 0} variant="outline">
                   {isRanking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trophy className="w-4 h-4 mr-2" />}
                   Perbarui Ranking
@@ -612,41 +750,66 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4 max-h-[60vh] overflow-y-auto pr-2">
-            {tempEkstra.length === 0 ? (
+            {isEkskulLoading ? (
+              <div className="flex items-center justify-center py-6 text-muted-foreground gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" /> Memuat daftar ekskul...
+              </div>
+            ) : tempEkstra.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">Belum ada kegiatan ekstrakurikuler.</p>
             ) : (
               tempEkstra.map((ekstra, idx) => (
                 <div key={idx} className="flex gap-2 items-start">
                   <div className="space-y-1 flex-1">
                     <Label className="text-xs">Nama Kegiatan</Label>
-                    <Input 
-                      value={ekstra.nama} 
-                      onChange={(e) => {
+                    <Select
+                      value={ekstra.nama}
+                      onValueChange={(val) => {
                         const newArr = [...tempEkstra]
-                        newArr[idx].nama = e.target.value
+                        newArr[idx] = { ...newArr[idx], nama: val }
                         setTempEkstra(newArr)
                       }}
-                      placeholder="Pramuka, Memanah..."
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pilih kegiatan..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ekskulOptions.length === 0 ? (
+                          <SelectItem value="__empty" disabled>Tidak ada ekskul terdaftar</SelectItem>
+                        ) : (
+                          ekskulOptions.map((opt) => (
+                            <SelectItem key={opt.id_ekskul} value={opt.nama_ekskul}>
+                              {opt.nama_ekskul}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="space-y-1 w-20">
+                  <div className="space-y-1 w-28">
                     <Label className="text-xs">Nilai</Label>
-                    <Input 
-                      value={ekstra.nilai} 
-                      maxLength={2}
-                      className="text-center uppercase"
-                      onChange={(e) => {
+                    <Select
+                      value={ekstra.nilai}
+                      onValueChange={(val) => {
                         const newArr = [...tempEkstra]
-                        newArr[idx].nilai = e.target.value
+                        newArr[idx] = { ...newArr[idx], nilai: val }
                         setTempEkstra(newArr)
                       }}
-                      placeholder="A/B..."
-                    />
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nilai" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A">A (Sangat Baik)</SelectItem>
+                        <SelectItem value="B">B (Baik)</SelectItem>
+                        <SelectItem value="C">C (Cukup)</SelectItem>
+                        <SelectItem value="D">D (Kurang)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="mt-5 text-destructive shrink-0" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="mt-5 text-destructive shrink-0"
                     onClick={() => {
                       const newArr = [...tempEkstra]
                       newArr.splice(idx, 1)
@@ -658,9 +821,10 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 </div>
               ))
             )}
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               className="w-full border-dashed"
+              disabled={ekskulOptions.length === 0}
               onClick={() => setTempEkstra([...tempEkstra, { nama: "", nilai: "" }])}
             >
               <Plus className="w-4 h-4 mr-2" /> Tambah Kegiatan
