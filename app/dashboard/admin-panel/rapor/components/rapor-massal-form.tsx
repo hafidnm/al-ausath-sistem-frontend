@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,7 +30,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X, Trophy } from "lucide-react"
+import { AlertTriangle, Search, Save, CheckCircle, Loader2, BookMarked, Plus, Trash2, Printer, FileText, X, Trophy, Download, Upload } from "lucide-react"
+
+import { downloadRaporTemplate, parseRaporCsv } from "../utils/csv-helpers"
 
 import { raporService } from "@/lib/services/rapor.service"
 import { rangkingKelasService } from "@/lib/services/rangking-kelas.service"
@@ -88,6 +90,8 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
   const [isRanking, setIsRanking] = useState(false)
   const [error, setError] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
+  const [isImporting, setIsImporting] = useState(false)
+  const csvInputRef = useRef<HTMLInputElement>(null)
 
   // Dialog Ekstra State
   const [ekstraDialogSantri, setEkstraDialogSantri] = useState<SantriRow | null>(null)
@@ -249,9 +253,87 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
       })
       setSuccessMsg(`Ranking kelas berhasil diperbarui — ${result.total_siswa} santri terurut.`)
     } catch (err: any) {
-      setError(err?.message || "Gagal memperbarui ranking kelas.")
+      setError(err?.response?.data?.message || "Gagal memperbarui ranking.")
     } finally {
       setIsRanking(false)
+    }
+  }
+
+  const handleDownloadCsv = () => {
+    if (!kodeKelas || !tahunAjaran || santris.length === 0) return
+    const csvData = santris.map((s) => ({
+      nomor_induk: s.nomor_induk,
+      nama_santri: s.nama_santri,
+      catatan_wali: s.catatan_wali,
+      keseharian_kebersihan: s.keseharian_kebersihan,
+      keseharian_kerapian: s.keseharian_kerapian,
+      keseharian_keterampilan: s.keseharian_keterampilan,
+      keseharian_kelakuan: s.keseharian_kelakuan,
+      keseharian_kerajinan: s.keseharian_kerajinan,
+      keseharian_kedisiplinan: s.keseharian_kedisiplinan,
+      keseharian_ketaatan: s.keseharian_ketaatan,
+      ekstrakurikuler: s.ekstrakurikuler.map(e => `${e.nama}:${e.nilai}`).join(";"),
+    }))
+    downloadRaporTemplate(csvData, {
+      kodeKelas,
+      tahunAjaran,
+      semester,
+    })
+  }
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsImporting(true)
+    setError("")
+    setSuccessMsg("")
+
+    try {
+      const result = await parseRaporCsv(file)
+
+      if (result.errors.length > 0) {
+        const errorList = result.errors.slice(0, 5).map(err => `Baris ${err.line}: ${err.message}`).join(", ")
+        const moreCount = result.errors.length > 5 ? ` ... (dan ${result.errors.length - 5} error lainnya)` : ""
+        setError(`Terdapat error pada file CSV: ${errorList}${moreCount}`)
+      } else {
+        // Apply CSV data to santris state
+        setSantris(prev => prev.map(s => {
+          const row = result.rows.find(r => r.nomor_induk === s.nomor_induk)
+          if (!row) return s
+
+          // Parse ekstrakurikuler (e.g. Pramuka:A;Futsal:B)
+          const parsedEkstra: Ekstra[] = row.ekstrakurikuler
+            .split(";")
+            .map(item => item.trim())
+            .filter(item => item.includes(":"))
+            .map(item => {
+              const [nama, ...rest] = item.split(":")
+              const nilai = rest.join(":")
+              return { nama: nama.trim(), nilai: nilai.trim().toUpperCase() }
+            })
+
+          return {
+            ...s,
+            catatan_wali: row.catatan_wali,
+            keseharian_kebersihan: row.keseharian_kebersihan,
+            keseharian_kerapian: row.keseharian_kerapian,
+            keseharian_keterampilan: row.keseharian_keterampilan,
+            keseharian_kelakuan: row.keseharian_kelakuan,
+            keseharian_kerajinan: row.keseharian_kerajinan,
+            keseharian_kedisiplinan: row.keseharian_kedisiplinan,
+            keseharian_ketaatan: row.keseharian_ketaatan,
+            ekstrakurikuler: parsedEkstra,
+            isDirty: true
+          }
+        }))
+        setSuccessMsg(`Berhasil membaca data CSV untuk ${result.rows.length} santri. Silakan klik "Simpan Perubahan" untuk menyimpan.`)
+      }
+    } catch (err: any) {
+      setError("Gagal membaca file CSV. Pastikan format file sesuai template.")
+    } finally {
+      setIsImporting(false)
+      if (csvInputRef.current) csvInputRef.current.value = ""
     }
   }
 
@@ -498,6 +580,34 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    className="hidden" 
+                    ref={csvInputRef}
+                    onChange={handleImportCsv}
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={handleDownloadCsv}
+                    disabled={santris.length === 0}
+                    className="flex-1 sm:flex-none"
+                    title="Unduh Template CSV"
+                  >
+                    <Download className="w-4 h-4 mr-2" /> Template
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => csvInputRef.current?.click()}
+                    disabled={isImporting || santris.length === 0}
+                    className="flex-1 sm:flex-none"
+                    title="Impor Nilai via CSV"
+                  >
+                    {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                    Impor CSV
+                  </Button>
+                </div>
                 <Button onClick={handleGenerateRanking} disabled={isRanking || santris.length === 0} variant="outline">
                   {isRanking ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Trophy className="w-4 h-4 mr-2" />}
                   Perbarui Ranking
