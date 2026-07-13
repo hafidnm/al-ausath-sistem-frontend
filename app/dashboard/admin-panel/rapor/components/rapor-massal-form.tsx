@@ -131,10 +131,10 @@ export function RaporMassalForm({ onCancel }: RaporMassalFormProps) {
         }
 
         const options = classes.map(k => ({
-          value: k.kode_kelas,
-          label: k.nama_kelas,
+          value: k.kode_kelas ?? "",
+          label: k.nama_kelas ?? k.kode_kelas ?? "",
           kode_unit: k.kode_unit,
-          id_wali_kelas: k.id_wali_kelas,
+          id_wali_kelas: k.id_wali_kelas ?? undefined,
         }))
 
         setRawKelasOptions(options)
