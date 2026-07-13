@@ -323,7 +323,7 @@ export default function PengumumanPage() {
                 <SelectContent>
                   <SelectItem value="all">Semua Unit</SelectItem>
                   {allUnit.map(u => (
-                    <SelectItem key={u.id_unit || u.id} value={(u.id_unit || u.id).toString()}>{u.nama_unit}</SelectItem>
+                    <SelectItem key={u.id_unit || u.id} value={String(u.id_unit ?? u.id)}>{u.nama_unit}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -503,7 +503,7 @@ export default function PengumumanPage() {
                   <SelectContent>
                     <SelectItem value="all">Semua Unit (Global)</SelectItem>
                     {allUnit.map(u => (
-                      <SelectItem key={u.id_unit || u.id} value={(u.id_unit || u.id).toString()}>{u.nama_unit}</SelectItem>
+                      <SelectItem key={u.id_unit || u.id} value={String(u.id_unit ?? u.id)}>{u.nama_unit}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
