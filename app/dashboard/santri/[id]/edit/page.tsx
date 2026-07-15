@@ -34,6 +34,7 @@ const toInitialData = (data: DataSantriApiItem): Partial<SantriFormState> => ({
   kecamatan: toText(data.kecamatan),
   kelurahan: toText(data.kelurahan),
   alamat_tinggal: toText(data.alamat_tinggal),
+  hobi: toText(data.hobi),
   nomor_telepon: toText(data.nomor_telepon),
   alamat_email: toText(data.alamat_email),
   nama_ayah_kandung: toText(data.nama_ayah_kandung),

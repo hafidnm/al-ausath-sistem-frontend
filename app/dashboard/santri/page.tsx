@@ -79,6 +79,7 @@ interface SantriRow {
   tanggalLahir: string
   status: string
   namaWali: string
+  hobi: string
   nomorTelepon: string
   alamatEmail: string
   isAnakGuru: boolean
@@ -108,6 +109,7 @@ interface SantriFormData {
   jenis_kelamin: string
   status: string
   nama_wali: string
+  hobi: string
   nomor_telepon: string
   alamat_email: string
 }
@@ -119,6 +121,7 @@ const defaultForm: SantriFormData = {
   jenis_kelamin: "",
   status: "AKTIF",
   nama_wali: "",
+  hobi: "",
   nomor_telepon: "",
   alamat_email: "",
 }
@@ -165,6 +168,7 @@ const normalizeSantriRow = (raw: DataSantriApiItem): SantriRow => ({
   namaWali: toText(raw.nama_wali),
   nomorTelepon: toText(raw.nomor_telepon),
   alamatEmail: toText(raw.alamat_email),
+  hobi: toText(raw.hobi),
   isAnakGuru: Boolean((raw as any).is_anak_guru ?? (raw as any).isAnakGuru ?? false),
 })
 
@@ -177,6 +181,7 @@ const toPayload = (form: SantriFormData): DataSantriPayload => ({
   nama_wali: form.nama_wali || null,
   nomor_telepon: form.nomor_telepon || null,
   alamat_email: form.alamat_email || null,
+  hobi: form.hobi || null,
 })
 
 const formatStatus = (status: string): string => {

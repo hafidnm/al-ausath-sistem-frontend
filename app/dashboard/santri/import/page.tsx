@@ -18,6 +18,7 @@ type PreviewRow = {
   status: string
   jenis_kelamin: string
   nama_wali: string
+  hobi: string
 }
 
 const SUPPORTED_IMPORT_EXTENSIONS = ["csv", "txt", "xlsx", "xls"] as const
@@ -60,6 +61,7 @@ const parseCsvText = (content: string): PreviewRow[] => {
       status: rowObj.status || "",
       jenis_kelamin: rowObj.jenis_kelamin || "",
       nama_wali: rowObj.nama_wali || "",
+      hobi: rowObj.hobi || "",
     }
   })
 }
@@ -97,6 +99,7 @@ const parseExcelRows = async (file: File): Promise<PreviewRow[]> => {
       status: rowObj.status || "",
       jenis_kelamin: rowObj.jenis_kelamin || "",
       nama_wali: rowObj.nama_wali || "",
+      hobi: rowObj.hobi || "",
     }
   })
 }
@@ -290,6 +293,7 @@ export default function SantriImportPage() {
                 <TableHead>KODE KELAS</TableHead>
                 <TableHead>STATUS</TableHead>
                 <TableHead>JENIS KELAMIN</TableHead>
+                <TableHead>HOBI</TableHead>
                 <TableHead>NAMA WALI</TableHead>
                 <TableHead>AKSI IMPOR</TableHead>
               </TableRow>
@@ -316,6 +320,7 @@ export default function SantriImportPage() {
                     <TableCell>{row.kode_kelas || "-"}</TableCell>
                     <TableCell>{row.status || "-"}</TableCell>
                     <TableCell>{row.jenis_kelamin || "-"}</TableCell>
+                    <TableCell>{row.hobi || "-"}</TableCell>
                     <TableCell>{row.nama_wali || "-"}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="bg-primary/15 text-primary">

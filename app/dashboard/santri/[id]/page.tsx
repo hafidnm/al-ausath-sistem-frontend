@@ -155,7 +155,7 @@ export default function SantriDetailPage() {
 
         <Card>
           <CardHeader><CardTitle className="text-base">Fisik</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">{renderField("Berat Badan", data.berat_badan)}{renderField("Tinggi Badan", data.tinggi_badan)}</CardContent>
+          <CardContent className="grid gap-4 md:grid-cols-2">{renderField("Berat Badan", data.berat_badan)}{renderField("Tinggi Badan", data.tinggi_badan)}{renderField("Hobi", data.hobi)}</CardContent>
         </Card>
 
         <Card>
