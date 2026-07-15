@@ -35,15 +35,32 @@ export function TahunAjaranProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const fetchTahunAjaran = async () => {
       try {
-        const { data } = await tahunAjaranService.getAll({ per_page: 50 })
-        setAllTahunAjaran(data)
+        // Cek cache session dulu untuk menghindari request berulang
+        const cachedListRaw = sessionStorage.getItem("all_tahun_ajaran")
+        const savedRaw = sessionStorage.getItem("selected_tahun_ajaran")
+        
+        let data = []
+        if (cachedListRaw) {
+          try {
+            data = JSON.parse(cachedListRaw)
+            setAllTahunAjaran(data)
+          } catch {
+            data = []
+          }
+        }
+        
+        // Jika tidak ada cache, fetch dari API
+        if (data.length === 0) {
+          const res = await tahunAjaranService.getAll({ per_page: 50 })
+          data = res.data
+          setAllTahunAjaran(data)
+          sessionStorage.setItem("all_tahun_ajaran", JSON.stringify(data))
+        }
 
         // Try to restore previous selection from sessionStorage
-        const savedRaw = sessionStorage.getItem("selected_tahun_ajaran")
         if (savedRaw) {
           try {
             const saved: TahunAjaranApiItem = JSON.parse(savedRaw)
-            // Validate that the saved item still exists in the current list
             const stillExists = data.find(
               (d) => (d.id_tahun_ajaran ?? d.id) === (saved.id_tahun_ajaran ?? saved.id)
             )

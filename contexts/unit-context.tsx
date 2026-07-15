@@ -38,11 +38,29 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const fetchUnit = async () => {
       try {
-        const { data } = await dataUnitService.getAll({ status: "AKTIF", per_page: 50 })
-        setAllUnit(data)
+        // Cek cache session dulu untuk menghindari request berulang
+        const cachedListRaw = sessionStorage.getItem("all_unit")
+        const savedRaw = sessionStorage.getItem("selected_unit")
+        
+        let data = []
+        if (cachedListRaw) {
+          try {
+            data = JSON.parse(cachedListRaw)
+            setAllUnit(data)
+          } catch {
+            data = []
+          }
+        }
+        
+        // Jika tidak ada cache, fetch dari API
+        if (data.length === 0) {
+          const res = await dataUnitService.getAll({ status: "AKTIF", per_page: 50 })
+          data = res.data
+          setAllUnit(data)
+          sessionStorage.setItem("all_unit", JSON.stringify(data))
+        }
 
         // Try to restore previous selection from sessionStorage
-        const savedRaw = sessionStorage.getItem("selected_unit")
         if (savedRaw) {
           try {
             const saved: DataUnitApiItem = JSON.parse(savedRaw)

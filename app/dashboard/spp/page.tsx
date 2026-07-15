@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -107,9 +108,18 @@ export default function TagihanPage() {
     })
   }
 
+  const lastFetchParams = useRef("")
+
   // Satu useEffect yang handle initial load + filter/page change
-  // Tidak pakai 2 effect terpisah agar tidak terjadi double-fetch (React StrictMode)
   useEffect(() => {
+    const currentParams = JSON.stringify({ currentPage, appliedSearch, appliedStatus, appliedSumber })
+    
+    // Cegah double fetch di Strict Mode (Atau re-fetch tidak perlu jika params sama)
+    if (lastFetchParams.current === currentParams) {
+      return
+    }
+    
+    lastFetchParams.current = currentParams
     doFetch(currentPage, appliedSearch, appliedStatus, appliedSumber, !hasFetched.current)
     hasFetched.current = true
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -409,9 +419,9 @@ export default function TagihanPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="outline" size="sm" asChild>
-                          <a href={`/dashboard/spp/${row.idSantri || row.idPendaftaran || row.id}`}>
+                          <Link href={`/dashboard/spp/${row.idSantri || row.idPendaftaran || row.id}`}>
                             <Eye className="w-4 h-4 mr-1" /> Detail
-                          </a>
+                          </Link>
                         </Button>
                       </TableCell>
                     </TableRow>
