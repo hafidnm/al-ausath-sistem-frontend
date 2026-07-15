@@ -240,6 +240,7 @@ const normalizeSetting = (item: ApiRecord): SppSetting => {
   const idUnitRaw = toStr(item.id_unit ?? item.idUnit ?? '');
   const kodeKelasRaw = toStr(item.kode_kelas ?? item.kodeKelas ?? item.kelas ?? '');
   const idGolonganRaw = toStr(item.id_golongan_spp ?? item.idGolonganSpp ?? '');
+  const discountRaw = toStr(item.discount ?? item.diskon ?? item.discount_value ?? '');
   const idKategoriRaw = toStr(item.kategori_tagihan_id ?? item.idKategoriTagihan ?? '');
   return {
     id,
@@ -248,6 +249,7 @@ const normalizeSetting = (item: ApiRecord): SppSetting => {
     jenjang: toStr(item.jenjang ?? item.unit ?? item.tingkat ?? '') || null,
     idGolonganSpp: idGolonganRaw || null,
     idKategoriTagihan: idKategoriRaw || null,
+    discount: discountRaw || null,
     nominal: toNum(item.nominal ?? item.nominal_spp ?? item.biaya ?? item.jumlah ?? 0),
     // Display helpers
     nama:

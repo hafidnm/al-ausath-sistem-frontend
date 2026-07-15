@@ -414,11 +414,31 @@ const normalizeProsesRow = (item: ApiRecord): ProsesRow => {
 
 export const pembayaranService = {
   /** GET /api/administrasi/pembayaran/tagihan — daftar tagihan semua entitas */
-  async getTagihan(params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }): Promise<{ data: TagihanRow[]; meta?: any }> {
+  async getTagihan(params?: {
+    nomor_induk?: string;
+    q?: string;
+    page?: number;
+    per_page?: number;
+    status?: string;
+    sumber?: string;
+    include_ringkasan?: boolean;
+  }): Promise<{ data: TagihanRow[]; meta?: any; ringkasan?: RingkasanPembayaran }> {
     try {
       const response = await api.get(`${BASE}/tagihan`, { params });
       const data = extractList(response.data).map(normalizeTagihanRow);
-      return { data, meta: response.data.meta };
+      let ringkasan: RingkasanPembayaran | undefined;
+      if (response.data?.ringkasan) {
+        const raw = response.data.ringkasan as ApiRecord;
+        ringkasan = {
+          totalTagihan: toNum(raw.total_tagihan ?? 0),
+          totalDibayar: toNum(raw.total_dibayar ?? 0),
+          totalTunggakan: toNum(raw.total_tunggakan ?? 0),
+          menungguKonfirmasi: 0,
+          lunas: 0,
+          dibatalkan: 0,
+        };
+      }
+      return { data, meta: response.data.meta, ringkasan };
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Gagal memuat daftar tagihan'));
     }

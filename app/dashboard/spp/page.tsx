@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/collapsible"
 import {
   RefreshCw,
-  Search,
   Receipt,
   CheckCircle2,
   AlertTriangle,
@@ -40,7 +39,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react"
-import { useTagihan, useRingkasanPembayaran } from "@/hooks/use-pembayaran"
+import { useTagihan } from "@/hooks/use-pembayaran"
 import type { TagihanRow, StatusPembayaran } from "@/hooks/use-pembayaran"
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,7 +51,6 @@ const formatCurrency = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value)
 
-/** Status badge sesuai FE Guide §9 */
 const StatusBadge = ({ status }: { status: StatusPembayaran }) => {
   switch (status) {
     case "lunas":
@@ -67,7 +65,7 @@ const StatusBadge = ({ status }: { status: StatusPembayaran }) => {
   }
 }
 
-const statusOptions: Array<{ value: string; label: string }> = [
+const statusOptions = [
   { value: "all", label: "Semua Status" },
   { value: "menunggu_pembayaran", label: "Menunggu Pembayaran" },
   { value: "menunggu_konfirmasi", label: "Menunggu Konfirmasi" },
@@ -75,60 +73,52 @@ const statusOptions: Array<{ value: string; label: string }> = [
   { value: "dibatalkan", label: "Dibatalkan" },
 ]
 
+const ITEMS_PER_PAGE = 10
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TagihanPage() {
-  const { data: tagihanData, meta, loading, error, fetchTagihan } = useTagihan()
-  const { data: ringkasan, loading: ringkasanLoading, fetchRingkasan } = useRingkasanPembayaran()
+  const { data: tagihanData, meta, ringkasan, loading, error, fetchTagihan } = useTagihan()
 
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+
+  // Draft filter (not yet applied)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedStatus, setSelectedStatus] = useState("all")
   const [selectedSumber, setSelectedSumber] = useState("all")
-  const [selectedKelas, setSelectedKelas] = useState("all")
-  const [selectedTahunAjaran, setSelectedTahunAjaran] = useState("all")
 
-  const [appliedSearchQuery, setAppliedSearchQuery] = useState("")
+  // Applied filter (triggers API call)
+  const [appliedSearch, setAppliedSearch] = useState("")
   const [appliedStatus, setAppliedStatus] = useState("all")
   const [appliedSumber, setAppliedSumber] = useState("all")
-  const [appliedKelas, setAppliedKelas] = useState("all")
-  const [appliedTahunAjaran, setAppliedTahunAjaran] = useState("all")
-  
-  // Pagination State
+
   const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
 
-  // ── Single stable fetch effect ─────────────────────────────────────────────
-  useEffect(() => {
+  const hasFetched = useRef(false)
+
+  const doFetch = (page: number, search: string, status: string, sumber: string, withRingkasan = false) => {
     void fetchTagihan({
-      page: currentPage,
-      per_page: itemsPerPage,
-      q: appliedSearchQuery || undefined,
-      status: appliedStatus !== "all" ? appliedStatus : undefined,
-      sumber: appliedSumber !== "all" ? appliedSumber : undefined,
+      page,
+      per_page: ITEMS_PER_PAGE,
+      q: search || undefined,
+      status: status !== "all" ? status : undefined,
+      sumber: sumber !== "all" ? sumber : undefined,
+      include_ringkasan: withRingkasan || undefined,
     })
-    void fetchRingkasan()
-  }, [currentPage, appliedSearchQuery, appliedStatus, appliedSumber, fetchTagihan, fetchRingkasan])
-
-  const refreshAll = async () => {
-    await Promise.all([
-      fetchTagihan({
-        page: currentPage,
-        per_page: itemsPerPage,
-        q: appliedSearchQuery || undefined,
-        status: appliedStatus !== "all" ? appliedStatus : undefined,
-        sumber: appliedSumber !== "all" ? appliedSumber : undefined,
-      }),
-      fetchRingkasan()
-    ])
   }
 
+  // Satu useEffect yang handle initial load + filter/page change
+  // Tidak pakai 2 effect terpisah agar tidak terjadi double-fetch (React StrictMode)
+  useEffect(() => {
+    doFetch(currentPage, appliedSearch, appliedStatus, appliedSumber, !hasFetched.current)
+    hasFetched.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, appliedSearch, appliedStatus, appliedSumber])
+
   const handleApplyFilter = () => {
-    setAppliedSearchQuery(searchQuery)
+    setAppliedSearch(searchQuery)
     setAppliedStatus(selectedStatus)
     setAppliedSumber(selectedSumber)
-    setAppliedKelas(selectedKelas)
-    setAppliedTahunAjaran(selectedTahunAjaran)
     setCurrentPage(1)
   }
 
@@ -136,71 +126,31 @@ export default function TagihanPage() {
     setSearchQuery("")
     setSelectedStatus("all")
     setSelectedSumber("all")
-    setSelectedKelas("all")
-    setSelectedTahunAjaran("all")
-    setAppliedSearchQuery("")
+    setAppliedSearch("")
     setAppliedStatus("all")
     setAppliedSumber("all")
-    setAppliedKelas("all")
-    setAppliedTahunAjaran("all")
     setCurrentPage(1)
   }
 
-  // ── Derived stats ─────────────────────────────────────────────────────────
+  const handleRefresh = () => {
+    doFetch(currentPage, appliedSearch, appliedStatus, appliedSumber, !ringkasan)
+  }
+
+  // Stats — use embedded ringkasan from first load; fall back to page-local aggregation
   const stats = useMemo(() => {
     if (ringkasan) return ringkasan
     return {
       totalTagihan: tagihanData.reduce((s, r) => s + r.totalTagihan, 0),
       totalDibayar: tagihanData.reduce((s, r) => s + r.totalDibayar, 0),
       totalTunggakan: tagihanData.reduce((s, r) => s + r.totalTunggakan, 0),
-      menungguKonfirmasi: tagihanData.filter((r) => r.status === "menunggu_konfirmasi").length,
-      lunas: tagihanData.filter((r) => r.status === "lunas").length,
-      dibatalkan: tagihanData.filter((r) => r.status === "dibatalkan").length,
+      menungguKonfirmasi: 0,
+      lunas: 0,
+      dibatalkan: 0,
     }
   }, [ringkasan, tagihanData])
 
-  // ── Options from data ─────────────────────────────────────────────────
-  const sumberOptions = useMemo(() => {
-    const set = new Set(tagihanData.map((r) => r.sumber))
-    return Array.from(set)
-  }, [tagihanData])
-
-  const kelasOptions = useMemo(() => {
-    const set = new Set(tagihanData.map((r) => r.kelasSaatIni).filter(Boolean))
-    return Array.from(set).sort()
-  }, [tagihanData])
-
-  const tahunAjaranOptions = useMemo(() => {
-    const set = new Set(tagihanData.map((r) => r.tahunAjaran).filter(Boolean))
-    return Array.from(set).sort()
-  }, [tagihanData])
-
-  // ── Filter ─────────────────────────────────────────────────────────────────
-  // Since we use server-side pagination, filteredData is just tagihanData
-  // But we still apply local filters for kelas and tahunAjaran since backend doesn't support them yet
-  const filteredData = useMemo(() => {
-    return tagihanData.filter((row) => {
-      const matchesKelas = appliedKelas === "all" || row.kelasSaatIni === appliedKelas
-      const matchesTahunAjaran = appliedTahunAjaran === "all" || row.tahunAjaran === appliedTahunAjaran
-      return matchesKelas && matchesTahunAjaran
-    })
-  }, [tagihanData, appliedKelas, appliedTahunAjaran])
-
-  const totalTunggakanFiltered = filteredData.reduce((s, r) => s + r.totalTunggakan, 0)
-  
-  const localTotalSantri = useMemo(() => {
-    const ids = new Set(tagihanData.map((row) => row.id).filter(Boolean))
-    return ids.size
-  }, [tagihanData])
-  const totalSantriTagihan = meta?.total ?? localTotalSantri
-
-  const totalPages = meta?.last_page ?? Math.max(1, Math.ceil(filteredData.length / itemsPerPage))
-  
-  const localPaginatedData = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage
-    return filteredData.slice(startIndex, startIndex + itemsPerPage)
-  }, [filteredData, currentPage, itemsPerPage])
-  const paginatedData = meta ? filteredData : localPaginatedData
+  const totalPages = meta?.last_page ?? 1
+  const totalSantri = meta?.total ?? tagihanData.length
 
   if (error) {
     return (
@@ -227,8 +177,8 @@ export default function TagihanPage() {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => void refreshAll()}
-          disabled={loading || ringkasanLoading}
+          onClick={handleRefresh}
+          disabled={loading}
           id="btn-refresh-tagihan"
         >
           <RefreshCw className="w-4 h-4 mr-2" />
@@ -246,7 +196,7 @@ export default function TagihanPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Jumlah Santri</p>
-                <p className="text-xl font-bold text-foreground">{totalSantriTagihan}</p>
+                <p className="text-xl font-bold text-foreground">{totalSantri}</p>
               </div>
             </div>
           </CardContent>
@@ -288,13 +238,7 @@ export default function TagihanPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Total Tunggakan</p>
-                <p className="text-lg font-bold text-red-600">
-                  {formatCurrency(
-                    typeof stats.totalTunggakan === "number"
-                      ? stats.totalTunggakan
-                      : totalTunggakanFiltered,
-                  )}
-                </p>
+                <p className="text-lg font-bold text-red-600">{formatCurrency(stats.totalTunggakan)}</p>
               </div>
             </div>
           </CardContent>
@@ -318,13 +262,14 @@ export default function TagihanPage() {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <CardContent className="border-t p-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
                   <Label>Kata Kunci</Label>
                   <Input
                     placeholder="Masukan nama atau nomor induk"
                     value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleApplyFilter()}
                   />
                 </div>
 
@@ -338,40 +283,6 @@ export default function TagihanPage() {
                       <SelectItem value="all">Semua Sumber</SelectItem>
                       <SelectItem value="santri">Santri</SelectItem>
                       <SelectItem value="ppdb">PPDB</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Pilih Kelas</Label>
-                  <Select value={selectedKelas} onValueChange={setSelectedKelas}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Kelas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Kelas</SelectItem>
-                      {kelasOptions.map((k) => (
-                        <SelectItem key={k} value={k}>
-                          Kelas {k}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Tahun Ajaran</Label>
-                  <Select value={selectedTahunAjaran} onValueChange={setSelectedTahunAjaran}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Pilih Tahun" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Semua Tahun</SelectItem>
-                      {tahunAjaranOptions.map((t) => (
-                        <SelectItem key={t} value={t}>
-                          TA {t}
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -413,10 +324,8 @@ export default function TagihanPage() {
             <div>
               <CardTitle>Daftar Tagihan</CardTitle>
               <CardDescription>
-                Menampilkan {filteredData.length} data tagihan
-                {totalTunggakanFiltered > 0
-                  ? ` · Total Tunggakan: ${formatCurrency(totalTunggakanFiltered)}`
-                  : ""}
+                Menampilkan {tagihanData.length} data tagihan
+                {meta ? ` (total ${meta.total})` : ""}
               </CardDescription>
             </div>
           </div>
@@ -426,7 +335,6 @@ export default function TagihanPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  {/* Sesuai kolom FE Guide §5.2 */}
                   <TableHead>Nama Unit</TableHead>
                   <TableHead>Nomor Induk</TableHead>
                   <TableHead>Nama Lengkap</TableHead>
@@ -449,14 +357,14 @@ export default function TagihanPage() {
                       </span>
                     </TableCell>
                   </TableRow>
-                ) : filteredData.length === 0 ? (
+                ) : tagihanData.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={10} className="text-center py-10 text-muted-foreground">
                       Tidak ada data tagihan yang sesuai filter.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  paginatedData.map((row: TagihanRow) => (
+                  tagihanData.map((row: TagihanRow) => (
                     <TableRow key={row.id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -512,32 +420,29 @@ export default function TagihanPage() {
               </TableBody>
             </Table>
           </div>
-          
+
           {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4">
               <div className="text-sm text-muted-foreground">
-                Menampilkan {Math.min(filteredData.length, (currentPage - 1) * itemsPerPage + 1)} -{" "}
-                {Math.min(filteredData.length, currentPage * itemsPerPage)} dari {filteredData.length} data
+                Halaman {currentPage} dari {totalPages}
+                {meta ? ` · ${meta.total} data` : ""}
               </div>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
+                  disabled={currentPage === 1 || loading}
                 >
                   <ChevronLeft className="w-4 h-4 mr-1" />
-                  Sebelummya
+                  Sebelumnya
                 </Button>
-                <div className="text-sm font-medium">
-                  Halaman {currentPage} dari {totalPages}
-                </div>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || loading}
                 >
                   Selanjutnya
                   <ChevronRight className="w-4 h-4 ml-1" />

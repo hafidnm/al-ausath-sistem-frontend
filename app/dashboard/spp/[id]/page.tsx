@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import {
   ArrowLeft,
@@ -270,14 +270,23 @@ export default function SppTagihanDetailPage() {
     tanggal_bayar: new Date().toISOString().split('T')[0]
   })
 
+  const hasFetched = useRef(false)
+  const settingsLoaded = useRef(false)
+
   useEffect(() => {
-    if (id) void fetchTagihanDetail(id)
+    if (id && !hasFetched.current) {
+      void fetchTagihanDetail(id)
+      hasFetched.current = true
+    }
   }, [id, fetchTagihanDetail])
 
   useEffect(() => {
-    sppService.getSettings({ per_page: 100 })
-      .then(res => setSppSettings(res.data))
-      .catch(err => console.error("Gagal memuat setting SPP", err))
+    if (!settingsLoaded.current) {
+      sppService.getSettings({ per_page: 100 })
+        .then(res => setSppSettings(res.data))
+        .catch(err => console.error("Gagal memuat setting SPP", err))
+      settingsLoaded.current = true
+    }
   }, [])
 
   const handlePayClick = (row: InvoiceRow) => {

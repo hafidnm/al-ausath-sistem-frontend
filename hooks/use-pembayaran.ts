@@ -29,20 +29,32 @@ export type {
 
 export function useTagihan() {
   const query = useCallback(
-    (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }) =>
+    (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string; include_ringkasan?: boolean }) =>
       pembayaranService.getTagihan(params),
     [],
   );
-  const { data: responseData, loading, error, run } = useAsyncQuery(query, { data: [] } as { data: TagihanRow[], meta?: any }, {
-    fallbackError: 'Gagal memuat daftar tagihan',
-    logLabel: 'Error fetching tagihan:',
-  });
+  const { data: responseData, loading, error, run } = useAsyncQuery(
+    query,
+    { data: [], meta: undefined, ringkasan: undefined } as { data: TagihanRow[]; meta?: any; ringkasan?: RingkasanPembayaran },
+    {
+      fallbackError: 'Gagal memuat daftar tagihan',
+      logLabel: 'Error fetching tagihan:',
+    },
+  );
 
   const fetchTagihan = useCallback(
-    async (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string }) => run(params),
+    async (params?: { nomor_induk?: string; q?: string; page?: number; per_page?: number; status?: string; sumber?: string; include_ringkasan?: boolean }) =>
+      run(params),
     [run],
   );
-  return { data: responseData?.data || [], meta: responseData?.meta, loading, error, fetchTagihan };
+  return {
+    data: responseData?.data || [],
+    meta: responseData?.meta,
+    ringkasan: responseData?.ringkasan,
+    loading,
+    error,
+    fetchTagihan,
+  };
 }
 
 export function useTagihanDetail() {

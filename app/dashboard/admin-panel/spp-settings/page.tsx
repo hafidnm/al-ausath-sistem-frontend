@@ -82,6 +82,7 @@ export default function SppSettingsPage() {
     id_golongan_spp: null,
     kategori_tagihan_id: null,
     jumlah: 0,
+    discount: null,
     periode: null,
     keterangan: "",
     aktif: true,
@@ -99,6 +100,7 @@ export default function SppSettingsPage() {
       id_golongan_spp: null,
       kategori_tagihan_id: null,
       jumlah: 0,
+      discount: null,
       periode: null,
       keterangan: "",
       aktif: true,
@@ -114,6 +116,7 @@ export default function SppSettingsPage() {
       id_golongan_spp: item.idGolonganSpp ? Number(item.idGolonganSpp) : null,
       kategori_tagihan_id: item.idKategoriTagihan ? Number(item.idKategoriTagihan) : null,
       jumlah: item.nominal || 0,
+      discount: item.discount ? Number(item.discount) : null,
       periode: item.tahunAjaran || null,
       keterangan: item.keterangan || "",
       aktif: item.aktif,
@@ -163,6 +166,11 @@ export default function SppSettingsPage() {
     }
   }
 
+  const discountOption = [
+    { value: 10, label: "10%" },
+    { value: 50, label: "50%" },
+   ]
+   
   const BULAN = [
     "Januari", "Februari", "Maret", "April", "Mei", "Juni",
     "Juli", "Agustus", "September", "Oktober", "November", "Desember",
@@ -393,6 +401,22 @@ export default function SppSettingsPage() {
                   />
                 </div>
               </div>
+
+                 <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <CalendarDays className="w-4 h-4 text-primary" /> Diskon
+                    </Label>
+                    <Select
+                      value={formData.discount?.toString() || "__none__"}
+                      onValueChange={(v) => setFormData({ ...formData, discount: v === "__none__" ? null : parseFloat(v) })}
+                    >
+                      <SelectTrigger><SelectValue placeholder="discount" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Diskon</SelectItem>
+                        {discountOption.map(t => <SelectItem key={t.value} value={t.value.toString()}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
               <DialogFooter>
                 <Button variant="ghost" onClick={() => setIsDialogOpen(false)}>Batal</Button>

@@ -81,6 +81,7 @@ export interface SppSetting {
   idGolonganSpp: string | null;
   idKategoriTagihan: string | null;
   nominal: number;
+  discount: string | number | null;
   // Extra display fields
   nama: string;
   kelas: string;
@@ -104,6 +105,7 @@ export interface CreateSppSettingRequest {
   nominal?: number;
   jumlah?: number;
   periode?: string | null;
+  discount?: string | number | null;
   keterangan?: string | null;
   aktif?: boolean;
 }
