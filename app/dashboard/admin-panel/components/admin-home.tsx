@@ -26,13 +26,6 @@ interface ModuleCard {
 export function AdminPanelHome() {
   const modules: ModuleCard[] = [
     {
-      title: "Validasi Presensi",
-      description: "Validasi presensi santri dan guru, riwayat validasi",
-      icon: <Clock className="w-6 h-6" />,
-      href: "/dashboard/admin-panel/validasi",
-      color: "bg-primary/10 text-primary",
-    },
-    {
       title: "Bobot Nilai",
       description: "Kelola persentase bobot penilaian untuk tugas, ulangan, dan ujian",
       icon: <Weight className="w-6 h-6" />,
@@ -45,13 +38,6 @@ export function AdminPanelHome() {
       icon: <ClipboardList className="w-6 h-6" />,
       href: "/dashboard/admin-panel/kkm",
       color: "bg-chart-3/20 text-chart-4",
-    },
-    {
-      title: "Konversi Nilai",
-      description: "Kelola rentang nilai ke huruf dan predikat untuk konsistensi rapor",
-      icon: <ArrowUpDown className="w-6 h-6" />,
-      href: "/dashboard/admin-panel/konversi",
-      color: "bg-chart-2/20 text-chart-2",
     },
     {
       title: "Nilai Akhlak",
