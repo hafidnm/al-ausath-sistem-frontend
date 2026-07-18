@@ -8,6 +8,7 @@ export interface KkmItem {
   tahun_ajaran: string
   semester: number
   nilai_kkm: number
+  status_ketuntasan?: string
   kode_unit?: string
   keterangan?: string
   updatedAt?: string
@@ -69,6 +70,7 @@ export interface KkmPayload {
   tahun_ajaran: string
   semester: number
   nilai_kkm: number
+  status_ketuntasan?: string | null
   kode_unit?: string | null
   keterangan?: string
 }
@@ -83,6 +85,7 @@ const normalizeKkmItem = (raw: any): KkmItem => {
     tahun_ajaran: toText(raw.tahun_ajaran) ?? "",
     semester: toNumber(raw.semester, 0),
     nilai_kkm: toNumber(raw.nilai_kkm, 0),
+    status_ketuntasan: toText(raw.status_ketuntasan),
     kode_unit: toText(raw.kode_unit),
     keterangan: toText(raw.keterangan),
     updatedAt: toText(raw.updated_at) ?? toText(raw.updatedAt),
@@ -111,11 +114,12 @@ const normalizePayload = (payload: KkmPayload): KkmPayload => {
   const rawKeterangan = ensureScalar(payload.keterangan)
   const rawSemester = ensureScalar(payload.semester)
   const rawNilai = ensureScalar(payload.nilai_kkm)
-
+  const rawStatusKetuntasan = ensureScalar(payload.status_ketuntasan)
   const kodeMapel = typeof rawKodeMapel === "string" ? rawKodeMapel.trim() : (rawKodeMapel != null ? String(rawKodeMapel) : undefined)
   const tahunAjaran = typeof rawTahun === "string" ? rawTahun.trim() : (rawTahun != null ? String(rawTahun) : undefined)
   const kodeUnitRaw = typeof rawKodeUnit === "string" ? rawKodeUnit.trim() : (rawKodeUnit != null ? String(rawKodeUnit) : undefined)
   const keteranganRaw = typeof rawKeterangan === "string" ? rawKeterangan.trim() : (rawKeterangan != null ? String(rawKeterangan) : undefined)
+  const statusKetuntasanRaw = typeof rawStatusKetuntasan === "string" ? rawStatusKetuntasan.trim() : (rawStatusKetuntasan != null ? String(rawStatusKetuntasan) : undefined)
 
   // Ensure numeric fields are proper numbers
   const semesterNum = Number(rawSemester)
@@ -128,6 +132,7 @@ const normalizePayload = (payload: KkmPayload): KkmPayload => {
     nilai_kkm: Number.isFinite(nilaiNum) ? nilaiNum : (typeof payload.nilai_kkm === 'number' ? payload.nilai_kkm : 0),
     kode_unit: kodeUnitRaw ? kodeUnitRaw : null,
     keterangan: keteranganRaw ? keteranganRaw : undefined,
+    status_ketuntasan: statusKetuntasanRaw ? statusKetuntasanRaw : undefined,
   }
 
   return out

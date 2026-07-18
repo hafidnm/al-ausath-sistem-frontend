@@ -56,6 +56,7 @@ interface KkmFormPayload {
   tahun_ajaran: string
   semester: number
   nilai_kkm: number
+  status_ketuntasan?: string
   kode_unit?: string
   keterangan?: string
 }
@@ -78,6 +79,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
 
   const [kodeMapel, setKodeMapel] = useState(initialData?.kode_mapel ?? "")
   const [semester, setSemester] = useState(String(initialData?.semester ?? ""))
+  const [statusKetuntasan, setStatusKetuntasan] = useState(initialData?.status_ketuntasan ?? "")
   const [nilaiKkm, setNilaiKkm] = useState(initialData?.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
   const [kodeUnit, setKodeUnit] = useState(initialData?.kode_unit?.toUpperCase() ?? kodeUnitFromContext)
   const [keterangan, setKeterangan] = useState(initialData?.keterangan ?? "")
@@ -128,6 +130,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
     setKodeMapel(initialData.kode_mapel)
     setSemester(String(initialData.semester))
     setNilaiKkm(initialData.nilai_kkm != null ? String(initialData.nilai_kkm) : "")
+    setStatusKetuntasan(initialData.status_ketuntasan ?? "")  
     setKodeUnit(initialData.kode_unit?.toUpperCase() ?? kodeUnitFromContext)
     setKeterangan(initialData.keterangan ?? "")
   }, [initialData, kodeUnitFromContext])
@@ -184,7 +187,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
     const normalizedKodeMapel = kodeMapel.trim().toUpperCase()
     const normalizedUnit = kodeUnit.trim().toUpperCase()
 
-    if (!normalizedKodeMapel || !tahunAjaran || !semester) {
+    if (!normalizedKodeMapel || !tahunAjaran || !semester || !statusKetuntasan || !nilaiKkm) {
       setError("Field wajib belum lengkap")
       return
     }
@@ -203,6 +206,7 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
         tahun_ajaran: tahunAjaran,
         semester: Number(semester),
         nilai_kkm: parsedNilaiKkm,
+        status_ketuntasan: statusKetuntasan?.trim() || undefined,
         kode_unit: normalizedUnit || undefined,
         keterangan,
       })
@@ -291,6 +295,29 @@ export function KkmForm({ isEdit = false, initialData, submitError, onSubmit, on
                 value={nilaiKkm}
                 onChange={(e) => { setNilaiKkm(e.target.value); setError("") }}
               />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <Label>Status Ketuntasan <span className="text-muted-foreground font-normal">(opsional)</span></Label>
+              <div className="flex flex-wrap gap-4">
+                {["menguasai", "ahli", "menerapkan"].map((opt) => (
+                  <label key={opt} className="flex items-center gap-1.5 text-sm cursor-pointer">
+                    <input
+                      type="radio"
+                      name="status_ketuntasan"
+                      value={opt}
+                      checked={statusKetuntasan === opt}
+                      onChange={() => setStatusKetuntasan(opt)}
+                    />
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </label>
+                ))}
+                {statusKetuntasan && (  
+                  <button type="button" onClick={() => setStatusKetuntasan("")} className="text-xs text-muted-foreground underline">
+                    Reset
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">

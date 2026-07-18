@@ -52,6 +52,7 @@ export default function KkmEditPage() {
     tahun_ajaran: string
     semester: number
     nilai_kkm: number
+    status_ketuntasan?: string
     kode_unit?: string
     keterangan?: string
   }) => {
@@ -80,6 +81,7 @@ export default function KkmEditPage() {
           tahun_ajaran: selected.tahun_ajaran,
           semester: selected.semester,
           nilai_kkm: selected.nilai_kkm,
+          status_ketuntasan: selected.status_ketuntasan,
           kode_unit: selected.kode_unit,
           keterangan: selected.keterangan,
         }}

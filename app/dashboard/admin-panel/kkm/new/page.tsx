@@ -14,6 +14,7 @@ export default function KkmNewPage() {
     tahun_ajaran: string
     semester: number
     nilai_kkm: number
+    status_ketuntasan?: string
     kode_unit?: string
     keterangan?: string
   }) => {
