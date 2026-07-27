@@ -14,6 +14,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContaine
 import { authService } from "@/lib/services/auth.service"
 import { tahunAjaranService, TahunAjaranApiItem } from "@/lib/services/tahun-ajaran.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
+import { useSemester } from "@/contexts/semester-context"
 import api from "@/lib/axios"
 import {
   BookOpen, FileText, Award, Receipt, Wallet, Megaphone,
@@ -79,6 +80,7 @@ const formatDate = (v: string) => {
 export default function SantriPanelPage() {
   const { toast } = useToast()
   const { selectedKodeTahun, isLoading: isTahunLoading } = useTahunAjaran()
+  const { semester } = useSemester()
   const contextReady = !isTahunLoading
 
   const [user, setUser] = useState<UserInfo | null>(null)
@@ -122,11 +124,14 @@ export default function SantriPanelPage() {
   }
 
   /* ─── Fetch rekap ─────────────────────────────────────── */
-  const fetchRekap = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
+  const fetchRekap = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string, sem?: number) => {
     try {
       const params: any = { nomor_induk: nomorInduk, per_page: 1, ...buildDateParams(periode, tanggal) }
       const activeTahun = tahunAjaran ?? selectedTahunAjaran
       if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
+      const activeSemester = sem ?? semester
+      if (activeSemester) params.semester = activeSemester
+
       const res = await api.get("/akademik/sesi-absensi/rekap/santri", { params })
       setRekap(res.data?.data?.[0] ?? null)
     } catch {
@@ -134,12 +139,14 @@ export default function SantriPanelPage() {
     }
   }
 
-  const fetchRiwayat = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
+  const fetchRiwayat = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string, sem?: number) => {
     setIsAbsensiLoading(true)
     try {
       const params: any = { nomor_induk: nomorInduk, per_page: 100, ...buildDateParams(periode, tanggal) }
       const activeTahun = tahunAjaran ?? selectedTahunAjaran
       if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
+      const activeSemester = sem ?? semester
+      if (activeSemester) params.semester = activeSemester
 
       const riwayatRes = await api.get("/akademik/sesi-absensi/riwayat-santri", { params })
       setAbsensiList(riwayatRes.data?.data ?? [])
@@ -148,11 +155,13 @@ export default function SantriPanelPage() {
     }
   }
 
-  const fetchMapelStats = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string) => {
+  const fetchMapelStats = async (nomorInduk: string, periode: string, tanggal: string, tahunAjaran?: string, sem?: number) => {
     try {
       const params: any = { nomor_induk: nomorInduk, ...buildDateParams(periode, tanggal) }
       const activeTahun = tahunAjaran ?? selectedTahunAjaran
       if (activeTahun && activeTahun !== "ALL") params.tahun_ajaran = activeTahun
+      const activeSemester = sem ?? semester
+      if (activeSemester) params.semester = activeSemester
 
       const res = await api.get("/akademik/sesi-absensi/rekap/santri/mapel", { params })
       setMapelStats(res.data?.data ?? [])
@@ -196,7 +205,7 @@ export default function SantriPanelPage() {
     void init()
   }, [contextReady])
 
-  // Trigger ulang riwayat saat filter periode atau tahun ajaran berubah
+  // Trigger ulang riwayat saat filter periode, tahun ajaran, atau semester berubah
   useEffect(() => {
     if (!isInitDone) return
     if (user?.nomor_induk) {
@@ -206,7 +215,7 @@ export default function SantriPanelPage() {
       void fetchRekap(user.nomor_induk, filterPeriode, filterTanggal)
       void fetchMapelStats(user.nomor_induk, filterPeriode, filterTanggal)
     }
-  }, [isInitDone, filterPeriode, filterTanggal, selectedTahunAjaran, user?.nomor_induk])
+  }, [isInitDone, filterPeriode, filterTanggal, selectedTahunAjaran, semester, user?.nomor_induk])
 
   /* ─── Computed ─────────────────────────────────────────────── */
   const hadir = Number(rekap?.jumlah_hadir ?? 0)
