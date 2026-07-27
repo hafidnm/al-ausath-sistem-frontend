@@ -24,6 +24,7 @@ export interface DataSantriApiItem {
   kelurahan?: string | null
   alamat_tinggal?: string | null
   hobi?: string | null
+  jumlah_saudara?: number | null 
   nomor_telepon?: string | null
   alamat_email?: string | null
   nama_ayah_kandung?: string | null
@@ -140,6 +141,7 @@ export interface DataSantriPayload {
   kelurahan?: string | null
   alamat_tinggal?: string | null
   hobi?: string | null
+  jumlah_saudara?: number | null  
   nomor_telepon?: string | null
   alamat_email?: string | null
   nama_ayah_kandung?: string | null
@@ -289,6 +291,7 @@ const normalizePayload = (payload: DataSantriPayload): DataSantriPayload => ({
   kelurahan: trimValue(payload.kelurahan),
   alamat_tinggal: trimValue(payload.alamat_tinggal),
   hobi: trimValue(payload.hobi),
+  jumlah_saudara: payload.jumlah_saudara ?? null,
   nomor_telepon: trimValue(payload.nomor_telepon),
   alamat_email: trimValue(payload.alamat_email),
   nama_ayah_kandung: trimValue(payload.nama_ayah_kandung),

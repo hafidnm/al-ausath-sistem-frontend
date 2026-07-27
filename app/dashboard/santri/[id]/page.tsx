@@ -170,7 +170,7 @@ export default function SantriDetailPage() {
 
         <Card>
           <CardHeader><CardTitle className="text-base">Orang Tua dan Wali</CardTitle></CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2">{renderField("Nama Ayah Kandung", data.nama_ayah_kandung)}{renderField("Nama Ibu Kandung", data.nama_ibu_kandung)}<div className="md:col-span-2">{renderField("Nama Wali", data.nama_wali)}</div></CardContent>
+          <CardContent className="grid gap-4 md:grid-cols-2">{renderField("Nama Ayah Kandung", data.nama_ayah_kandung)}{renderField("Nama Ibu Kandung", data.nama_ibu_kandung)}<div className="md:col-span-2">{renderField("Nama Wali", data.nama_wali)} {renderField("Jumlah Saudara", data.jumlah_saudara)}</div></CardContent>
         </Card>
 
         <Card>

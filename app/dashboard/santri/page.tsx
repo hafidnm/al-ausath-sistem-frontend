@@ -80,6 +80,7 @@ interface SantriRow {
   status: string
   namaWali: string
   hobi: string
+  jumlahSaudara: number
   nomorTelepon: string
   alamatEmail: string
   isAnakGuru: boolean
@@ -169,6 +170,7 @@ const normalizeSantriRow = (raw: DataSantriApiItem): SantriRow => ({
   nomorTelepon: toText(raw.nomor_telepon),
   alamatEmail: toText(raw.alamat_email),
   hobi: toText(raw.hobi),
+  jumlahSaudara: toNumber(raw.jumlah_saudara, 0),
   isAnakGuru: Boolean((raw as any).is_anak_guru ?? (raw as any).isAnakGuru ?? false),
 })
 
