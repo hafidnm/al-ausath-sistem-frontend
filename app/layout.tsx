@@ -12,25 +12,15 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'e-Rapor Pesantren - Sistem Penilaian Digital',
+  title: {
+    default: 'Pesantren Al-Ausath - Sistem Informasi Akademik dan Administrasi',
+    template: '%s | Pesantren Al-Ausath',
+  },
   description: 'Sistem e-Rapor digital untuk pesantren. Kelola nilai santri dengan mudah dan efisien.',
   generator: 'v0.app',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
+    icon: '/logo.png',
+    apple: '/logo.png',
   },
 }
 

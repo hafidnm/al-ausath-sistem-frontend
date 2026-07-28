@@ -339,6 +339,36 @@ function mergeMenuItems(peran: string[]): MenuItem[] {
   return merged
 }
 
+function getPageTitle(pathname: string): string {
+  const allMenus = [...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems]
+  
+  // Exact match
+  for (const item of allMenus) {
+    if (item.subItems) {
+      for (const sub of item.subItems) {
+        if (sub.href === pathname) return sub.label
+      }
+    }
+    if (item.href === pathname) return item.label
+  }
+
+  // Prefix match
+  for (const item of allMenus) {
+    if (item.subItems) {
+      for (const sub of item.subItems) {
+        if (sub.href && sub.href !== "/dashboard" && pathname.startsWith(sub.href)) return sub.label
+      }
+    }
+    if (item.href && item.href !== "/dashboard" && pathname.startsWith(item.href)) return item.label
+  }
+
+  if (pathname.includes("/santri/lulus")) return "Santri Lulus"
+  if (pathname.includes("/nilai-mapel/new")) return "Tambah Nilai Mapel"
+  if (pathname.includes("/nilai-akhlak/new")) return "Tambah Nilai Akhlak"
+
+  return "Dashboard"
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -352,6 +382,13 @@ export default function DashboardLayout({
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({})
   const pathname = usePathname()
   const router = useRouter()
+  const currentTitle = getPageTitle(pathname)
+
+  useEffect(() => {
+    if (currentTitle) {
+      document.title = `${currentTitle} | Pesantren Al-Ausath`
+    }
+  }, [pathname, currentTitle])
 
   const toggleMenu = (label: string) => {
     setOpenMenus((prev) => ({ ...prev, [label]: !prev[label] }))
@@ -467,11 +504,11 @@ export default function DashboardLayout({
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             <Link href="/dashboard" className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
-                <Moon className="w-6 h-6 text-sidebar-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-border/20 shadow-sm shrink-0">
+                <img src="/logo.png" alt="Logo Al-Ausath" className="w-full h-full object-contain" />
               </div>
               <div>
-                <h1 className="font-bold text-sidebar-foreground">Al-Ausath </h1>
+                <h1 className="font-bold text-sidebar-foreground">Al-Ausath</h1>
                 <p className="text-xs text-sidebar-foreground/60">Pesantren</p>
               </div>
             </Link>
@@ -574,25 +611,6 @@ export default function DashboardLayout({
               )
             })}
           </nav>
-
-          {/* Sidebar Footer */}
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-sidebar-accent/50">
-              <Avatar className="w-9 h-9">
-                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
-                  {user ? getInitials(user.nama_lengkap) : 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-sidebar-foreground truncate">
-                  {user?.nama_lengkap || 'User'}
-                </p>
-                <p className="text-xs text-sidebar-foreground/60 truncate">
-                  {user?.email || 'user@example.com'}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -622,15 +640,10 @@ export default function DashboardLayout({
                   <Menu className="w-5 h-5" />
                 </Button>
               )}
-              <div>
+              <div className="flex items-center gap-2.5">
+                <img src="/logo.png" alt="Logo Al-Ausath" className="w-7 h-7 object-contain shrink-0" />
                 <h2 className="font-semibold text-foreground">
-                  {([...adminMenuItems, ...guruMenuItems, ...sppMenuItems, ...ppdbMenuItems, ...santriMenuItems] as any[]).find((item) => {
-                    if (isMenuHrefActive(item.href)) return true;
-                    if (item.subItems) {
-                      return item.subItems.find((sub: any) => isMenuHrefActive(sub.href));
-                    }
-                    return false;
-                  })?.label || "Dashboard"}
+                  {currentTitle}
                 </h2>
               </div>
               {/* Tahun Ajaran Global Selector */}
@@ -669,10 +682,7 @@ export default function DashboardLayout({
               Profil
             </DropdownMenuItem>
           </Link>
-          <DropdownMenuItem>
-            <Settings className="w-4 h-4 mr-2" />
-            Pengaturan
-          </DropdownMenuItem>
+          
           <DropdownMenuSeparator />
           <DropdownMenuItem 
             onClick={handleLogout}

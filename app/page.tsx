@@ -40,6 +40,7 @@ export default function LandingPage() {
   const { isOpen, isKuotaPenuh, period, loading: periodLoading } = usePpdbPortalPeriodCheck()
 
   React.useEffect(() => {
+    document.title = "Beranda | Pesantren Al-Ausath"
     let isMounted = true
 
     const loadPengumuman = async () => {
@@ -105,8 +106,8 @@ export default function LandingPage() {
         <div className="container mx-auto px-4">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <Moon className="w-6 h-6 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-border/50 shadow-sm shrink-0">
+                <img src="/logo.png" alt="Logo Al Ausath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-lg font-bold text-foreground">Pesantren Al Ausath</h1>
@@ -216,13 +217,6 @@ export default function LandingPage() {
                 </Button>
               </Link>
             </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-16 max-w-4xl mx-auto">
-            <StatCard number="1" label="Mitra Institusi" />
-            <StatCard number="4" label="Bidang Kegiatan" />
-            <StatCard number="10++" label="Ustadz & Guru" />
-            <StatCard number="Banyak" label="Fasilitas Belajar" />
           </div>
         </div>
       </section>
@@ -572,8 +566,8 @@ export default function LandingPage() {
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-xl bg-sidebar-primary flex items-center justify-center">
-                  <Moon className="w-6 h-6 text-sidebar-primary-foreground" />
+                <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-sidebar-border shadow-sm shrink-0">
+                  <img src="/logo.png" alt="Logo Al Ausath" className="w-full h-full object-contain" />
                 </div>
                 <div>
                   <h3 className="font-bold text-sidebar-foreground">PP Al Ausath</h3>

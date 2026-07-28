@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { BookOpen, Users, GraduationCap, Shield, Star, Moon, ArrowLeft } from "lucide-react"
+import { BookOpen, Users, GraduationCap, Shield, Star, Moon, ArrowLeft, HeartHandshake, Award, Sparkles, Quote, MapPin } from "lucide-react"
 import { authService } from "@/lib/services/auth.service"
 import { useToast } from "@/hooks/use-toast"
 
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const { toast } = useToast()
 
   useEffect(() => {
+    document.title = "Login | Pesantren Al-Ausath"
     const checkExistingSession = async () => {
       try {
         const userData = await authService.me()
@@ -122,54 +123,66 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-sidebar text-sidebar-foreground flex-col justify-between p-12">
-        <div>
-          <Link href="/" className="inline-flex items-center gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors mb-8">
-            <ArrowLeft className="w-4 h-4" />
-            <span className="text-sm">Kembali ke Beranda</span>
+      <div className="hidden lg:flex lg:w-1/2 bg-sidebar text-sidebar-foreground flex-col justify-between p-10 relative overflow-hidden bg-gradient-to-br from-sidebar via-sidebar to-sidebar-accent/30">
+        {/* Subtle decorative glow */}
+        <div className="absolute -top-24 -left-24 w-96 h-96 bg-sidebar-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="relative z-10">
+          <Link href="/" className="inline-flex items-center gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground transition-colors mb-6 group">
+            <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+            <span className="text-sm font-medium">Kembali ke Beranda</span>
           </Link>
           
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-12 h-12 rounded-xl bg-sidebar-primary flex items-center justify-center">
-              <Moon className="w-7 h-7 text-sidebar-primary-foreground" />
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white p-1.5 flex items-center justify-center shadow-lg border border-sidebar-border/50 shrink-0">
+              <img src="/logo.png" alt="Logo Al Ausath" className="w-full h-full object-contain" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">e-Rapor Pesantren</h1>
-              <p className="text-sidebar-foreground/70 text-sm">Sistem Penilaian Digital</p>
+              <h1 className="text-xl font-bold tracking-tight">PONDOK PESANTREN AL-AUSATH</h1>
+              <p className="text-xs text-sidebar-foreground/70 flex items-center gap-1 mt-0.5">
+                <MapPin className="w-3 h-3 text-sidebar-primary" />
+                Karanganyar, Jawa Tengah
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-3xl font-bold leading-tight text-balance">
-              Kelola Nilai Santri dengan Mudah dan Efisien
+        <div className="space-y-6 relative z-10 my-auto py-6">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sidebar-primary/15 text-sidebar-primary text-xs font-semibold border border-sidebar-primary/20">
+              <Sparkles className="w-3.5 h-3.5" />
+              Pendidikan Islam & Akademik Terpadu
+            </div>
+            <h2 className="text-3xl font-bold leading-snug text-balance">
+              Mendidik Generasi Rabbani Berakhlaq Mulia & Berwawasan Global
             </h2>
-            <p className="mt-4 text-sidebar-foreground/80 leading-relaxed">
-              Sistem e-Rapor digital untuk pesantren modern. Mendukung jenjang PAUD hingga SMA dengan fitur lengkap untuk admin, guru, dan wali santri.
+            <p className="text-sm text-sidebar-foreground/80 leading-relaxed max-w-xl">
+              Pondok Pesantren Al-Ausath memadukan nilai-nilai keislaman, tahfidzul Qur'an, dan kurikulum akademik modern secara seimbang demi mencetak santri berprestasi dan beradab.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* 4 Pilar Pesantren */}
+          <div className="grid grid-cols-2 gap-3 pt-2">
             <FeatureCard
-              icon={<BookOpen className="w-5 h-5" />}
-              title="Multi Jenjang"
-              description="PAUD, TK, SD, SMP, SMA"
+              icon={<BookOpen className="w-4 h-4 text-sidebar-primary" />}
+              title="Tahfidz & Dirasah"
+              description="Pembinaan Al-Qur'an dan pemahaman ilmu syar'i."
             />
             <FeatureCard
-              icon={<Users className="w-5 h-5" />}
-              title="Multi Pengguna"
-              description="Admin, Guru, Wali Santri"
+              icon={<GraduationCap className="w-4 h-4 text-sidebar-primary" />}
+              title="Pendidikan Formal"
+              description="Kurikulum terpadu jenjang PAUD hingga SMA."
             />
             <FeatureCard
-              icon={<GraduationCap className="w-5 h-5" />}
-              title="Rapor Digital"
-              description="Cetak & unduh rapor"
+              icon={<HeartHandshake className="w-4 h-4 text-sidebar-primary" />}
+              title="Kemitraan Orang Tua"
+              description="Transparansi presensi, nilai & SPP realtime."
             />
             <FeatureCard
-              icon={<Shield className="w-5 h-5" />}
-              title="Aman & Terpercaya"
-              description="Data terenkripsi"
+              icon={<Award className="w-4 h-4 text-sidebar-primary" />}
+              title="Karakter & Adab"
+              description="Pembentukan akhlaqul karimah & kemandirian."
             />
           </div>
         </div>
@@ -186,8 +199,8 @@ export default function LoginPage() {
             </Link>
             
             <div className="flex items-center justify-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
-                <Moon className="w-6 h-6 text-primary-foreground" />
+              <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-border/50 shadow-sm shrink-0">
+                <img src="/logo.png" alt="Logo Al Ausath" className="w-full h-full object-contain" />
               </div>
               <div>
                 <h1 className="text-xl font-bold text-foreground">e-Rapor Pesantren</h1>
