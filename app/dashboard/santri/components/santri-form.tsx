@@ -35,6 +35,7 @@ export interface SantriFormState {
   kelurahan: string
   alamat_tinggal: string
   hobi: string
+  jumlah_saudara: number
   nomor_telepon: string
   alamat_email: string
   nama_ayah_kandung: string
@@ -89,6 +90,7 @@ const defaultState: SantriFormState = {
   kelurahan: "",
   alamat_tinggal: "",
   hobi: "",
+  jumlah_saudara: 0,
   nomor_telepon: "",
   alamat_email: "",
   nama_ayah_kandung: "",
@@ -143,6 +145,7 @@ const toSantriFormState = (initialData?: Partial<SantriFormState> | DataSantriAp
   kelurahan: toText(initialData?.kelurahan),
   alamat_tinggal: toText(initialData?.alamat_tinggal),
   hobi: toText(initialData?.hobi),
+  jumlah_saudara: Number(toText(initialData?.jumlah_saudara)),
   nomor_telepon: toText(initialData?.nomor_telepon),
   alamat_email: toText(initialData?.alamat_email),
   nama_ayah_kandung: toText(initialData?.nama_ayah_kandung),
@@ -207,6 +210,7 @@ export function santriFormToPayload(values: SantriFormState): DataSantriPayload 
     kelurahan: values.kelurahan.trim() || null,
     alamat_tinggal: values.alamat_tinggal.trim() || null,
     hobi: values.hobi.trim() || null,
+    jumlah_saudara: values.jumlah_saudara ? Number(values.jumlah_saudara) : null,
     nomor_telepon: values.nomor_telepon.trim() || null,
     alamat_email: values.alamat_email.trim() || null,
     nama_ayah_kandung: values.nama_ayah_kandung.trim() || null,
@@ -522,6 +526,10 @@ export function SantriForm({
                 <Label htmlFor="nama_wali">Nama Wali</Label>
                 <Input id="nama_wali" value={formData.nama_wali} onChange={(event) => updateField("nama_wali", event.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="jumlah_saudara">Jumlah Saudara</Label>
+                <Input id="jumlah_saudara" type="number" value={formData.jumlah_saudara} onChange={(event) => updateField("jumlah_saudara", event.target.value)} />
+              </div> 
             </CardContent>
           </Card>
 

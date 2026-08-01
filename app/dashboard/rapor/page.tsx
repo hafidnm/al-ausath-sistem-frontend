@@ -364,11 +364,11 @@ export default function RaporPage() {
                               {/* Rapor Header */}
                               <div className="border border-border rounded-lg p-6 bg-card">
                                 <div className="flex items-center justify-center gap-4 mb-4">
-                                  <div className="w-16 h-16 rounded-xl bg-primary flex items-center justify-center">
-                                    <Moon className="w-10 h-10 text-primary-foreground" />
+                                  <div className="w-16 h-16 rounded-xl bg-white p-1 flex items-center justify-center border border-border shadow-sm shrink-0">
+                                    <img src="/logo.png" alt="Logo Al-Ausath" className="w-full h-full object-contain" />
                                   </div>
                                   <div className="text-center">
-                                    <h3 className="text-xl font-bold text-foreground">PESANTREN NURUL ILMI</h3>
+                                    <h3 className="text-xl font-bold text-foreground">PESANTREN AL-AUSATH</h3>
                                     <p className="text-sm text-muted-foreground">Jl. Raya Pesantren No. 123, Jakarta</p>
                                     <p className="text-sm text-muted-foreground">Telp: (021) 12345678</p>
                                   </div>
