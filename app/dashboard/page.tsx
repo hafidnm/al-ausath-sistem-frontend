@@ -492,10 +492,10 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-              <Link href="/dashboard/validasi-presensi">
+              <Link href="/dashboard/presensi-guru">
                 <Button variant="outline" className="w-full mt-4 bg-transparent">
                   <ClipboardCheck className="w-4 h-4 mr-2" />
-                  Validasi Sekarang
+                  Kelola Presensi Guru
                 </Button>
               </Link>
             </CardContent>

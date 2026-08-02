@@ -237,7 +237,6 @@ const adminMenuItems: MenuItem[] = [
       { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
       { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
       { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
-      { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
     ],
   },
   {

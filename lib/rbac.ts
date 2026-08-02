@@ -122,10 +122,6 @@ export const routeWhitelist: RouteRule[] = [
     allowedRoles: ["Petugas Admin"],
   },
   {
-    prefix: "/dashboard/validasi-presensi",
-    allowedRoles: ["Petugas Admin"],
-  },
-  {
     prefix: "/dashboard/presensi-overview",
     allowedRoles: ["Petugas Admin"],
   },
