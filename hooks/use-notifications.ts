@@ -26,7 +26,7 @@ export function useNotifications(options?: { perPage?: number; onlyUnread?: bool
     mutationFn: (id: string) => notificationsService.markRead(id),
     onSuccess: (_data, id) => {
       // update cached notifications optimistically
-      queryClient.setQueryData<any>(queryKey, (old) => {
+      queryClient.setQueryData<any>(queryKey, (old: any) => {
         if (!old?.data) return old
         return {
           ...old,
@@ -40,7 +40,7 @@ export function useNotifications(options?: { perPage?: number; onlyUnread?: bool
   const markAllMutation = useMutation({
     mutationFn: () => notificationsService.markAllRead(),
     onSuccess: () => {
-      queryClient.setQueryData<any>(["notifications"], (old) => {
+      queryClient.setQueryData<any>(["notifications"], (old: any) => {
         if (!old?.data) return old
         return { ...old, data: old.data.map((n: NotificationItem) => ({ ...n, read_at: new Date().toISOString() })) }
       })

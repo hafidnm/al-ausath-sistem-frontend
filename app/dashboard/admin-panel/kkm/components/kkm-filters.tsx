@@ -56,16 +56,17 @@ export function KkmFilters({
 
     dataKelasMapelService.getAll({
       kode_unit: kodeUnitFromContext || undefined,
-      tahun_ajaran: selectedKodeTahun,
+      tahun_ajaran: selectedKodeTahun ?? undefined,
       status: "AKTIF",
-      per_page: "200",
+      per_page: 200,
     })
       .then(res => {
         if (!cancelled) {
           const kelasMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
           const mapelMap = new Map<string, { value: string; label: string; kode_unit?: string }>()
 
-          for (const item of res.data || []) {
+          const items = Array.isArray(res.data) ? res.data : []
+          for (const item of items) {
             const kodeKelas = item.kode_kelas ?? item.kelas?.kode_kelas
             const namaKelas = item.nama_kelas ?? item.kelas?.nama_kelas ?? kodeKelas
             const kodeMapel = item.kode_mapel ?? item.mapel?.kode_mapel ?? item.mata_pelajaran?.kode_mapel ?? item.mataPelajaran?.kode_mapel
@@ -102,10 +103,11 @@ export function KkmFilters({
         // Find all mapels that are actually assigned to this class
         dataKelasMapelService.getAll({
           kode_kelas: kodeKelas,
-          tahun_ajaran: selectedKodeTahun,
-          per_page: "200"
+          tahun_ajaran: selectedKodeTahun ?? undefined,
+          per_page: 200
         }).then(res => {
-          const mapelsForClass = Array.from(new Set(res.data.map(m => m.kode_mapel).filter(Boolean) as string[]))
+          const items = Array.isArray(res.data) ? res.data : []
+          const mapelsForClass = Array.from(new Set(items.map(m => m.kode_mapel).filter(Boolean) as string[]))
           onValidMapelsChange(mapelsForClass)
         })
       } else {
@@ -174,7 +176,7 @@ export function KkmFilters({
           <Select
             value={query || "all"}
             onValueChange={(val) => onQueryChange(val === "all" ? "" : val)}
-            disabled={isLoadingOptions || (kodeKelas && kodeKelas !== "all")}
+            disabled={isLoadingOptions || Boolean(kodeKelas && kodeKelas !== "all")}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder={

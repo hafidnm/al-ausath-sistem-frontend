@@ -22,11 +22,7 @@ export default function NilaiMapelNewPage() {
         <p className="text-muted-foreground">Simpan komponen tugas, ulangan, dan ujian akhir per mapel</p>
       </div>
 
-      <NilaiMapelForm
-        initialNomorInduk={nomorInduk}
-        onSubmit={handleSubmit}
-        onCancel={() => router.back()}
-      />
+      <NilaiMapelForm />
     </div>
   )
 }

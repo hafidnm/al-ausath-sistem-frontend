@@ -69,26 +69,26 @@ const toBoolean = (value: unknown): boolean | undefined => {
 }
 
 const extractList = (payload: unknown): ApiRecord[] => {
-  if (Array.isArray(payload)) return payload.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray(payload)) return (payload as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
   if (!payload || typeof payload !== "object") return []
 
-  const record = payload as ApiRecord
-  if (Array.isArray(record.data)) return record.data.filter((item): item is ApiRecord => !!item && typeof item === "object")
-  if (record.data && typeof record.data === "object" && Array.isArray((record.data as ApiRecord).data)) {
-    return (record.data as ApiRecord).data.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  const record = payload as Record<string, any>
+  if (Array.isArray(record.data)) return (record.data as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+  if (record.data && typeof record.data === "object" && Array.isArray(record.data.data)) {
+    return (record.data.data as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
   }
   if (record.data && typeof record.data === "object") {
-    const nested = record.data as ApiRecord
-    if (Array.isArray(nested.items)) return nested.items.filter((item): item is ApiRecord => !!item && typeof item === "object")
-    if (Array.isArray(nested.results)) return nested.results.filter((item): item is ApiRecord => !!item && typeof item === "object")
-    if (nested.data && typeof nested.data === "object" && Array.isArray((nested.data as ApiRecord).data)) {
-      return (nested.data as ApiRecord).data.filter((item): item is ApiRecord => !!item && typeof item === "object")
+    const nested = record.data
+    if (Array.isArray(nested.items)) return (nested.items as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+    if (Array.isArray(nested.results)) return (nested.results as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+    if (nested.data && typeof nested.data === "object" && Array.isArray(nested.data.data)) {
+      return (nested.data.data as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
     }
   }
-  if (Array.isArray(record.items)) return record.items.filter((item): item is ApiRecord => !!item && typeof item === "object")
-  if (Array.isArray(record.results)) return record.results.filter((item): item is ApiRecord => !!item && typeof item === "object")
-  if (Array.isArray((record as ApiRecord).rows)) return (record as ApiRecord).rows.filter((item): item is ApiRecord => !!item && typeof item === "object")
-  if (Array.isArray((record as ApiRecord).list)) return (record as ApiRecord).list.filter((item): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray(record.items)) return (record.items as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray(record.results)) return (record.results as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray(record.rows)) return (record.rows as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
+  if (Array.isArray(record.list)) return (record.list as any[]).filter((item: any): item is ApiRecord => !!item && typeof item === "object")
 
   return []
 }

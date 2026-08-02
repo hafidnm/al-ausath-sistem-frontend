@@ -30,11 +30,7 @@ export default function NilaiAkhlakNewPage() {
         <p className="text-muted-foreground">Masukkan nilai akhlak santri dengan format angka sederhana</p>
       </div>
 
-      <NilaiAkhlakForm
-        initialData={{ nomor_induk: nomorInduk, aspek: "AKHLAK" }}
-        onSubmit={handleSubmit}
-        onCancel={() => router.back()}
-      />
+      <NilaiAkhlakForm />
     </div>
   )
 }

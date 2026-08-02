@@ -40,6 +40,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { dataKelasService } from "@/lib/services/kelas.service"
@@ -64,6 +75,8 @@ import {
   Rows3,
   Search,
   BookCheck,
+  Info,
+  AlertTriangle,
 } from "lucide-react"
 
 interface SantriRow {
@@ -111,6 +124,7 @@ interface SantriFormData {
   status: string
   nama_wali: string
   hobi: string
+  jumlah_saudara: string | number
   nomor_telepon: string
   alamat_email: string
 }
@@ -123,6 +137,7 @@ const defaultForm: SantriFormData = {
   status: "AKTIF",
   nama_wali: "",
   hobi: "",
+  jumlah_saudara: "",
   nomor_telepon: "",
   alamat_email: "",
 }
@@ -181,9 +196,10 @@ const toPayload = (form: SantriFormData): DataSantriPayload => ({
   jenis_kelamin: form.jenis_kelamin || null,
   status: form.status || null,
   nama_wali: form.nama_wali || null,
+  hobi: form.hobi || null,
+  jumlah_saudara: (form.jumlah_saudara !== undefined && form.jumlah_saudara !== null && String(form.jumlah_saudara).trim() !== "") ? Number(form.jumlah_saudara) : null,
   nomor_telepon: form.nomor_telepon || null,
   alamat_email: form.alamat_email || null,
-  hobi: form.hobi || null,
 })
 
 const formatStatus = (status: string): string => {
@@ -271,6 +287,10 @@ export default function SantriPage() {
   const [isLulusDialogOpen, setIsLulusDialogOpen] = useState(false)
   const [tahunLulusInput, setTahunLulusInput] = useState(String(new Date().getFullYear()))
   const [lulusSingleTarget, setLulusSingleTarget] = useState<SantriRow | null>(null)
+
+  const [deleteSingleTarget, setDeleteSingleTarget] = useState<SantriRow | null>(null)
+  const [isSingleDeleteDialogOpen, setIsSingleDeleteDialogOpen] = useState(false)
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false)
 
   const rowsLimit = Number(rowsPerPage)
 
@@ -472,16 +492,21 @@ export default function SantriPage() {
     }
   }
 
-  const handleDelete = async (row: SantriRow) => {
-    const confirmed = window.confirm(`Hapus data santri ${row.namaLengkap}?`)
-    if (!confirmed) return
+  const openSingleDeleteDialog = (row: SantriRow) => {
+    setDeleteSingleTarget(row)
+    setIsSingleDeleteDialogOpen(true)
+  }
 
+  const confirmSingleDelete = async () => {
+    if (!deleteSingleTarget) return
     try {
-      const result = await dataSantriService.remove(row.id)
+      const result = await dataSantriService.remove(deleteSingleTarget.id)
       toast({
         title: "Berhasil",
         description: result.message || "Data santri berhasil dihapus.",
       })
+      setIsSingleDeleteDialogOpen(false)
+      setDeleteSingleTarget(null)
       void fetchRows()
     } catch (error) {
       toast({
@@ -530,18 +555,19 @@ export default function SantriPage() {
     }
   }
 
-  const handleBulkDelete = async () => {
+  const openBulkDeleteDialog = () => {
     if (selectedIds.length === 0) {
       toast({
         title: "Belum Ada Data Dipilih",
-        description: "Pilih minimal satu santri untuk aksi dihapus.",
+        description: "Pilih minimal satu santri untuk dihapus.",
+        variant: "destructive",
       })
       return
     }
+    setIsBulkDeleteDialogOpen(true)
+  }
 
-    const confirmed = window.confirm(`Hapus ${selectedIds.length} data santri terpilih?`)
-    if (!confirmed) return
-
+  const confirmBulkDelete = async () => {
     setIsBulkActionLoading(true)
     try {
       const results = await Promise.allSettled(selectedIds.map((id) => dataSantriService.remove(id)))
@@ -564,6 +590,7 @@ export default function SantriPage() {
         })
       }
 
+      setIsBulkDeleteDialogOpen(false)
       setSelectedIds([])
       await fetchRows()
     } finally {
@@ -681,14 +708,27 @@ export default function SantriPage() {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="nama_wali">Nama Wali</Label>
-        <Input
-          id="nama_wali"
-          placeholder="Nama wali"
-          value={data.nama_wali}
-          onChange={(event) => setData((prev) => ({ ...prev, nama_wali: event.target.value }))}
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="nama_wali">Nama Wali</Label>
+          <Input
+            id="nama_wali"
+            placeholder="Nama wali"
+            value={data.nama_wali}
+            onChange={(event) => setData((prev) => ({ ...prev, nama_wali: event.target.value }))}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="jumlah_saudara">Jumlah Saudara</Label>
+          <Input
+            id="jumlah_saudara"
+            type="number"
+            min={0}
+            placeholder="Contoh: 2"
+            value={data.jumlah_saudara}
+            onChange={(event) => setData((prev) => ({ ...prev, jumlah_saudara: event.target.value }))}
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -945,7 +985,7 @@ export default function SantriPage() {
             <Select
               defaultValue="aksi-massal"
               onValueChange={(value) => {
-                if (value === "hapus") void handleBulkDelete()
+                if (value === "hapus") openBulkDeleteDialog()
                 if (value === "lulus") openLulusDialog()
               }}
             >
@@ -1085,7 +1125,7 @@ export default function SantriPage() {
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(santri)}>
+                            <DropdownMenuItem className="text-destructive" onClick={() => openSingleDeleteDialog(santri)}>
                               <Trash2 className="mr-2 h-4 w-4" />
                               Hapus
                             </DropdownMenuItem>
@@ -1213,7 +1253,7 @@ export default function SantriPage() {
                 placeholder="Contoh: 2025"
               />
             </div>
-            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800">
+            <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-300">
               Status santri akan berubah menjadi <strong>LULUS</strong> dan tahun lulus akan dicatat. Aksi ini bisa dibatalkan dari halaman Santri Lulus.
             </div>
           </div>
@@ -1229,6 +1269,48 @@ export default function SantriPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Modal Hapus Tunggal */}
+      <AlertDialog open={isSingleDeleteDialogOpen} onOpenChange={setIsSingleDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Konfirmasi Hapus Santri
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus data santri <strong className="text-foreground">{deleteSingleTarget?.namaLengkap}</strong> (Nomor Induk: {deleteSingleTarget?.nomorInduk})? Data yang dihapus dapat dipulihkan melalui menu Riwayat Hapus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeleteSingleTarget(null)}>Batal</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={confirmSingleDelete}>
+              Hapus Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Modal Hapus Massal */}
+      <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Konfirmasi Hapus Massal
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Apakah Anda yakin ingin menghapus <strong className="text-foreground">{selectedIds.length} santri</strong> yang dipilih? Data dapat dipulihkan dari menu Riwayat Hapus.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={confirmBulkDelete} disabled={isBulkActionLoading}>
+              {isBulkActionLoading ? "Memproses..." : "Hapus Terpilih"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

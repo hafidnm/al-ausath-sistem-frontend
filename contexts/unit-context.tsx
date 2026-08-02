@@ -65,7 +65,7 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
           try {
             const saved: DataUnitApiItem = JSON.parse(savedRaw)
             const stillExists = data.find(
-              (d) => (d.id_unit ?? d.id) === (saved.id_unit ?? saved.id)
+              (d: DataUnitApiItem) => (d.id_unit ?? d.id) === (saved.id_unit ?? saved.id)
             )
             if (stillExists) {
               setSelectedUnitState(stillExists)

@@ -77,6 +77,7 @@ const normalizeKkmItem = (raw: any): KkmItem => {
   const rawId = raw?.id ?? raw?.id_kkm ?? raw?.idKkm
 
   return {
+    id_kkm: rawId ?? toNumber(rawId, -1),
     id: toNumber(rawId, -1),
     kode_mapel: toText(raw.kode_mapel) ?? "",
     mapel: normalizeMapel(raw),

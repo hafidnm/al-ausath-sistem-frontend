@@ -12,20 +12,7 @@ interface ScoreDistributionProps {
   loading: boolean
 }
 
-interface DistributionRange {
-  label: string
-  color: string
-  key: keyof Omit<ScoreDistribution, 'kode_kelas' | 'nama_kelas' | 'kode_mapel' | 'nama_mapel' | 'total_santri'>
-}
-
 export function ScoreDistributionSection({ data, loading }: ScoreDistributionProps) {
-  const ranges: DistributionRange[] = [
-    { label: '90-100', color: 'bg-green-500', key: 'rentang_90_100' },
-    { label: '80-89', color: 'bg-blue-500', key: 'rentang_80_89' },
-    { label: '70-79', color: 'bg-yellow-500', key: 'rentang_70_79' },
-    { label: '60-69', color: 'bg-orange-500', key: 'rentang_60_69' },
-    { label: '<60', color: 'bg-red-500', key: 'rentang_bawah_60' },
-  ]
 
   if (loading) {
     return (

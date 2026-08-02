@@ -77,7 +77,7 @@ export function RaporFiltersCard({
             value: k.kode_kelas ?? "",
             label: k.nama_kelas ?? k.kode_kelas ?? "",
             kode_unit: k.kode_unit,
-            jenjang: k.jenjang,
+            jenjang: (k as any).jenjang,
           })));
         }
       } catch (err) {

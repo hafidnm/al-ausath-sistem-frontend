@@ -214,7 +214,6 @@ type MenuItem = {
 
 const adminMenuItems: MenuItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard/admin-panel" },
-  { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
   {
     icon: Building2,
     label: "Data Master",
@@ -231,15 +230,30 @@ const adminMenuItems: MenuItem[] = [
       { icon: Calendar, label: "Tahun Ajaran", href: "/dashboard/tahun-ajaran" },
     ]
   },
+  {
+    icon: UserCheck,
+    label: "Presensi",
+    subItems: [
+      { icon: BarChart3, label: "Overview Presensi", href: "/dashboard/presensi-overview" },
+      { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
+      { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
+      { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
+    ],
+  },
+  {
+    icon: ClipboardList,
+    label: "Penilaian & Rapor",
+    subItems: [
+      { icon: ClipboardList, label: "Input Nilai Mapel", href: "/dashboard/admin-panel/nilai-mapel" },
+      { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
+      { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
+      { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
+      { icon: BookMarked, label: "Bobot Nilai", href: "/dashboard/admin-panel/bobot" },
+      { icon: TrendingUp, label: "Rangking Kelas", href: "/dashboard/admin-panel/rangking" },
+    ],
+  },
   { icon: Star, label: "Ekstrakurikuler", href: "/dashboard/ekskul" },
   { icon: ListChecks, label: "Rekap Pendaftar Ekskul", href: "/dashboard/ekskul-rekap" },
-  { icon: UserCheck, label: "Presensi Santri", href: "/dashboard/presensi-santri" },
-  { icon: ClipboardCheck, label: "Presensi Guru", href: "/dashboard/presensi-guru" },
-  { icon: CheckCircle, label: "Validasi Presensi", href: "/dashboard/validasi-presensi" },
-  { icon: ClipboardList, label: "Input Nilai", href: "/dashboard/admin-panel/nilai-mapel" },
-  { icon: ClipboardList, label: "Nilai Akhlak", href: "/dashboard/admin-panel/nilai-akhlak" },
-  { icon: ClipboardList, label: "KKM", href: "/dashboard/admin-panel/kkm" },
-  { icon: FileText, label: "Rapor", href: "/dashboard/admin-panel/rapor" },
   { icon: TrendingUp, label: "Analitik", href: "/dashboard/analitik" },
   { icon: UserPlus, label: "PPDB", href: "/dashboard/ppdb" },
   {
@@ -384,6 +398,14 @@ export default function DashboardLayout({
   const router = useRouter()
   const currentTitle = getPageTitle(pathname)
 
+  const effectiveRoles: string[] = role === "santri"
+    ? ["santri"]
+    : (Array.isArray(user?.peran_akun)
+        ? user.peran_akun.flat().map(String)
+        : (user?.peran_akun ? [String(user.peran_akun)] : []))
+
+  const logoHref = effectiveRoles.length > 0 ? getRoleHome(effectiveRoles) : "/dashboard"
+
   useEffect(() => {
     if (currentTitle) {
       document.title = `${currentTitle} | Pesantren Al-Ausath`
@@ -503,7 +525,7 @@ export default function DashboardLayout({
         <div className="flex flex-col h-full">
           {/* Sidebar Header */}
           <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-            <Link href="/dashboard" className="flex items-center gap-3">
+            <Link href={logoHref} className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center border border-border/20 shadow-sm shrink-0">
                 <img src="/logo.png" alt="Logo Al-Ausath" className="w-full h-full object-contain" />
               </div>
@@ -641,7 +663,6 @@ export default function DashboardLayout({
                 </Button>
               )}
               <div className="flex items-center gap-2.5">
-                <img src="/logo.png" alt="Logo Al-Ausath" className="w-7 h-7 object-contain shrink-0" />
                 <h2 className="font-semibold text-foreground">
                   {currentTitle}
                 </h2>

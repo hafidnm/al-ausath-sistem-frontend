@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { AlertTriangle } from "lucide-react"
+import { AlertTriangle, Info } from "lucide-react"
 import { dataKelasService } from "@/lib/services/kelas.service"
 import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { useUnit } from "@/contexts/unit-context"
@@ -210,7 +210,7 @@ export function santriFormToPayload(values: SantriFormState): DataSantriPayload 
     kelurahan: values.kelurahan.trim() || null,
     alamat_tinggal: values.alamat_tinggal.trim() || null,
     hobi: values.hobi.trim() || null,
-    jumlah_saudara: values.jumlah_saudara ? Number(values.jumlah_saudara) : null,
+    jumlah_saudara: (values.jumlah_saudara !== undefined && values.jumlah_saudara !== null && String(values.jumlah_saudara).trim() !== "") ? Number(values.jumlah_saudara) : null,
     nomor_telepon: values.nomor_telepon.trim() || null,
     alamat_email: values.alamat_email.trim() || null,
     nama_ayah_kandung: values.nama_ayah_kandung.trim() || null,
@@ -302,6 +302,11 @@ export function SantriForm({
 
     if (!formData.nomor_induk.trim() || !formData.nama_lengkap_santri.trim() || !formData.kode_kelas.trim()) {
       setError("Nomor induk, nama lengkap, dan kelas wajib diisi.")
+      return
+    }
+
+    if (formData.jumlah_saudara !== undefined && formData.jumlah_saudara !== null && String(formData.jumlah_saudara).trim() !== "" && Number(formData.jumlah_saudara) < 0) {
+      setError("Jumlah saudara tidak boleh bernilai negatif.")
       return
     }
 
@@ -528,7 +533,7 @@ export function SantriForm({
               </div>
               <div className="space-y-2">
                 <Label htmlFor="jumlah_saudara">Jumlah Saudara</Label>
-                <Input id="jumlah_saudara" type="number" value={formData.jumlah_saudara} onChange={(event) => updateField("jumlah_saudara", event.target.value)} />
+                <Input id="jumlah_saudara" type="number" min={0} value={formData.jumlah_saudara} onChange={(event) => updateField("jumlah_saudara", event.target.value)} />
               </div> 
             </CardContent>
           </Card>
@@ -555,7 +560,14 @@ export function SantriForm({
                 </div>
 
                 {accountData.create_account && (
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <>
+                    <Alert className="border-blue-200 bg-blue-50/50 text-blue-900 dark:border-blue-800/50 dark:bg-blue-950/20 dark:text-blue-200">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <AlertDescription className="text-xs text-blue-800/90 dark:text-blue-300">
+                        Akun ini akan langsung diaktifkan untuk login santri. Pastikan Nama Akun unik dan Password minimal 6 karakter.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label htmlFor="nama_akun">Nama Akun</Label>
                       <Input id="nama_akun" value={accountData.nama_akun} onChange={(event) => updateAccountField("nama_akun", event.target.value)} />
@@ -581,7 +593,8 @@ export function SantriForm({
                       <Input id="password_confirmation" type="password" value={accountData.password_confirmation} onChange={(event) => updateAccountField("password_confirmation", event.target.value)} />
                     </div>
                   </div>
-                )}
+                </>
+              )}
               </CardContent>
             </Card>
           )}

@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useToast } from "@/hooks/use-toast"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { DataSantriImportSummary, dataSantriService } from "@/lib/services/santri.service"
-import { ArrowLeft, CircleCheck, Download, Upload } from "lucide-react"
+import { ArrowLeft, CircleCheck, Download, Info, Upload } from "lucide-react"
 
 type PreviewRow = {
   nomor_induk: string
@@ -248,7 +249,15 @@ export default function SantriImportPage() {
       </div>
 
       <Card>
-        <CardContent className="space-y-8 p-6">
+        <CardContent className="space-y-6 p-6">
+          <Alert className="border-blue-200 bg-blue-50/50 text-blue-900 dark:border-blue-800/50 dark:bg-blue-950/20 dark:text-blue-200">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertTitle className="font-semibold text-blue-900 dark:text-blue-100">Petunjuk Impor Data Santri</AlertTitle>
+            <AlertDescription className="mt-1 text-xs leading-relaxed text-blue-800/90 dark:text-blue-300">
+              Pastikan berkas CSV/Excel Anda memiliki kolom header: <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">nomor_induk</code>, <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">nama_lengkap_santri</code>, <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">kode_kelas</code>, <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">jenis_kelamin</code> (L/P), <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">nama_wali</code>, dan <code className="rounded bg-blue-100 px-1 py-0.5 font-mono text-blue-900 dark:bg-blue-900/40 dark:text-blue-200">hobi</code>. Anda dapat mengunduh templat di bawah sebagai acuan.
+            </AlertDescription>
+          </Alert>
+
           <div className="space-y-4">
             <p className="text-2xl text-foreground">Silakan unduh templat impor data santri:</p>
             <Button className="h-11 gap-2 px-5" onClick={handleDownloadTemplate}>

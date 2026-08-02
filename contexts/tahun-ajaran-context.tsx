@@ -62,7 +62,7 @@ export function TahunAjaranProvider({ children }: { children: React.ReactNode })
           try {
             const saved: TahunAjaranApiItem = JSON.parse(savedRaw)
             const stillExists = data.find(
-              (d) => (d.id_tahun_ajaran ?? d.id) === (saved.id_tahun_ajaran ?? saved.id)
+              (d: TahunAjaranApiItem) => (d.id_tahun_ajaran ?? d.id) === (saved.id_tahun_ajaran ?? saved.id)
             )
             if (stillExists) {
               setSelectedTahunAjaranState(stillExists)
@@ -75,7 +75,7 @@ export function TahunAjaranProvider({ children }: { children: React.ReactNode })
         }
 
         // Default: select the AKTIF year
-        const aktif = data.find((d) => d.status === "AKTIF")
+        const aktif = data.find((d: TahunAjaranApiItem) => d.status === "AKTIF")
         if (aktif) {
           setSelectedTahunAjaranState(aktif)
         } else if (data.length > 0) {
