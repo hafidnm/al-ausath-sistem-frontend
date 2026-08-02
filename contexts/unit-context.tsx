@@ -8,6 +8,7 @@ interface UnitContextType {
   selectedUnit: DataUnitApiItem | null
   selectedKodeUnit: string | null
   setSelectedUnit: (item: DataUnitApiItem | null) => void
+  refetchUnit: () => Promise<void>
   isLoading: boolean
 }
 
@@ -16,6 +17,7 @@ const UnitContext = createContext<UnitContextType>({
   selectedUnit: null,
   selectedKodeUnit: null,
   setSelectedUnit: () => {},
+  refetchUnit: async () => {},
   isLoading: true,
 })
 
@@ -26,68 +28,77 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedUnit = useCallback((item: DataUnitApiItem | null) => {
     setSelectedUnitState(item)
-    // Persist to sessionStorage so it survives page navigation
     if (item?.kode_unit) {
       sessionStorage.setItem("selected_unit", JSON.stringify(item))
     } else {
-      // null means "Semua Unit"
       sessionStorage.removeItem("selected_unit")
     }
   }, [])
 
-  useEffect(() => {
-    const fetchUnit = async () => {
-      try {
-        // Cek cache session dulu untuk menghindari request berulang
-        const cachedListRaw = sessionStorage.getItem("all_unit")
-        const savedRaw = sessionStorage.getItem("selected_unit")
-        
-        let data = []
-        if (cachedListRaw) {
-          try {
-            data = JSON.parse(cachedListRaw)
-            setAllUnit(data)
-          } catch {
-            data = []
-          }
-        }
-        
-        // Jika tidak ada cache, fetch dari API
-        if (data.length === 0) {
-          const res = await dataUnitService.getAll({ status: "AKTIF", per_page: 50 })
-          data = res.data
-          setAllUnit(data)
-          sessionStorage.setItem("all_unit", JSON.stringify(data))
-        }
+  const fetchUnit = useCallback(async () => {
+    try {
+      // 1. Initial quick load from cache
+      const cachedListRaw = sessionStorage.getItem("all_unit")
+      const savedRaw = sessionStorage.getItem("selected_unit")
+      let initialSaved: DataUnitApiItem | null = null
 
-        // Try to restore previous selection from sessionStorage
-        if (savedRaw) {
-          try {
-            const saved: DataUnitApiItem = JSON.parse(savedRaw)
-            const stillExists = data.find(
-              (d: DataUnitApiItem) => (d.id_unit ?? d.id) === (saved.id_unit ?? saved.id)
-            )
-            if (stillExists) {
-              setSelectedUnitState(stillExists)
-              setIsLoading(false)
-              return
-            }
-          } catch {
-            // Ignore parse errors
-          }
+      if (savedRaw) {
+        try {
+          initialSaved = JSON.parse(savedRaw)
+        } catch {
+          initialSaved = null
         }
-
-        // Default: no unit selected = "Semua Unit"
-        setSelectedUnitState(null)
-      } catch (err) {
-        console.error("Gagal mengambil data unit:", err)
-      } finally {
-        setIsLoading(false)
       }
-    }
 
-    fetchUnit()
+      if (cachedListRaw) {
+        try {
+          const cachedData: DataUnitApiItem[] = JSON.parse(cachedListRaw)
+          if (cachedData.length > 0) {
+            setAllUnit(cachedData)
+            if (initialSaved) {
+              const matched = cachedData.find(
+                (d) => (d.id_unit ?? d.id) === (initialSaved?.id_unit ?? initialSaved?.id) || d.kode_unit === initialSaved?.kode_unit
+              )
+              if (matched) setSelectedUnitState(matched)
+            }
+          }
+        } catch {
+          // Ignore cache parse error
+        }
+      }
+
+      // 2. Always fetch fresh data from API
+      const res = await dataUnitService.getAll({ status: "AKTIF", per_page: 50 })
+      const freshData = res.data ?? []
+
+      setAllUnit(freshData)
+      sessionStorage.setItem("all_unit", JSON.stringify(freshData))
+
+      // 3. Update active selection with fresh data
+      if (initialSaved) {
+        const stillExists = freshData.find(
+          (d: DataUnitApiItem) =>
+            (d.id_unit ?? d.id) === (initialSaved?.id_unit ?? initialSaved?.id) ||
+            d.kode_unit === initialSaved?.kode_unit
+        )
+        if (stillExists) {
+          setSelectedUnitState(stillExists)
+          sessionStorage.setItem("selected_unit", JSON.stringify(stillExists))
+          return
+        }
+      }
+
+      setSelectedUnitState(null)
+    } catch (err) {
+      console.error("Gagal mengambil data unit:", err)
+    } finally {
+      setIsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    void fetchUnit()
+  }, [fetchUnit])
 
   const selectedKodeUnit = selectedUnit?.kode_unit ?? null
 
@@ -98,6 +109,7 @@ export function UnitProvider({ children }: { children: React.ReactNode }) {
         selectedUnit,
         selectedKodeUnit,
         setSelectedUnit,
+        refetchUnit: fetchUnit,
         isLoading,
       }}
     >

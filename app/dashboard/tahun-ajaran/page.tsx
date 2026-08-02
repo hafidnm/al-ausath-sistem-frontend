@@ -35,6 +35,7 @@ import {
   TahunAjaranListParams,
   BackendYearStatus,
 } from "@/lib/services/tahun-ajaran.service"
+import { useTahunAjaran } from "@/contexts/tahun-ajaran-context"
 import { ArrowUpDown, ChevronDown, Filter, MoreVertical, PencilLine, PlusCircle, Trash2 } from "lucide-react"
 
 type YearStatus = "Aktif" | "Nonaktif"
@@ -110,6 +111,7 @@ const getErrorMessage = (error: unknown, fallback: string): string => {
 
 export default function TahunAjaranPage() {
   const { toast } = useToast()
+  const { refetchTahunAjaran } = useTahunAjaran()
 
   const [yearRows, setYearRows] = useState<YearRow[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -271,6 +273,7 @@ export default function TahunAjaranPage() {
         setFormData(defaultFormState)
         setIsAddDialogOpen(false)
         await fetchYears()
+        void refetchTahunAjaran()
       } catch (error) {
         toast({
           title: "Gagal",
@@ -307,6 +310,7 @@ export default function TahunAjaranPage() {
         setEditingId(null)
         setEditingFormData(defaultFormState)
         await fetchYears()
+        void refetchTahunAjaran()
       } catch (error) {
         toast({
           title: "Gagal",
@@ -348,6 +352,7 @@ export default function TahunAjaranPage() {
 
         setSelectedIds([])
         await fetchYears()
+        void refetchTahunAjaran()
       } catch (error) {
         toast({
           title: "Gagal",
@@ -377,6 +382,7 @@ export default function TahunAjaranPage() {
 
         setSelectedIds([])
         await fetchYears()
+        void refetchTahunAjaran()
       } catch (error) {
         toast({
           title: "Gagal",
@@ -402,6 +408,7 @@ export default function TahunAjaranPage() {
           description: "Data tahun ajaran berhasil dihapus.",
         })
         await fetchYears()
+        void refetchTahunAjaran()
       } catch (error) {
         toast({
           title: "Gagal",
