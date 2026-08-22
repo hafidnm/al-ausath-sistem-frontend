@@ -58,6 +58,8 @@ import {
   BookMarked,
   Landmark,
   Building2 as UnitIcon,
+  Database,
+  HardDrive,
 } from "lucide-react"
 import NotificationsBell from "@/components/notifications/notifications-bell"
 
@@ -266,6 +268,13 @@ const adminMenuItems: MenuItem[] = [
       { icon: Landmark, label: "Rekening Bank", href: "/dashboard/admin-panel/rekening" },
       { icon: Megaphone, label: "Pengumuman", href: "/dashboard/pengumuman" },
       { icon: Building2, label: "Profil Web", href: "/dashboard/admin-panel/profil-web" },
+    ],
+  },
+  {
+    icon: HardDrive,
+    label: "Pengaturan Sistem",
+    subItems: [
+      { icon: Database, label: "Backup Database", href: "/dashboard/admin-panel/backup" },
     ],
   },
 ]
