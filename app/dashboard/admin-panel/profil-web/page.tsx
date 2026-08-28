@@ -17,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Loader2, Plus, Trash2, Save, AlertTriangle } from "lucide-react"
+import { Loader2, Plus, Trash2, Save, AlertTriangle, ExternalLink } from "lucide-react"
 
 export default function ProfilWebPage() {
   const { toast } = useToast()
@@ -188,6 +188,65 @@ export default function ProfilWebPage() {
           Tambah Jenjang Baru
         </Button>
       </div>
+
+      {/* ── Pengaturan Global (Artikel) ────────────────────────────────────────── */}
+      {profiles.length > 0 && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Pengaturan Global</CardTitle>
+            <CardDescription>Pengaturan ini berlaku untuk seluruh landing page pesantren.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Link Website Artikel</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                URL website artikel pesantren yang akan muncul di navbar halaman utama. Kosongkan jika tidak ingin menampilkan menu Artikel.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                <div className="flex-1 w-full flex gap-2">
+                  <Input
+                    type="url"
+                    placeholder="https://artikel.pesantren.com"
+                    value={
+                      (profiles.find(p => p.tipe.toUpperCase() === "UMUM") || profiles[0])?.artikel_url || ""
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setProfiles(prev => {
+                        const targetProfile = prev.find(p => p.tipe.toUpperCase() === "UMUM") || prev[0];
+                        if (!targetProfile) return prev;
+                        return prev.map(p => p.id_profil === targetProfile.id_profil ? { ...p, artikel_url: val } : p);
+                      });
+                    }}
+                  />
+                  {(profiles.find(p => p.tipe.toUpperCase() === "UMUM") || profiles[0])?.artikel_url && (
+                    <a
+                      href={(profiles.find(p => p.tipe.toUpperCase() === "UMUM") || profiles[0])?.artikel_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center shrink-0 w-10 h-10 rounded-md border border-input bg-background hover:bg-muted"
+                      title="Buka link"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+                <Button 
+                  onClick={() => {
+                    const target = profiles.find(p => p.tipe.toUpperCase() === "UMUM") || profiles[0];
+                    if (target) handleUpdate(target);
+                  }} 
+                  disabled={saving}
+                  className="w-full sm:w-auto shrink-0"
+                >
+                  {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Simpan Tautan
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="mb-4 flex flex-wrap h-auto">

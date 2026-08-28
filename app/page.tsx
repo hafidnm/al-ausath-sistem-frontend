@@ -34,6 +34,7 @@ export default function LandingPage() {
 
   const [jenjangProfiles, setJenjangProfiles] = React.useState<any[]>([])
   const [profilLoading, setProfilLoading] = React.useState(true)
+  const [artikelUrl, setArtikelUrl] = React.useState<string | null>(null)
 
   const [publicUnits, setPublicUnits] = React.useState<any[]>([])
 
@@ -62,11 +63,17 @@ export default function LandingPage() {
     const loadProfilWeb = async () => {
       setProfilLoading(true)
       try {
-        // Fetch from API
         const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/profil-web')
         const data = await response.json()
         if (isMounted && data.data) {
           setJenjangProfiles(data.data)
+          // Ambil artikel_url dari profil UMUM (atau profil pertama yang punya nilai)
+          const umum = (data.data as any[]).find(
+            (p: any) => p.tipe === 'UMUM' || p.tipe === 'umum'
+          ) ?? (data.data as any[])[0]
+          if (umum?.artikel_url) {
+            setArtikelUrl(umum.artikel_url)
+          }
         }
       } catch (error) {
         console.error("Failed to load profil web", error)
@@ -127,6 +134,20 @@ export default function LandingPage() {
               <Link href="#location" className="text-sm font-medium text-foreground hover:text-primary transition-colors">
                 Lokasi
               </Link>
+              <a
+                href={artikelUrl || "#"}
+                target={artikelUrl ? "_blank" : undefined}
+                rel={artikelUrl ? "noopener noreferrer" : undefined}
+                className="text-sm font-medium text-foreground hover:text-primary transition-colors"
+                onClick={(e) => {
+                  if (!artikelUrl) {
+                    e.preventDefault();
+                    alert("Link artikel belum diatur oleh admin.");
+                  }
+                }}
+              >
+                Artikel
+              </a>
             </div>
 
             <div className="flex items-center gap-3">

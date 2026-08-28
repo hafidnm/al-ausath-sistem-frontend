@@ -10,6 +10,7 @@ export interface ProfilWeb {
   sejarah: string
   program_unggulan: string[]
   fasilitas: string[]
+  artikel_url?: string  // URL website artikel pesantren yang sudah ada
 }
 
 export const profilWebService = {
